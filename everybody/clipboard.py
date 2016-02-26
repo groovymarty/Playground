@@ -5,6 +5,15 @@ recentPeople = []
 
 def recent_people():
     return recentPeople
+  
+def recent_people_inst_ids():
+    return [t[0] for t in recentPeople]
+  
+def recent_people_labels():
+    return [t[1] for t in recentPeople]
+  
+def find_recent_person_by_label(label):
+    return next((t[0] for t in recentPeople if t[1] == label), '')
 
 def add_recent_person(person):
     global recentPeople
