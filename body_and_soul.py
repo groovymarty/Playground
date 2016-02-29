@@ -19,6 +19,8 @@ Therefore soul.save() can assume soul has been loaded.
 Default soul methods are for testing and illustration only.
 """
 
+from basic_services import log_debug
+
 class Body:
     defaultValues = {}
     checkers = {}
@@ -36,14 +38,18 @@ class Body:
         return dup
 
     def load(self, version='current', check=True):
-        self.soul.load(self.defaultValues, version)
+        log_debug("Body.load", "Loading {} {}".format(self.instId, version))
+        freshLoad = self.soul.load(self.defaultValues, version)
         self.newValues.clear()
         self.protoValues.clear()
-        self.post_load()
-        if check:
-            # Check and silently update soul.values on loading
-            # Leave bad values in place and save exceptions in self.valueErrors
-            self.valueErrors.clear()
+        self.valueErrors.clear()
+        # Do post-load processing on initial load
+        if freshLoad:
+            self.post_load()
+        # Check and silently update soul.values on loading
+        # This takes care of minor things like stripping white space from strings
+        # Leave bad values in place and save exceptions in self.valueErrors
+        if freshLoad or check:
             for key, checker in self.checkers.items():
                 if key in self.soul.values:
                     try:
@@ -60,6 +66,7 @@ class Body:
         pass
 
     def save(self, version='advance'):
+        log_debug("Body.save", "Saving {} {}".format(self.instId, version))
         if self.soul.values is None:
             self.soul.load(self.defaultValues)
         # Fold protoValues into newValues
@@ -253,6 +260,9 @@ class Soul:
     def load(self, defaultValues, version='current'):
         if self.values is None or version != 'current':
             self.values = defaultValues.copy()
+            return True #Really did pretend to load
+        else:
+            return False #Already loaded
 
     # save has two steps
     # step 1, update values with newValues

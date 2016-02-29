@@ -2,6 +2,7 @@
 
 from body_and_soul import Body
 from basic_data import checkers, gender, us_state, maritalstatus, phone, date
+from basic_services import log_error
 
 class Person(Body):
     # Note all phone numbers are included here, so they exist even if address counterpart does not
@@ -48,7 +49,8 @@ class Person(Body):
     }
 
     # Relationships
-    relatKeys = 'father', 'mother', 'husband', 'wife'
+    simpleRelats = 'father', 'mother', 'husband', 'wife'
+    indexedRelats = 'parent', 'child', 'son', 'daughter'
     relatNames = {
         'father': "Father",
         'mother': "Mother",
@@ -109,23 +111,37 @@ class Person(Body):
     def make_flavored(flavor, d):
         return {Person.join_key(flavor, key): value for key, value in d.items()}
 
-    # Fill in missing defaults for all existing address flavors
-    # But don't add any new address flavors
     def post_load(self):
+        # Fill in missing defaults for all existing address flavors
+        # But don't add any new address flavors
         for flavor, sentinelKey in self.addrSentinelKeys.items():
             if sentinelKey in self.soul.values:
                 self.soul.values.update((key, value) for key, value in self.addrDefaultsByFlavor[flavor].items()
                                         if not key in self.soul.values)
+        # Count indexed relationships
+        maximums = {self.maxIndexKeys[relat]: 0 for relat in self.indexedRelats}
+        for key in self.soul.values:
+            if key not in self.keyToAddrFlavor and "." in key:
+                relat, index = key.split(".", 2)
+                if relat in self.indexedRelats:
+                    maxKey = self.maxIndexKeys[relat]
+                    try:
+                        index = int(index)
+                        if index > maximums[maxKey]:
+                            maximums[maxKey] = index
+                    except ValueError:
+                        log_error("person.post_load: index is not a number, ignoring: {}".format(key))
+        self.soul.values.update(maximums)
 
-    # If an address flavor (other than home) is all defaults, remove it before saving to storage
-    # Also remove deleted relationships
     def pre_save(self):
+        # If an address flavor (other than home) is all defaults, remove it before saving to storage
         for flavor, sentinelKey in self.addrSentinelKeys.items():
             if sentinelKey in self.soul.values and flavor != 'home':
                 if all(self.soul.values[key] == value for key, value in self.addrDefaultsByFlavor[flavor].items()):
                     for key in self.addrKeysByFlavor[flavor]:
                         del self.soul.values[key]
-        for relatKey in self.relatKeys:
+        # Remove deleted relationships
+        for relatKey in self.simpleRelats:
             if relatKey in self.soul.values and self.soul.values[relatKey] is None:
                 del self.soul.values[relatKey]
 
@@ -239,3 +255,6 @@ for flavor in Person.addrFlavors:
 
 # Mapping from key to address flavor, for example 'home.addrLine1' maps to 'home'
 Person.keyToAddrFlavor = {key: flavor for flavor, d in Person.addrKeysByFlavor.items() for key in d}
+
+# Max index key for each indexed relationship
+Person.maxIndexKeys = {relat: relat+"_N" for relat in Person.indexedRelats}

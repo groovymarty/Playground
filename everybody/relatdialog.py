@@ -13,9 +13,9 @@ class RelatDialog(simpledialog.Dialog, WidgetHelper):
         self.personInstId = ''
         ttk.Label(master, text="Relationship").grid(row=0, column=0, sticky=(N,W))
         self.relatCbx = ttk.Combobox(master,
-                                     values=[Person.relatNames[relat] for relat in Person.relatKeys])
+                                     values=[Person.relatNames[relat] for relat in Person.simpleRelats])
         self.relatCbx.grid(row=0, column=1, sticky=(N,W,E))
-        ttk.Label(master, text="Person").grid(row=1, column=0)
+        ttk.Label(master, text="Person").grid(row=1, column=0, sticky=(N,W))
         self.personCbx = ttk.Combobox(master, width=30,
                                       values=clipboard.recent_people_labels())
         self.personCbx.grid(row=1, column=1, sticky=(N,W,E))

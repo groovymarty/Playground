@@ -44,6 +44,9 @@ class Variant:
                 except ValueError as e:
                     self.loadErrorMsg = "Error reading {}: {}".format(self.fileName, str(e))
                     log_error("FileCity:", self.loadErrorMsg)
+            return True #Freshly loaded, or at least tried to
+        else:
+            return False #Already loaded
 
     def save(self, label=""):
         if self.values is not None:
@@ -67,8 +70,9 @@ class FileCitySoul(Soul):
     def load(self, defaultValues, version='current'):
         if version != 'current':
             self.curVariant = self.inst.find_variant(version, self.curVariant)
-        self.curVariant.load(defaultValues)
+        freshLoad = self.curVariant.load(defaultValues)
         self.values = self.curVariant.values
+        return freshLoad
 
     # save has two steps
     # step 1, find variant that we want to save into, and update its values with newValues

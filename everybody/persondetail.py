@@ -353,7 +353,7 @@ class PersonDetail(ttk.Frame, WidgetGarden):
     def load_relats(self):
         self.relatTree.delete(*self.relatTree.get_children())
         if self.person is not None:
-            for relat in Person.relatKeys:
+            for relat in Person.simpleRelats:
                 who = self.person.get_value(relat)
                 if who is not None:
                     self.relatTree.insert('', END, iid=relat, text=Person.relatNames[relat], values=who)
