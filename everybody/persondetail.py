@@ -5,6 +5,7 @@ from tkinter import ttk
 from tkinter import messagebox, simpledialog
 from everybody import services, clipboard
 from everybody.person import Person
+from everybody.relat import Relat
 from everybody.relatdialog import RelatDialog
 from basic_data import gender, us_state, maritalstatus
 from basic_services import log_debug, log_error
@@ -353,10 +354,10 @@ class PersonDetail(ttk.Frame, WidgetGarden):
     def load_relats(self):
         self.relatTree.delete(*self.relatTree.get_children())
         if self.person is not None:
-            for relat in Person.simpleRelats:
+            for relat in Relat.simpleRelats:
                 who = self.person.get_value(relat)
                 if who is not None:
-                    self.relatTree.insert('', END, iid=relat, text=Person.relatNames[relat], values=who)
+                    self.relatTree.insert('', END, iid=relat, text=Relat.relatNames[relat], values=who)
 
     def load_all(self):
         self.load_vars()
@@ -364,7 +365,8 @@ class PersonDetail(ttk.Frame, WidgetGarden):
         self.load_relats()
 
     def do_add_relat(self):
-        RelatDialog(services.tkRoot())
+        if self.person is not None:
+            RelatDialog(services.tkRoot(), self.person.generate_relats(extra=3))
 
     def do_discard(self):
         if self.person is not None:

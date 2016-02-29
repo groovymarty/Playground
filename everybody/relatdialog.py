@@ -5,15 +5,20 @@ from tkinter import ttk
 from tkinter import simpledialog
 from everybody import clipboard, services, personsearch
 from everybody.person import Person
+from everybody.relat import Relat
 from everybody.personsearch import PersonSearch
 from tkit.widgethelper import WidgetHelper
 
 class RelatDialog(simpledialog.Dialog, WidgetHelper):
+    def __init__(self, parent, genRelats1):
+        self.genRelats = genRelats1
+        simpledialog.Dialog.__init__(self, parent)
+
     def body(self, master):
         self.personInstId = ''
         ttk.Label(master, text="Relationship").grid(row=0, column=0, sticky=(N,W))
         self.relatCbx = ttk.Combobox(master,
-                                     values=[Person.relatNames[relat] for relat in Person.simpleRelats])
+                                     values=[Relat.format_relat(key) for key in self.genRelats])
         self.relatCbx.grid(row=0, column=1, sticky=(N,W,E))
         ttk.Label(master, text="Person").grid(row=1, column=0, sticky=(N,W))
         self.personCbx = ttk.Combobox(master, width=30,

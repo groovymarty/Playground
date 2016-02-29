@@ -1,10 +1,11 @@
-# person
+# everybody.person
 
 from body_and_soul import Body
 from basic_data import checkers, gender, us_state, maritalstatus, phone, date
 from basic_services import log_error
+from everybody.relat import RelatHelper
 
-class Person(Body):
+class Person(Body, RelatHelper):
     # Note all phone numbers are included here, so they exist even if address counterpart does not
     defaultValues = {
         'namePrefix': "",
@@ -48,15 +49,6 @@ class Person(Body):
         'email': str.strip
     }
 
-    # Relationships
-    simpleRelats = 'father', 'mother', 'husband', 'wife'
-    indexedRelats = 'parent', 'child', 'son', 'daughter'
-    relatNames = {
-        'father': "Father",
-        'mother': "Mother",
-        'husband': "Husband",
-        'wife': "Wife"
-    }
     # Address flavors
     addrFlavors = 'home', 'work', 'seasonal', 'other'
     addrNames = {
@@ -118,20 +110,7 @@ class Person(Body):
             if sentinelKey in self.soul.values:
                 self.soul.values.update((key, value) for key, value in self.addrDefaultsByFlavor[flavor].items()
                                         if not key in self.soul.values)
-        # Count indexed relationships
-        maximums = {self.maxIndexKeys[relat]: 0 for relat in self.indexedRelats}
-        for key in self.soul.values:
-            if key not in self.keyToAddrFlavor and "." in key:
-                relat, index = key.split(".", 2)
-                if relat in self.indexedRelats:
-                    maxKey = self.maxIndexKeys[relat]
-                    try:
-                        index = int(index)
-                        if index > maximums[maxKey]:
-                            maximums[maxKey] = index
-                    except ValueError:
-                        log_error("person.post_load: index is not a number, ignoring: {}".format(key))
-        self.soul.values.update(maximums)
+        self.count_indexed_relats()
 
     def pre_save(self):
         # If an address flavor (other than home) is all defaults, remove it before saving to storage
@@ -140,10 +119,7 @@ class Person(Body):
                 if all(self.soul.values[key] == value for key, value in self.addrDefaultsByFlavor[flavor].items()):
                     for key in self.addrKeysByFlavor[flavor]:
                         del self.soul.values[key]
-        # Remove deleted relationships
-        for relatKey in self.simpleRelats:
-            if relatKey in self.soul.values and self.soul.values[relatKey] is None:
-                del self.soul.values[relatKey]
+        self.remove_deleted_relats()
 
     def build_name(self, lnf=False, punct=False, formal=False):
         words = []
@@ -188,8 +164,14 @@ class Person(Body):
     def sortName(self):
         return self.build_name(lnf=True)
 
+    def get_real_label(self):
+        return self.sortName
+
     def has_address(self, flavor):
         return self.has_value(self.addrSentinelKeys[flavor])
+
+    def is_ok_to_save(self):
+        return not any(key in self.valueErrors for key in ('firstName', 'lastName'))
 
     def touch_address(self, flavor):
         if not self.has_address(flavor):
@@ -230,12 +212,6 @@ class Person(Body):
                 lines.append(trailer)
         return lines
 
-    def get_real_label(self):
-        return self.sortName
-
-    def is_ok_to_save(self):
-        return not any(key in self.valueErrors for key in ('firstName', 'lastName'))
-
 # Add properties for all non-flavored fields
 Person.make_all_properties()
 
@@ -255,6 +231,3 @@ for flavor in Person.addrFlavors:
 
 # Mapping from key to address flavor, for example 'home.addrLine1' maps to 'home'
 Person.keyToAddrFlavor = {key: flavor for flavor, d in Person.addrKeysByFlavor.items() for key in d}
-
-# Max index key for each indexed relationship
-Person.maxIndexKeys = {relat: relat+"_N" for relat in Person.indexedRelats}
