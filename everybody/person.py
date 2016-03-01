@@ -1,11 +1,12 @@
 # everybody.person
 
 from body_and_soul import Body
+from bodyhelper import BodyHelper
 from basic_data import checkers, gender, us_state, maritalstatus, phone, date
 from basic_services import log_error
 from everybody.relat import RelatHelper
 
-class Person(Body, RelatHelper):
+class Person(Body, BodyHelper, RelatHelper):
     # Note all phone numbers are included here, so they exist even if address counterpart does not
     defaultValues = {
         'namePrefix': "",
@@ -94,14 +95,6 @@ class Person(Body, RelatHelper):
 
     # Mapping from key to address flavor, for example 'home.addrLine1' maps to 'home'
     keyToAddrFlavor = None
-
-    @staticmethod
-    def join_key(*parts):
-        return ".".join(parts)
-
-    @staticmethod
-    def make_flavored(flavor, d):
-        return {Person.join_key(flavor, key): value for key, value in d.items()}
 
     def post_load(self):
         # Fill in missing defaults for all existing address flavors

@@ -4,7 +4,6 @@ from tkinter import *
 from tkinter import ttk
 from tkinter import simpledialog
 from everybody import clipboard, services, personsearch
-from everybody.person import Person
 from everybody.relat import Relat
 from everybody.personsearch import PersonSearch
 from tkit.widgethelper import WidgetHelper
@@ -15,11 +14,13 @@ class RelatDialog(simpledialog.Dialog, WidgetHelper):
         simpledialog.Dialog.__init__(self, parent)
 
     def body(self, master):
-        self.personInstId = ''
+        self.relatKey = ""
+        self.personInstId = ""
         ttk.Label(master, text="Relationship").grid(row=0, column=0, sticky=(N,W))
         self.relatCbx = ttk.Combobox(master,
                                      values=[Relat.format_relat(key) for key in self.genRelats])
         self.relatCbx.grid(row=0, column=1, sticky=(N,W,E))
+        self.bind_combobox_big_change(self.relatCbx, self.on_relat_big_change)
         ttk.Label(master, text="Person").grid(row=1, column=0, sticky=(N,W))
         self.personCbx = ttk.Combobox(master, width=30,
                                       values=clipboard.recent_people_labels())
@@ -40,23 +41,37 @@ class RelatDialog(simpledialog.Dialog, WidgetHelper):
         self.message['style'] = self.join_style(modifier, 'TLabel')
         self.message['text'] = text
 
+    def update_message(self):
+        if self.personInstId:
+            self.set_message("(Selected: {})".format(self.personInstId))
+        else:
+            self.set_message("")
+
+    def on_relat_big_change(self, event):
+        try:
+            self.relatKey = Relat.check_relat(self.relatCbx.get())
+            self.relatCbx.set(Relat.format_relat(self.relatKey))
+            self.update_message()
+        except ValueError as e:
+            self.set_message(str(e), 'Error')
+
     def set_person(self, instId):
         if instId:
             person = services.database().lookup(instId)
             if person is not None:
                 self.personInstId = instId
                 self.personCbx.set(person.label)
-                self.set_message("(Selected: {})".format(instId))
                 clipboard.add_recent_person(person)
                 self.personCbx['values'] = clipboard.recent_people_labels()
+                self.update_message()
             else:
                 self.personInstId = ''
                 self.set_message("{} not found".format(instId), 'Error')
         else:
             self.personInstId = ''
             self.personCbx.set("")
-            self.set_message("")
-                          
+            self.update_message()
+
     def do_search(self):
         instId = PersonSearch(services.tkRoot()).result
         if instId:

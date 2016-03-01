@@ -1,5 +1,8 @@
 # everybody.relat
 
+from bodyhelper import BodyHelper
+from basic_services import log_error
+
 class Relat:
     simpleRelats = 'father', 'mother', 'husband', 'wife', 'spouse'
     indexedRelats = 'parent', 'child', 'son', 'daughter'
@@ -14,22 +17,63 @@ class Relat:
         'son': "Son",
         'daughter': "Daughter"
     }
-    maxIndexKeys = None #see below
+    # see below...
+    maxIndexKeys = None
+    ucNameToRelat = None
 
     @staticmethod            
     def format_relat(key):
-        if "." in key:
-            relat, index = key.split(".", 2)
+        if not key:
+            return ""
+        elif "." in key:
+            (relat, index) = key.split(".", 2)
             return "{} {}".format(Relat.relatNames[relat], index)
         else:
             return Relat.relatNames[key]
           
     @staticmethod
     def check_relat(value):
-        pass
+        # accept relat key names (dotted) as well as formatted ones (space separated)
+        if "." in value:
+            parts = value.strip().split(".", 2)
+        else:
+            # split used this way will split at whitespace and strip extra whitespace
+            parts = value.split(maxsplit=2)
+        if len(parts) == 0:
+            return ""
+        elif len(parts) == 1:
+            (name,) = parts
+            index = None
+        else:
+            (name, index) = parts
+        if name in Relat.relatNames:
+            # relat key names may be used if typed perfectly
+            relat = name
+        else:
+            ucName = name.upper()
+            if ucName in Relat.ucNameToRelat:
+                relat = Relat.ucNameToRelat[ucName]
+            else:
+                raise ValueError('"{}" is not a valid relationship'.format(value))
+        if index is None:
+            if relat in Relat.simpleRelats:
+                return relat
+            else:
+                raise ValueError("{} is not a simple relationship (index missing)".format(Relat.relatNames[relat]))
+        else:
+            if relat in Relat.indexedRelats:
+                try:
+                    i = int(index)
+                except ValueError:
+                    raise ValueError('"{}" is not a valid indexed relationship'.format(value))
+                if i > BodyHelper.maxIndex:
+                    raise ValueError('"{}" index is too high'.format(value))
+                return BodyHelper.join_key(relat, str(i))
+            else:
+                raise ValueError("{} is not an indexed relationship".format(Relat.relatNames[relat]))
 
-# Max index key for each indexed relationship
 Relat.maxIndexKeys = {relat: relat+"_N" for relat in Relat.indexedRelats}
+Relat.ucNameToRelat = {name.upper(): relat for relat, name in Relat.relatNames.items()}
 
 # Adds relationship methods to Person    
 class RelatHelper:
@@ -72,4 +116,3 @@ class RelatHelper:
             n = maximum
         for i in range(1, n+1):
             yield self.join_key(relat, str(i))
-
