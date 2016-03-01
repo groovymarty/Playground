@@ -108,6 +108,9 @@ class FileCitySoul(Soul):
             return variant.version
         else:
             return None
+          
+    def get_all_versions(self):
+        return (var.version for var in self.inst.variants)
 
     @staticmethod
     def format_version(version):
@@ -157,10 +160,7 @@ class Instance:
         elif version == 'advance_major':
             return self.add_next_major_version()
         else:
-            for var in self.variants:
-                if var.version == version:
-                    return var
-            return None
+            return next((var for var in self.variants if var.version == version), None)
 
     def get_previous(self, curVariant):
         i = self.variants.index(curVariant)

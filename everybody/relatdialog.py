@@ -15,26 +15,41 @@ class RelatDialog(simpledialog.Dialog, WidgetHelper):
 
     def body(self, master):
         self.relatKey = ""
-        self.personInstId = ""
-        ttk.Label(master, text="Relationship").grid(row=0, column=0, sticky=(N,W))
+        self.instId = ""
+        self.version = ""
+        
+        for row in range(0, 4):
+            master.rowconfigure(row, pad=10)
+        for column in range(0, 3):
+            master.columnconfigure(column, pad=10)
+
+        ttk.Label(master, text="Relationship").grid(row=0, column=0, sticky=W)
         self.relatCbx = ttk.Combobox(master,
                                      values=[Relat.format_relat(key) for key in self.genRelats])
-        self.relatCbx.grid(row=0, column=1, sticky=(N,W,E))
+        self.relatCbx.grid(row=0, column=1, sticky=(W,E))
         self.bind_combobox_big_change(self.relatCbx, self.on_relat_big_change)
-        ttk.Label(master, text="Person").grid(row=1, column=0, sticky=(N,W))
+
+        ttk.Label(master, text="Person").grid(row=1, column=0, sticky=W)
         self.personCbx = ttk.Combobox(master, width=30,
                                       values=clipboard.recent_people_labels())
-        self.personCbx.grid(row=1, column=1, sticky=(N,W,E))
+        self.personCbx.grid(row=1, column=1, sticky=(W,E))
         self.bind_combobox_big_change(self.personCbx, self.on_person_big_change)
+
         self.searchButton = ttk.Button(master, text="Search", command=self.do_search)
-        self.searchButton.grid(row=1, column=2, sticky=(N,W))
+        self.searchButton.grid(row=1, column=2, sticky=E)
+        
+        ttk.Label(master, text="Version").grid(row=2, column=0, sticky=W)
+        self.versionCbx = ttk.Combobox(master)
+        self.versionCbx.grid(row=2, column=1, sticky=(W,E))
+        self.bind_combobox_big_change(self.versionCbx, self.on_version_big_change)
+
         self.message = ttk.Label(master)
-        self.message.grid(row=2, column=0, columnspan=2, sticky=(N,W))
+        self.message.grid(row=3, column=0, columnspan=2, sticky=W)
         return self.relatCbx
 
     def buttonbox(self):
-        super().buttonbox()
-        # remove binding with OK button
+        simpledialog.Dialog.buttonbox(self)
+        # remove binding with OK button and Enter key
         self.unbind('<Return>')
         
     def set_message(self, text, modifier=''):
@@ -42,11 +57,41 @@ class RelatDialog(simpledialog.Dialog, WidgetHelper):
         self.message['text'] = text
 
     def update_message(self):
-        if self.personInstId:
-            self.set_message("(Selected: {})".format(self.personInstId))
+        if self.instId:
+            self.set_message("(Selected: {})".format(self.instId))
         else:
             self.set_message("")
 
+    def set_person(self, instId):
+        if instId:
+            person = services.database().lookup(instId)
+            if person is not None:
+                self.instId = instId
+                self.personCbx.set(person.label)
+                clipboard.add_recent_person(person)
+                self.personCbx['values'] = clipboard.recent_people_labels()
+                self.versionCbx['values'] = [person.format_version(ver) for ver in person.get_all_versions()]
+                self.versionCbx.set(person.format_version(person.version))
+                self.update_message()
+            else:
+                self.instId = ''
+                self.clear_versions()
+                self.set_message("{} not found".format(instId), 'Error')
+        else:
+            self.instId = ''
+            self.personCbx.set("")
+            self.clear_versions()
+            self.update_message()
+            
+    def clear_versions(self):
+            self.versionCbx['values'] = []
+            self.versionCbx.set("")
+
+    def do_search(self):
+        instId = PersonSearch(services.tkRoot()).result
+        if instId:
+            self.set_person(instId)          
+          
     def on_relat_big_change(self, event):
         try:
             self.relatKey = Relat.check_relat(self.relatCbx.get())
@@ -55,28 +100,6 @@ class RelatDialog(simpledialog.Dialog, WidgetHelper):
         except ValueError as e:
             self.set_message(str(e), 'Error')
 
-    def set_person(self, instId):
-        if instId:
-            person = services.database().lookup(instId)
-            if person is not None:
-                self.personInstId = instId
-                self.personCbx.set(person.label)
-                clipboard.add_recent_person(person)
-                self.personCbx['values'] = clipboard.recent_people_labels()
-                self.update_message()
-            else:
-                self.personInstId = ''
-                self.set_message("{} not found".format(instId), 'Error')
-        else:
-            self.personInstId = ''
-            self.personCbx.set("")
-            self.update_message()
-
-    def do_search(self):
-        instId = PersonSearch(services.tkRoot()).result
-        if instId:
-            self.set_person(instId)          
-          
     def on_person_big_change(self, event):
         label = self.personCbx.get().strip()
         if label:
@@ -90,10 +113,14 @@ class RelatDialog(simpledialog.Dialog, WidgetHelper):
                 if instId:
                     self.set_person(instId)
                 else:
-                    self.personInstId = ''
+                    self.instId = ''
+                    self.clear_versions()
                     self.set_message("{} not found".format(label), 'Error')               
         else:
-            self.set_person('')        
+            self.set_person('')
+            
+    def on_version_big_change(self, event):
+        pass
 
     def apply(self):
-        self.result = self.personInstId
+        self.result = self.instId

@@ -123,6 +123,9 @@ class Body:
 
     def get_version(self, version='current'):
         return self.soul.get_version(version)
+      
+    def get_all_versions(self):
+        return self.soul.get_all_versions()
 
     def format_version(self, version):
         return self.soul.format_version(version)
@@ -292,6 +295,9 @@ class Soul:
             return 1,0
         else:
             return None
+          
+    def get_all_versions(self):
+        return [(1,0)]
 
     @staticmethod
     def format_version(version):
