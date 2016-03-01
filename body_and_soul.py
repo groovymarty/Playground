@@ -300,3 +300,15 @@ class Soul:
     @staticmethod
     def is_same_minor_series(version1, version2):
         return version1[0] == version2[0]
+
+# Adds some methods for handling structured keys like "work.phone" and "child.3"
+class BodyHelper:
+    maxIndex = 100
+
+    @staticmethod
+    def join_key(*parts):
+        return ".".join(parts)
+
+    @staticmethod
+    def make_flavored(flavor, d):
+        return {BodyHelper.join_key(flavor, key): value for key, value in d.items()}

@@ -1,6 +1,6 @@
 # everybody.relat
 
-from bodyhelper import BodyHelper
+from body_and_soul import BodyHelper
 from basic_services import log_error
 
 class Relat:

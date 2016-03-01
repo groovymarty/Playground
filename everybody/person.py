@@ -1,7 +1,6 @@
 # everybody.person
 
-from body_and_soul import Body
-from bodyhelper import BodyHelper
+from body_and_soul import Body, BodyHelper
 from basic_data import checkers, gender, us_state, maritalstatus, phone, date
 from basic_services import log_error
 from everybody.relat import RelatHelper
