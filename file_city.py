@@ -19,7 +19,7 @@ class Variant:
 
     @staticmethod
     def format_version(version):
-        return "%d.%d" % version
+        return ".".join(str(part) if part is not None else "*" for part in version)
 
     def is_new(self):
         return not self.fileName
@@ -63,7 +63,7 @@ class VersionChecker:
         # So (None, None) is the same as "*.*" which matches the latest version
         self.version = (None, None)
 
-    def check_version(self, value):
+    def check_selector(self, value):
         # treat empty string same as *.*
         value = value.strip()
         if value:
@@ -71,7 +71,7 @@ class VersionChecker:
             if len(parts) != 2:
                 raise ValueError('"{}" is not a valid version, should have two parts'.format(value))
             try:
-                self.version = [None if part == "*" else int(part) for part in parts]
+                self.version = tuple(None if part == "*" else int(part) for part in parts)
             except ValueError:
                 raise ValueError('"{}" is not a valid version, parts should be numbers or *'.format(value))
             if self.version[0] is None and self.version[1] is not None:
@@ -130,12 +130,19 @@ class FileCitySoul(Soul):
         else:
             return None
           
-    def get_all_versions(self):
+    def generate_all_versions(self):
         return (var.version for var in self.inst.variants)
 
+    def generate_major_selectors(self):
+        major = None
+        for var in self.inst.variants:
+            if var.version[0] != major:
+                major = var.version[0]
+                yield "{}.*".format(major)
+
     @staticmethod
-    def check_version(value):
-        return VersionChecker().check_version(value)
+    def check_selector(value):
+        return VersionChecker().check_selector(value)
 
     @staticmethod
     def format_version(version):
@@ -198,14 +205,14 @@ class Instance:
                 # assume selector argument is a version selector string
                 checker = VersionChecker()
                 try:
-                    checker.check_version(selector)
+                    checker.check_selector(selector)
                 except ValueError as e:
                     log_error("FileCity.find_variant: {}".format(str(e)))
                     return None
                 return self.find_by_version(checker.version)
         else:
             # assume selector argument is a version tuple
-            return self.find_exact_version(selector)
+            return self.find_by_version(selector)
 
     def find_by_version(self, version):
         if version[0] is None:
@@ -214,7 +221,7 @@ class Instance:
         elif version[1] is None:
             # version selector is N.*, find latest version under specified major branch
             major = version[0]
-            return next((var for var in self.variants.reversed() if var.version[0] == major), None)
+            return next((var for var in reversed(self.variants) if var.version[0] == major), None)
         else:
             # version selector is N.N, find exact version match
             return next((var for var in self.variants if var.version == version), None)
@@ -406,8 +413,8 @@ class FileCity:
         return self.get_type(tag).make_new(hint)
 
     @staticmethod
-    def check_version(value):
-        return VersionChecker().check_version(value)
+    def check_selector(value):
+        return VersionChecker().check_selector(value)
 
     @staticmethod
     def format_version(version):

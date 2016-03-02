@@ -16,7 +16,9 @@ class RelatDialog(simpledialog.Dialog, WidgetHelper):
     def body(self, master):
         self.relatKey = ""
         self.instId = ""
-        self.version = ""
+        self.selector = ""
+        self.errorMsgs = {}
+        self.errorMsgKeys = 'relat', 'person', 'version'
         
         for row in range(0, 4):
             master.rowconfigure(row, pad=10)
@@ -43,8 +45,8 @@ class RelatDialog(simpledialog.Dialog, WidgetHelper):
         self.versionCbx.grid(row=2, column=1, sticky=(W,E))
         self.bind_combobox_big_change(self.versionCbx, self.on_version_big_change)
 
-        self.message = ttk.Label(master)
-        self.message.grid(row=3, column=0, columnspan=3, sticky=W)
+        self.statusLabel = ttk.Label(master)
+        self.statusLabel.grid(row=3, column=0, columnspan=3, sticky=W)
         return self.relatCbx
 
     def buttonbox(self):
@@ -52,15 +54,24 @@ class RelatDialog(simpledialog.Dialog, WidgetHelper):
         # remove binding with OK button and Enter key
         self.unbind('<Return>')
         
-    def set_message(self, text, modifier=''):
-        self.message['style'] = self.join_style(modifier, 'TLabel')
-        self.message['text'] = text
+    def set_status(self, text, modifier=""):
+        self.statusLabel['style'] = self.join_style(modifier, 'TLabel')
+        self.statusLabel['text'] = text
 
-    def update_message(self):
-        if self.instId:
-            self.set_message("(Selected: {})".format(self.instId))
+    def update_status(self):
+        if self.errorMsgs:
+            messages = (self.errorMsgs[key] for key in self.errorMsgKeys if key in self.errorMsgs)
+            self.set_status("\n".join(messages), 'Error')
+        elif self.instId:
+            self.set_status("(Selected: {})".format(self.instId))
         else:
-            self.set_message("")
+            self.set_status("")
+
+    def set_error_message(self, key, text):
+        if text:
+            self.errorMsgs[key] = text
+        elif key in self.errorMsgs:
+            del self.errorMsgs[key]
 
     def set_person(self, instId):
         if instId:
@@ -70,35 +81,39 @@ class RelatDialog(simpledialog.Dialog, WidgetHelper):
                 self.personCbx.set(person.label)
                 clipboard.add_recent_person(person)
                 self.personCbx['values'] = clipboard.recent_people_labels()
-                self.versionCbx['values'] = [person.format_version(ver) for ver in person.get_all_versions()]
-                self.versionCbx.set(person.format_version(person.version))
-                self.update_message()
+                selectors = [value for value in person.generate_major_selectors()]
+                self.versionCbx['values'] = selectors
+                self.versionCbx.set(selectors[-1])
+                self.set_error_message('person', "")
             else:
-                self.instId = ''
+                self.instId = ""
                 self.clear_versions()
-                self.set_message("{} not found".format(instId), 'Error')
+                self.set_error_message('person', "{} not found".format(instId))
         else:
-            self.instId = ''
+            self.instId = ""
             self.personCbx.set("")
             self.clear_versions()
-            self.update_message()
-            
+            self.set_error_message('person', "")
+
     def clear_versions(self):
-            self.versionCbx['values'] = []
-            self.versionCbx.set("")
+        self.versionCbx['values'] = []
+        self.versionCbx.set("")
+        self.set_error_message('version', "")
 
     def do_search(self):
         instId = PersonSearch(services.tkRoot()).result
         if instId:
-            self.set_person(instId)          
+            self.set_person(instId)
+        self.update_status()
           
     def on_relat_big_change(self, event):
         try:
             self.relatKey = Relat.check_relat(self.relatCbx.get())
             self.relatCbx.set(Relat.format_relat(self.relatKey))
-            self.update_message()
+            self.set_error_message('relat', "")
         except ValueError as e:
-            self.set_message(str(e), 'Error')
+            self.set_error_message('relat', str(e))
+        self.update_status()
 
     def on_person_big_change(self, event):
         label = self.personCbx.get().strip()
@@ -107,24 +122,32 @@ class RelatDialog(simpledialog.Dialog, WidgetHelper):
             if instId:
                 self.set_person(instId)
             else:
-                self.set_message("Searching...")
+                self.set_status("Searching...")
                 self.update_idletasks()
                 instId = personsearch.find_person_by_label(label)
                 if instId:
                     self.set_person(instId)
                 else:
-                    self.instId = ''
+                    self.instId = ""
                     self.clear_versions()
-                    self.set_message("{} not found".format(label), 'Error')               
+                    self.set_error_message('person', '"{}" not found'.format(label))
         else:
-            self.set_person('')
+            self.set_person("")
+        self.update_status()
             
     def on_version_big_change(self, event):
         try:
-            self.version = services.database().check_version(self.versionCbx.get())
-            self.versionCbx.set(self.version)
+            self.selector = services.database().check_selector(self.versionCbx.get())
+            self.versionCbx.set(self.selector)
+            self.set_error_message('version', "")
         except ValueError as e:
-            self.set_message(str(e), 'Error')
+            self.selector = ""
+            self.set_error_message('version', str(e))
+        if self.selector and self.instId:
+            person = services.database().lookup(self.instId)
+            if person is not None and not person.has_version(self.selector):
+                self.set_error_message('version', "Version {} not found".format(self.selector))
+        self.update_status()
 
     def apply(self):
         self.result = self.instId

@@ -124,11 +124,14 @@ class Body:
     def get_version(self, selector='current'):
         return self.soul.get_version(selector)
       
-    def get_all_versions(self):
-        return self.soul.get_all_versions()
+    def generate_all_versions(self):
+        yield from self.soul.generate_all_versions()
 
-    def check_version(self, value):
-        return self.soul.check_version(value)
+    def generate_major_selectors(self):
+        yield from self.soul.generate_major_selectors()
+
+    def check_selector(self, value):
+        return self.soul.check_selector(value)
 
     def format_version(self, version):
         return self.soul.format_version(version)
@@ -299,11 +302,14 @@ class Soul:
         else:
             return None
           
-    def get_all_versions(self):
-        return [(1,0)]
+    def generate_all_versions(self):
+        yield 1,0
+
+    def generate_major_selectors(self):
+        yield "1.*"
 
     @staticmethod
-    def check_version(value):
+    def check_selector(value):
         return len(value.split(".")) == 2
 
     @staticmethod
