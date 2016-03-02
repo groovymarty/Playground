@@ -57,6 +57,26 @@ class Variant:
                 json.dump(self.values, f, indent=2, sort_keys=True)
             self.loadErrorMsg = ""
 
+class VersionChecker:
+    def __init__(self):
+        self.major = None
+        self.minor = None
+
+    def check_version(self, value):
+        # treat empty string same as *.*
+        value = value.strip()
+        if value:
+            parts = value.split(".")
+            if len(parts) != 2:
+                raise ValueError('"{}" is not a valid version, should have two parts'.format(value))
+            try:
+                (self.major, self.minor) = [None if part == "*" else int(part) for part in parts]
+            except ValueError:
+                raise ValueError('"{}" is not a valid version, parts should be numbers or *'.format(value))
+            if self.major is None and self.minor is not None:
+                raise ValueError('"{}" is not a valid version, *.N not allowed'.format(value))
+        return value
+
 class FileCitySoul(Soul):
     def __init__(self, variant):
         super().__init__()
@@ -113,6 +133,10 @@ class FileCitySoul(Soul):
         return (var.version for var in self.inst.variants)
 
     @staticmethod
+    def check_version(value):
+        return VersionChecker().check_version(value)
+
+    @staticmethod
     def format_version(version):
         return Variant.format_version(version)
 
@@ -138,29 +162,54 @@ class Instance:
 
     def sort_variants(self):
         self.variants.sort(key=lambda var: var.version)
-        previousVer = None
-        for var in self.variants:
-            if var.version == previousVer:
-                raise ValueError("Duplicate version:", var.varId)
-            previousVer = var.version
+        # use two iterators, spaced one element apart, to scan list for duplicates
+        vars = iter(self.variants)
+        prev = iter(self.variants)
+        next(vars, None)
+        dup = next((var for var in vars if var.version == next(prev).version), None)
+        if dup is not None:
+            raise ValueError("Duplicate version:", dup.varId)
 
     def find_variant(self, version, curVariant=None):
-        if version == 'current':
-            return curVariant
-        elif version == 'previous':
-            return self.get_previous(curVariant)
-        elif version == 'next':
-            return self.get_next(curVariant)
-        elif version == 'first':
-            return self.get_first()
-        elif version == 'latest':
-            return self.get_latest()
-        elif version == 'advance' or version == 'advance_minor':
-            return self.add_next_minor_version(curVariant)
-        elif version == 'advance_major':
-            return self.add_next_major_version()
+        if isinstance(version, str):
+            if version == 'current':
+                return curVariant
+            elif version == 'previous':
+                return self.get_previous(curVariant)
+            elif version == 'next':
+                return self.get_next(curVariant)
+            elif version == 'first':
+                return self.get_first()
+            elif version == 'latest' or version == "*.*":
+                return self.get_latest()
+            elif version == 'advance' or version == 'advance_minor':
+                return self.add_next_minor_version(curVariant)
+            elif version == 'advance_major':
+                return self.add_next_major_version()
+            else:
+                checker = VersionChecker()
+                try:
+                    checker.check_version(version)
+                except ValueError as e:
+                    log_error("FileCity.find_variant: {}".format(str(e)))
+                    return None
+                if checker.major is None:
+                    # handle *.*, but probably already matched above
+                    return self.get_latest()
+                elif checker.minor is None:
+                    # handle N.*
+                    return self.find_major_latest(checker.major)
+                else:
+                    # handle N.N
+                    return self.find_exact_version((checker.major, checker.minor))
         else:
-            return next((var for var in self.variants if var.version == version), None)
+            return self.find_exact_version(version)
+
+    def find_exact_version(self, version):
+        return next((var for var in self.variants if var.version == version), None)
+
+    def find_major_latest(self, major):
+        return next((var for var in self.variants.reversed() if var.version[0] == major), None)
 
     def get_previous(self, curVariant):
         i = self.variants.index(curVariant)
@@ -347,3 +396,11 @@ class FileCity:
 
     def make_new(self, tag, hint=""):
         return self.get_type(tag).make_new(hint)
+
+    @staticmethod
+    def check_version(value):
+        return VersionChecker().check_version(value)
+
+    @staticmethod
+    def format_version(version):
+        return Variant.format_version(version)
