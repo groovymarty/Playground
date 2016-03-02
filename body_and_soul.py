@@ -37,9 +37,9 @@ class Body:
         dup.protoValues = self.protoValues.copy()
         return dup
 
-    def load(self, version='current', check=True):
-        log_debug("Body.load", "Loading {} {}".format(self.instId, version))
-        freshLoad = self.soul.load(self.defaultValues, version)
+    def load(self, selector='current', check=True):
+        log_debug("Body.load", "Loading {} {}".format(self.instId, selector))
+        freshLoad = self.soul.load(self.defaultValues, selector)
         self.newValues.clear()
         self.protoValues.clear()
         self.valueErrors.clear()
@@ -65,8 +65,8 @@ class Body:
     def pre_save(self):
         pass
 
-    def save(self, version='advance'):
-        log_debug("Body.save", "Saving {} {}".format(self.instId, version))
+    def save(self, selector='advance'):
+        log_debug("Body.save", "Saving {} {}".format(self.instId, selector))
         if self.soul.values is None:
             self.soul.load(self.defaultValues)
         # Fold protoValues into newValues
@@ -74,7 +74,7 @@ class Body:
         self.protoValues.clear()
         # save has two steps
         # step 1, update soul.values with newValues
-        self.soul.save_update(self.newValues, version)
+        self.soul.save_update(self.newValues, selector)
         self.newValues.clear()
         self.pre_save()
         # step 2, write values to persistent storage
@@ -118,14 +118,17 @@ class Body:
     def is_latest(self):
         return not self.has_version('next')
 
-    def has_version(self, version):
-        return self.soul.get_version(version) is not None
+    def has_version(self, selector):
+        return self.soul.get_version(selector) is not None
 
-    def get_version(self, version='current'):
-        return self.soul.get_version(version)
+    def get_version(self, selector='current'):
+        return self.soul.get_version(selector)
       
     def get_all_versions(self):
         return self.soul.get_all_versions()
+
+    def check_version(self, value):
+        return self.soul.check_version(value)
 
     def format_version(self, version):
         return self.soul.format_version(version)
@@ -260,8 +263,8 @@ class Soul:
         dup.values = self.values
         return dup
 
-    def load(self, defaultValues, version='current'):
-        if self.values is None or version != 'current':
+    def load(self, defaultValues, selector='current'):
+        if self.values is None or selector != 'current':
             self.values = defaultValues.copy()
             return True #Really did pretend to load
         else:
@@ -269,7 +272,7 @@ class Soul:
 
     # save has two steps
     # step 1, update values with newValues
-    def save_update(self, newValues, version='advance'):
+    def save_update(self, newValues, selector='advance'):
         if self.values is None:
             raise Exception("Soul must be loaded before saving")
         self.values.update(newValues)
@@ -290,14 +293,18 @@ class Soul:
     def get_load_error_msg(self):
         return ""
 
-    def get_version(self, version='current'):
-        if version == 'current':
+    def get_version(self, selector='current'):
+        if selector == 'current':
             return 1,0
         else:
             return None
           
     def get_all_versions(self):
         return [(1,0)]
+
+    @staticmethod
+    def check_version(value):
+        return len(value.split(".")) == 2
 
     @staticmethod
     def format_version(version):

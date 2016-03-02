@@ -377,11 +377,11 @@ class PersonDetail(ttk.Frame, WidgetGarden):
             self.update_all()
             self.event_generate('<<PersonChange>>')
 
-    def do_save(self, version="current"):
+    def do_save(self, selector="current"):
         if self.person is not None:
             if not self.confirm_save_with_errors():
                 return
-            self.person.save(version)
+            self.person.save(selector)
             self.update_all()
             self.event_generate('<<PersonSave>>')
             clipboard.add_recent_person(self.person)
@@ -394,20 +394,20 @@ class PersonDetail(ttk.Frame, WidgetGarden):
         if self.person is not None:
             self.do_save('advance_major' if not self.person.is_new() else 'current')
 
-    def go_to_version(self, version, diff=False):
-        if self.person is not None and self.person.has_version(version):
+    def go_to_version(self, selector, diff=False):
+        if self.person is not None and self.person.has_version(selector):
             if not self.confirm_unsaved_changes("move to a different version"):
                 return
             if diff:
                 prior = self.person.copy()
-                self.person.load(version)
+                self.person.load(selector)
                 # Make sure both are populated with same addresses before comparing
                 self.person.touch_addresses(prior.get_addresses())
                 prior.touch_addresses(self.person.get_addresses())
                 self.diffs = self.person.compare(prior)
                 self.diffVersion = prior.version
             else:
-                self.person.load(version)
+                self.person.load(selector)
                 self.clear_diffs()
             self.load_all()
             self.update_all()

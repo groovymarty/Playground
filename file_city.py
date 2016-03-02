@@ -59,8 +59,9 @@ class Variant:
 
 class VersionChecker:
     def __init__(self):
-        self.major = None
-        self.minor = None
+        # None represents "*", which matches the highest version number in whichever position it occurs
+        # So (None, None) is the same as "*.*" which matches the latest version
+        self.version = (None, None)
 
     def check_version(self, value):
         # treat empty string same as *.*
@@ -70,10 +71,10 @@ class VersionChecker:
             if len(parts) != 2:
                 raise ValueError('"{}" is not a valid version, should have two parts'.format(value))
             try:
-                (self.major, self.minor) = [None if part == "*" else int(part) for part in parts]
+                self.version = [None if part == "*" else int(part) for part in parts]
             except ValueError:
                 raise ValueError('"{}" is not a valid version, parts should be numbers or *'.format(value))
-            if self.major is None and self.minor is not None:
+            if self.version[0] is None and self.version[1] is not None:
                 raise ValueError('"{}" is not a valid version, *.N not allowed'.format(value))
         return value
 
@@ -87,20 +88,20 @@ class FileCitySoul(Soul):
     def copy(self):
         return FileCitySoul(self.curVariant)
 
-    def load(self, defaultValues, version='current'):
-        if version != 'current':
-            self.curVariant = self.inst.find_variant(version, self.curVariant)
+    def load(self, defaultValues, selector='current'):
+        if selector != 'current':
+            self.curVariant = self.inst.find_variant(selector, self.curVariant)
         freshLoad = self.curVariant.load(defaultValues)
         self.values = self.curVariant.values
         return freshLoad
 
     # save has two steps
     # step 1, find variant that we want to save into, and update its values with newValues
-    def save_update(self, newValues, version='advance'):
+    def save_update(self, newValues, selector='advance'):
         if self.values is None:
             raise Exception("Soul must be loaded before saving")
-        if version != 'current':
-            self.curVariant = self.inst.find_variant(version, self.curVariant)
+        if selector != 'current':
+            self.curVariant = self.inst.find_variant(selector, self.curVariant)
         if self.curVariant.values is not self.values:
             self.curVariant.values = self.values.copy()
             self.values = self.curVariant.values
@@ -122,8 +123,8 @@ class FileCitySoul(Soul):
     def get_load_error_msg(self):
         return self.curVariant.loadErrorMsg
 
-    def get_version(self, version='current'):
-        variant = self.inst.find_variant(version, self.curVariant)
+    def get_version(self, selector='current'):
+        variant = self.inst.find_variant(selector, self.curVariant)
         if variant is not None:
             return variant.version
         else:
@@ -170,46 +171,53 @@ class Instance:
         if dup is not None:
             raise ValueError("Duplicate version:", dup.varId)
 
-    def find_variant(self, version, curVariant=None):
-        if isinstance(version, str):
-            if version == 'current':
+    # This method can be used many ways!
+    # The selector argument can be one of the strings you see below, like 'current' or 'latest',
+    # in which case curVariant provides the reference point if needed (current, next, previous, etc.)
+    # You can also say 'advance' or 'advance_major' to create a new version.
+    # The selector argument can also be a version selector string like "1.0", "2.*" or "*.*"
+    # If not a string, then it should be a version tuple like (1,0), (2,None) or (None,None)
+    # Remember that "*" or None matches the latest version number in the corresponding position.
+    def find_variant(self, selector, curVariant=None):
+        if isinstance(selector, str):
+            if selector == 'current':
                 return curVariant
-            elif version == 'previous':
+            elif selector == 'previous':
                 return self.get_previous(curVariant)
-            elif version == 'next':
+            elif selector == 'next':
                 return self.get_next(curVariant)
-            elif version == 'first':
+            elif selector == 'first':
                 return self.get_first()
-            elif version == 'latest' or version == "*.*":
+            elif selector == 'latest' or selector == "*.*":
                 return self.get_latest()
-            elif version == 'advance' or version == 'advance_minor':
+            elif selector == 'advance' or selector == 'advance_minor':
                 return self.add_next_minor_version(curVariant)
-            elif version == 'advance_major':
+            elif selector == 'advance_major':
                 return self.add_next_major_version()
             else:
+                # assume selector argument is a version selector string
                 checker = VersionChecker()
                 try:
-                    checker.check_version(version)
+                    checker.check_version(selector)
                 except ValueError as e:
                     log_error("FileCity.find_variant: {}".format(str(e)))
                     return None
-                if checker.major is None:
-                    # handle *.*, but probably already matched above
-                    return self.get_latest()
-                elif checker.minor is None:
-                    # handle N.*
-                    return self.find_major_latest(checker.major)
-                else:
-                    # handle N.N
-                    return self.find_exact_version((checker.major, checker.minor))
+                return self.find_by_version(checker.version)
         else:
-            return self.find_exact_version(version)
+            # assume selector argument is a version tuple
+            return self.find_exact_version(selector)
 
-    def find_exact_version(self, version):
-        return next((var for var in self.variants if var.version == version), None)
-
-    def find_major_latest(self, major):
-        return next((var for var in self.variants.reversed() if var.version[0] == major), None)
+    def find_by_version(self, version):
+        if version[0] is None:
+            # version selector is *.*, find latest version
+            return self.get_latest()
+        elif version[1] is None:
+            # version selector is N.*, find latest version under specified major branch
+            major = version[0]
+            return next((var for var in self.variants.reversed() if var.version[0] == major), None)
+        else:
+            # version selector is N.N, find exact version match
+            return next((var for var in self.variants if var.version == version), None)
 
     def get_previous(self, curVariant):
         i = self.variants.index(curVariant)

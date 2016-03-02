@@ -44,7 +44,7 @@ class RelatDialog(simpledialog.Dialog, WidgetHelper):
         self.bind_combobox_big_change(self.versionCbx, self.on_version_big_change)
 
         self.message = ttk.Label(master)
-        self.message.grid(row=3, column=0, columnspan=2, sticky=W)
+        self.message.grid(row=3, column=0, columnspan=3, sticky=W)
         return self.relatCbx
 
     def buttonbox(self):
@@ -120,7 +120,11 @@ class RelatDialog(simpledialog.Dialog, WidgetHelper):
             self.set_person('')
             
     def on_version_big_change(self, event):
-        pass
+        try:
+            self.version = services.database().check_version(self.versionCbx.get())
+            self.versionCbx.set(self.version)
+        except ValueError as e:
+            self.set_message(str(e), 'Error')
 
     def apply(self):
         self.result = self.instId
