@@ -2,7 +2,7 @@
 
 from tkinter import *
 from tkinter import ttk
-from tkinter import simpledialog
+from tkinter import simpledialog, messagebox
 from everybody import clipboard, services, personsearch
 from everybody.relat import Relat
 from everybody.personsearch import PersonSearch
@@ -19,6 +19,7 @@ class RelatDialog(simpledialog.Dialog, WidgetHelper):
         self.selector = ""
         self.errorMsgs = {}
         self.errorMsgKeys = 'relat', 'person', 'version'
+        self.tolerateBlank = True
         
         for row in range(0, 4):
             master.rowconfigure(row, pad=10)
@@ -73,6 +74,15 @@ class RelatDialog(simpledialog.Dialog, WidgetHelper):
         elif key in self.errorMsgs:
             del self.errorMsgs[key]
 
+    def check_for_blank(self):
+        if not self.tolerateBlank:
+            if not self.relatKey:
+                self.set_error_message('relat', "You must select a relationship.")
+            if not self.instId:
+                self.set_error_message('person', "You must select a person.")
+            if not self.selector:
+                self.set_error_message('version', "You must select a version.")
+
     def set_person(self, instId):
         if instId:
             person = services.database().lookup(instId)
@@ -83,22 +93,27 @@ class RelatDialog(simpledialog.Dialog, WidgetHelper):
                 self.personCbx['values'] = clipboard.recent_people_labels()
                 selectors = [value for value in person.generate_major_selectors()]
                 self.versionCbx['values'] = selectors
-                self.versionCbx.set(selectors[-1])
+                self.selector = selectors[-1]
+                self.versionCbx.set(self.selector)
                 self.set_error_message('person', "")
+                self.set_error_message('version', "")
             else:
                 self.instId = ""
-                self.clear_versions()
+                self.clear_version()
                 self.set_error_message('person', "{} not found".format(instId))
         else:
             self.instId = ""
             self.personCbx.set("")
-            self.clear_versions()
+            self.clear_version()
             self.set_error_message('person', "")
+            self.check_for_blank()
 
-    def clear_versions(self):
+    def clear_version(self):
+        self.selector = ""
         self.versionCbx['values'] = []
         self.versionCbx.set("")
         self.set_error_message('version', "")
+        self.check_for_blank()
 
     def do_search(self):
         instId = PersonSearch(services.tkRoot()).result
@@ -111,6 +126,7 @@ class RelatDialog(simpledialog.Dialog, WidgetHelper):
             self.relatKey = Relat.check_relat(self.relatCbx.get())
             self.relatCbx.set(Relat.format_relat(self.relatKey))
             self.set_error_message('relat', "")
+            self.check_for_blank()
         except ValueError as e:
             self.set_error_message('relat', str(e))
         self.update_status()
@@ -129,17 +145,18 @@ class RelatDialog(simpledialog.Dialog, WidgetHelper):
                     self.set_person(instId)
                 else:
                     self.instId = ""
-                    self.clear_versions()
+                    self.clear_version()
                     self.set_error_message('person', '"{}" not found'.format(label))
         else:
             self.set_person("")
         self.update_status()
-            
+
     def on_version_big_change(self, event):
         try:
             self.selector = services.database().check_selector(self.versionCbx.get())
             self.versionCbx.set(self.selector)
             self.set_error_message('version', "")
+            self.check_for_blank()
         except ValueError as e:
             self.selector = ""
             self.set_error_message('version', str(e))
@@ -148,6 +165,19 @@ class RelatDialog(simpledialog.Dialog, WidgetHelper):
             if person is not None and not person.has_version(self.selector):
                 self.set_error_message('version', "Version {} not found".format(self.selector))
         self.update_status()
+
+    def validate(self):
+        # Blank is no longer tolerated once you click OK
+        self.tolerateBlank = False
+        # Force a focus-out event on whatever widget had focus when user clicked OK
+        # This ensures "big change" validation is done for all widgets
+        self.focus_get().event_generate("<FocusOut>")
+        self.check_for_blank()
+        if self.errorMsgs:
+            self.update_status()
+            return False
+        else:
+            return True
 
     def apply(self):
         self.result = self.instId

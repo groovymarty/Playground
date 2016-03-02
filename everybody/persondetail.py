@@ -2,7 +2,7 @@
 
 from tkinter import *
 from tkinter import ttk
-from tkinter import messagebox, simpledialog
+from tkinter import messagebox
 from everybody import services, clipboard
 from everybody.person import Person
 from everybody.relat import Relat
