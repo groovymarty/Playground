@@ -1,7 +1,7 @@
 import os, re, fnmatch, glob
 picBaseDir = "\\Users\\Marty\\Pictures"
-num = 65
-prefix = "D16C"
+num = 19
+prefix = "D16E"
 workdir = "DScratch"
 
 def findPicDir(name):

@@ -65,6 +65,8 @@ def skipdir(folder, dname):
     if folder.endswith("Documents"):
         if dname == "My Music" or dname == "My Pictures" or dname == "My Videos":
             return True
+    if dname == ".git" or dname == "__pycache__":
+        return True
     return False
 
 def skipfile(folder, fname):
