@@ -188,6 +188,7 @@ class Instance:
     # The selector argument can also be a version selector string like "1.0", "2.*" or "*.*"
     # If not a string, then it should be a version tuple like (1,0), (2,None) or (None,None)
     # Remember that "*" or None matches the latest version number in the corresponding position.
+    # Here are all the ways you can get the latest version: 'latest', "*.*", "" or (None,None)
     def find_variant(self, selector, curVariant=None):
         if isinstance(selector, str):
             if selector == 'current':
@@ -198,7 +199,7 @@ class Instance:
                 return self.get_next(curVariant)
             elif selector == 'first':
                 return self.get_first()
-            elif selector == 'latest' or selector == "*.*":
+            elif selector == 'latest' or selector == "*.*" or not selector:
                 return self.get_latest()
             elif selector == 'advance' or selector == 'advance_minor':
                 return self.add_next_minor_version(curVariant)
@@ -328,7 +329,6 @@ class FileCity:
     def __init__(self):
         self.types = {}
         self.fileNameRe = re.compile(r"([A-Z]+)(\d+)-(\d+)\.(\d+)-(.*)\.([A-Z]+)", re.IGNORECASE)
-        self.variantRe = re.compile(r"([A-Z]+)(\d+)-(\d+)\.(\d+)", re.IGNORECASE)
         self.instRe = re.compile(r"([A-Z]+)(\d+)", re.IGNORECASE)
 
     def add_type(self, tag, variantClass, fileExt="json"):
@@ -384,29 +384,32 @@ class FileCity:
                 except ValueError as e:
                     log_error("FileCity.sort_variants:", e.args)
 
+    # If you call this method with an instance id, like "Per0123", it will return
+    # the latest version of that instance.
+    # If you call with a variant id, like "Per0123-1.2", it will return the
+    # specified version.
+    # The version selector can have asterisks, such as "Per0123-1.*" to get
+    # the latest version on major branch 1.
+    # "Per0123-*.*" returns the latest version, same as "Per0123" by itself.
     def lookup(self, instOrVarId):
-        match = self.variantRe.match(instOrVarId)
+        parts = instOrVarId.split("-", 2)
+        if len(parts) == 1:
+           # argument is an instance id
+           instId = instOrVarId
+           selector = ""
+        else:
+           # argument is a variant id
+           (instId, selector) = parts
+        match = self.instRe.match(instId)
         if match:
             tag = match.group(1)
             if tag in self.types:
                 theType = self.types[tag]
                 instNum = int(match.group(2))
-                version = (int(match.group(3)), int(match.group(4)))
                 if instNum in theType.instances:
                     inst = theType.instances[instNum]
-                    var = inst.find_variant(version)
+                    var = inst.find_variant(selector)
                     if var is not None:
-                        return inst.make_body(var)
-        else:
-            match = self.instRe.match(instOrVarId)
-            if match:
-                tag = match.group(1)
-                if tag in self.types:
-                    theType = self.types[tag]
-                    instNum = int(match.group(2))
-                    if instNum in theType.instances:
-                        inst = theType.instances[instNum]
-                        var = inst.get_latest()
                         return inst.make_body(var)
         return None
 
@@ -423,3 +426,7 @@ class FileCity:
     @staticmethod
     def format_version(version):
         return format_version(version)
+      
+    @staticmethod
+    def join_id(*parts):
+        return join_id(*parts)

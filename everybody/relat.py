@@ -3,6 +3,10 @@
 from body_and_soul import join_key
 from basic_services import log_error
 
+# A relationship specifier string can be a simple relat name (like 'father' or 'spouse')
+# or a dotted form for indexed relationships (like "son.1" or "parent.2")
+# Relationship specs are directly used as value keys in Person objects
+
 class Relat:
     simpleRelats = 'father', 'mother', 'husband', 'wife', 'spouse'
     indexedRelats = 'parent', 'child', 'son', 'daughter'
@@ -22,14 +26,14 @@ class Relat:
     ucNameToRelat = None
 
     @staticmethod            
-    def format_relat(key):
-        if not key:
+    def format_relat(spec):
+        if not spec:
             return ""
-        elif "." in key:
-            (relat, index) = key.split(".", 2)
+        elif "." in spec:
+            (relat, index) = spec.split(".", 2)
             return "{} {}".format(Relat.relatNames[relat], index)
         else:
-            return Relat.relatNames[key]
+            return Relat.relatNames[spec]
           
     @staticmethod
     def check_relat(value, maxIndex=100):
@@ -47,7 +51,7 @@ class Relat:
         else:
             (name, index) = parts
         if name in Relat.relatNames:
-            # relat key names may be used if typed perfectly
+            # relat names may be used if typed perfectly
             relat = name
         else:
             ucName = name.upper()
@@ -68,7 +72,7 @@ class Relat:
                     raise ValueError('"{}" is not a valid indexed relationship'.format(value))
                 if i > maxIndex:
                     raise ValueError('"{}" index is too high'.format(value))
-                return BodyHelper.join_key(relat, str(i))
+                return join_key(relat, str(i))
             else:
                 raise ValueError("{} is not an indexed relationship".format(Relat.relatNames[relat]))
 
@@ -99,7 +103,7 @@ class RelatHelper:
             if key in self.soul.values and self.soul.values[key] is None:
                 del self.soul.values[key]
                 
-    def generate_relats(self, extra=0):
+    def generate_relat_specs(self, extra=0):
         yield 'father'
         yield 'mother'
         yield from self.generate_indexed_relat('parent', extra, maximum=2)

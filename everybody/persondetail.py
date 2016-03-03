@@ -367,7 +367,8 @@ class PersonDetail(ttk.Frame, WidgetGarden):
 
     def do_add_relat(self):
         if self.person is not None:
-            RelatDialog(services.tkRoot(), self.person.generate_relats(extra=3))
+            result = RelatDialog(services.tkRoot(), self.person.generate_relat_specs(extra=3)).result
+            print(result)
 
     def do_discard(self):
         if self.person is not None:
