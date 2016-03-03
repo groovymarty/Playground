@@ -4,6 +4,13 @@ import os, re, json
 from body_and_soul import Soul
 from basic_services import log_info, log_error, log_debug
 
+# Some handy functions
+def format_version(version):
+    return ".".join(str(part) if part is not None else "*" for part in version)
+
+def join_id(*parts):
+    return "-".join(parts)
+
 class Variant:
     def __init__(self, inst, version, fileName="", hint=""):
         self.inst = inst
@@ -15,18 +22,14 @@ class Variant:
 
     @property
     def varId(self):
-        return self.inst.instId + '-' + Variant.format_version(self.version)
-
-    @staticmethod
-    def format_version(version):
-        return ".".join(str(part) if part is not None else "*" for part in version)
+        return join_id(self.inst.instId, format_version(self.version))
 
     def is_new(self):
         return not self.fileName
 
     def make_file_name(self, label=""):
-        hint = "".join(c for c in label if c.isalnum() or c in " .,-")
-        return self.varId + "-" + hint + "." + self.inst.type.fileExt
+        hint = "".join(c for c in label if c.isalnum() or c in " ,-")
+        return "{}-{}.{}".format(self.varId, hint, self.inst.type.fileExt)
 
     def load(self, defaultValues):
         if self.values is None:
@@ -59,8 +62,8 @@ class Variant:
 
 class VersionChecker:
     def __init__(self):
-        # None represents "*", which matches the highest version number in whichever position it occurs
-        # So (None, None) is the same as "*.*" which matches the latest version
+        # None is like "*", matching the highest version number in whichever position it occurs
+        # So (None, None) is the same as "*.*", which matches the latest version
         self.version = (None, None)
 
     def check_selector(self, value):
@@ -146,7 +149,7 @@ class FileCitySoul(Soul):
 
     @staticmethod
     def format_version(version):
-        return Variant.format_version(version)
+        return format_version(version)
 
     @staticmethod
     def is_same_minor_series(version1, version2):
@@ -392,7 +395,8 @@ class FileCity:
                 if instNum in theType.instances:
                     inst = theType.instances[instNum]
                     var = inst.find_variant(version)
-                    return inst.make_body(var)
+                    if var is not None:
+                        return inst.make_body(var)
         else:
             match = self.instRe.match(instOrVarId)
             if match:
@@ -418,4 +422,4 @@ class FileCity:
 
     @staticmethod
     def format_version(version):
-        return Variant.format_version(version)
+        return format_version(version)

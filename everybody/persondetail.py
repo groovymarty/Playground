@@ -7,6 +7,7 @@ from everybody import services, clipboard
 from everybody.person import Person
 from everybody.relat import Relat
 from everybody.relatdialog import RelatDialog
+from body_and_soul import join_key, make_flavored
 from basic_data import gender, us_state, maritalstatus
 from basic_services import log_debug, log_error
 from tkit.widgetgarden import WidgetGarden
@@ -163,23 +164,23 @@ class PersonDetail(ttk.Frame, WidgetGarden):
             self.addrTabIds[flavor] = i
             self.begin_layout(childFrame, 3)
             childFrame.grid_columnconfigure(1, weight=1)
-            self.make_entry(Person.join_key(flavor, 'addrLine1'))
+            self.make_entry(join_key(flavor, 'addrLine1'))
             self.next_row()
-            self.make_entry(Person.join_key(flavor, 'addrLine2'))
+            self.make_entry(join_key(flavor, 'addrLine2'))
             self.next_row()
-            self.make_entry(Person.join_key(flavor, 'addrLine3'))
-            self.make_checkbutton(Person.join_key(flavor, 'useLine3'))
+            self.make_entry(join_key(flavor, 'addrLine3'))
+            self.make_checkbutton(join_key(flavor, 'useLine3'))
             self.next_row()
-            self.make_entry(Person.join_key(flavor, 'city'))
+            self.make_entry(join_key(flavor, 'city'))
             self.next_row()
-            self.make_combobox(Person.join_key(flavor, 'state'), us_state.stateNames+["Unknown"], width=20)
+            self.make_combobox(join_key(flavor, 'state'), us_state.stateNames+["Unknown"], width=20)
             self.next_row()
-            self.make_entry(Person.join_key(flavor, 'zipCode'))
+            self.make_entry(join_key(flavor, 'zipCode'))
             self.next_row()
-            self.make_entry(Person.join_key(flavor, 'country'))
-            self.make_checkbutton(Person.join_key(flavor, 'useCountry'))
+            self.make_entry(join_key(flavor, 'country'))
+            self.make_checkbutton(join_key(flavor, 'useCountry'))
             self.next_row()
-            self.make_entry(Person.join_key(flavor, 'phone'))
+            self.make_entry(join_key(flavor, 'phone'))
             self.end_layout()
         self.next_col()
 
@@ -290,7 +291,7 @@ class PersonDetail(ttk.Frame, WidgetGarden):
         flavor = self.get_cur_addr_tab()
         self.load_addr_vars(flavor)
         # Do this to prevent focus from jumping to first widget in address frame when you click tab
-        self.entries[Person.join_key(flavor, 'addrLine1')].state(['!focus'])
+        self.entries[join_key(flavor, 'addrLine1')].state(['!focus'])
         self.update_top()
 
     def get_cur_addr_tab(self):
@@ -574,5 +575,5 @@ Click "No" to go back to where you were without losing anything.""".format(what)
                 return self.person.is_same_minor_series(self.person.version, nextVersion)
 
 for flavor in Person.addrFlavors:
-    PersonDetail.labelText.update(Person.make_flavored(flavor, PersonDetail.addrLabelText))
-    PersonDetail.mappers.update(Person.make_flavored(flavor, PersonDetail.addrMappers))
+    PersonDetail.labelText.update(make_flavored(flavor, PersonDetail.addrLabelText))
+    PersonDetail.mappers.update(make_flavored(flavor, PersonDetail.addrMappers))

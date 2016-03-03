@@ -92,6 +92,7 @@ class RelatDialog(simpledialog.Dialog, WidgetHelper):
                 clipboard.add_recent_person(person)
                 self.personCbx['values'] = clipboard.recent_people_labels()
                 selectors = [value for value in person.generate_major_selectors()]
+                #selectors = [person.format_version(version) for version in person.generate_all_versions()]
                 self.versionCbx['values'] = selectors
                 self.selector = selectors[-1]
                 self.versionCbx.set(self.selector)

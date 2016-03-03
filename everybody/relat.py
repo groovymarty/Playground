@@ -1,6 +1,6 @@
 # everybody.relat
 
-from body_and_soul import BodyHelper
+from body_and_soul import join_key
 from basic_services import log_error
 
 class Relat:
@@ -32,7 +32,7 @@ class Relat:
             return Relat.relatNames[key]
           
     @staticmethod
-    def check_relat(value):
+    def check_relat(value, maxIndex=100):
         # accept relat key names (dotted) as well as formatted ones (space separated)
         if "." in value:
             parts = value.strip().split(".", 2)
@@ -66,7 +66,7 @@ class Relat:
                     i = int(index)
                 except ValueError:
                     raise ValueError('"{}" is not a valid indexed relationship'.format(value))
-                if i > BodyHelper.maxIndex:
+                if i > maxIndex:
                     raise ValueError('"{}" index is too high'.format(value))
                 return BodyHelper.join_key(relat, str(i))
             else:
@@ -115,4 +115,4 @@ class RelatHelper:
         if maximum is not None and n > maximum:
             n = maximum
         for i in range(1, n+1):
-            yield self.join_key(relat, str(i))
+            yield join_key(relat, str(i))

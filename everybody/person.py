@@ -1,11 +1,11 @@
 # everybody.person
 
-from body_and_soul import Body, BodyHelper
+from body_and_soul import *
 from basic_data import checkers, gender, us_state, maritalstatus, phone, date
 from basic_services import log_error
 from everybody.relat import RelatHelper
 
-class Person(Body, BodyHelper, RelatHelper):
+class Person(Body, RelatHelper):
     # Note all phone numbers are included here, so they exist even if address counterpart does not
     defaultValues = {
         'namePrefix': "",
@@ -179,11 +179,11 @@ class Person(Body, BodyHelper, RelatHelper):
 
     def get_addr_value(self, flavor, key):
         self.touch_address(flavor)
-        return self.get_value(self.join_key(flavor, key))
+        return self.get_value(join_key(flavor, key))
 
     def set_addr_value(self, flavor, key, value):
         self.touch_address(flavor)
-        self.set_value(self.join_key(flavor, value))
+        self.set_value(join_key(flavor, value))
 
     def build_address(self, flavor='home'):
         lines = []
@@ -208,7 +208,7 @@ class Person(Body, BodyHelper, RelatHelper):
 Person.make_all_properties()
 
 # Build default value dictionary with flavored keys for each address flavor
-Person.addrDefaultsByFlavor = {flavor: Person.make_flavored(flavor, Person.addrDefaults)
+Person.addrDefaultsByFlavor = {flavor: make_flavored(flavor, Person.addrDefaults)
                                for flavor in Person.addrFlavors}
 
 # Built set of flavored keys for each address flavor
@@ -219,7 +219,7 @@ Person.defaultValues.update(Person.addrDefaultsByFlavor['home'])
 
 # Add checkers for each address flavor
 for flavor in Person.addrFlavors:
-    Person.checkers.update(Person.make_flavored(flavor, Person.addrCheckers))
+    Person.checkers.update(make_flavored(flavor, Person.addrCheckers))
 
 # Mapping from key to address flavor, for example 'home.addrLine1' maps to 'home'
 Person.keyToAddrFlavor = {key: flavor for flavor, d in Person.addrKeysByFlavor.items() for key in d}

@@ -125,10 +125,10 @@ class Body:
         return self.soul.get_version(selector)
       
     def generate_all_versions(self):
-        yield from self.soul.generate_all_versions()
+        return self.soul.generate_all_versions()
 
     def generate_major_selectors(self):
-        yield from self.soul.generate_major_selectors()
+        return self.soul.generate_major_selectors()
 
     def check_selector(self, value):
         return self.soul.check_selector(value)
@@ -320,14 +320,9 @@ class Soul:
     def is_same_minor_series(version1, version2):
         return version1[0] == version2[0]
 
-# Adds some methods for handling structured keys like "work.phone" and "child.3"
-class BodyHelper:
-    maxIndex = 100
+# Functions for handling structured keys like "work.phone" and "child.3"
+def join_key(*parts):
+    return ".".join(parts)
 
-    @staticmethod
-    def join_key(*parts):
-        return ".".join(parts)
-
-    @staticmethod
-    def make_flavored(flavor, d):
-        return {BodyHelper.join_key(flavor, key): value for key, value in d.items()}
+def make_flavored(flavor, d):
+    return {join_key(flavor, key): value for key, value in d.items()}
