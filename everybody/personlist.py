@@ -27,10 +27,10 @@ class PersonList(ttk.Frame):
 
         self.tree = ttk.Treeview(self, height=5, show='tree')
         self.tree.grid(column=0, row=0, sticky=(N,W,E,S))
-        self.tree.bind('<<TreeviewSelect>>', self.on_tree_select)
+        self.tree.bind("<<TreeviewSelect>>", self.on_tree_select)
         self.tree.tag_configure('changed', background='yellow')
         self.tree.tag_configure('error', background='orange')
-        self.tree.tag_configure('past', background='light blue')
+        self.tree.tag_configure('past', background='lightblue')
 
         sb = ttk.Scrollbar(self, orient=VERTICAL, command=self.tree.yview)
         sb.grid(column=1, row=0, sticky=(N,S))
@@ -38,24 +38,24 @@ class PersonList(ttk.Frame):
 
     def populate_tree(self):
         for person in self.peopleSorted:
-            self.tree.insert('', END, iid=person.instId, text=person.label)
+            self.tree.insert("", END, iid=person.instId, text=person.label)
 
     def add_person(self, person):
         i = self.find_insertion_point(person.label)
         self.peopleSorted.insert(i, person)
         self.people[person.instId] = person
-        self.tree.insert('', i, iid=person.instId, text=person.label)
+        self.tree.insert("", i, iid=person.instId, text=person.label)
         self.update_tags(person)
 
     def on_tree_select(self, event):
-        self.event_generate('<<PersonSelect>>')
+        self.event_generate("<<PersonSelect>>")
 
     def select(self, person):
         iid = person.instId
         self.tree.selection_set(iid)
         self.tree.focus(iid)
         self.tree.see(iid)
-        self.event_generate('<<PersonSelect>>')
+        self.event_generate("<<PersonSelect>>")
 
     def get_selected(self):
         iid = self.tree.focus()
@@ -87,7 +87,7 @@ class PersonList(ttk.Frame):
         elif not person.is_latest():
             self.tree.item(iid, tags='past')
         else:
-            self.tree.item(iid, tags='')
+            self.tree.item(iid, tags="")
 
     def update_label(self, person):
         iid = person.instId
@@ -99,9 +99,9 @@ class PersonList(ttk.Frame):
             self.tree.detach(person.instId)
             self.peopleSorted.remove(person)
             i = self.find_insertion_point(person.label)
-            self.tree.move(person.instId, '', i)
+            self.tree.move(person.instId, "", i)
             self.peopleSorted.insert(i, person)
-            log_debug("PersonList.update_position", "Moved to index %d: %s" % (i, person.label))
+            log_debug("PersonList.update_position", "Moved to index {}: {}".format(i, person.label))
 
     def is_correct_position(self, person):
         i = self.peopleSorted.index(person)
@@ -112,7 +112,5 @@ class PersonList(ttk.Frame):
         return True
 
     def find_insertion_point(self, label):
-        for i, person in enumerate(self.peopleSorted):
-            if label <= person.label:
-                return i
-        return len(self.peopleSorted)
+        return next((i for i, person in enumerate(self.peopleSorted) if label <= person.label),
+                    len(self.peopleSorted))

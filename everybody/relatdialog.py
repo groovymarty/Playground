@@ -2,18 +2,17 @@
 
 from tkinter import *
 from tkinter import ttk
-from tkinter import simpledialog, messagebox
+from tkinter import simpledialog
 from everybody import clipboard, services, personsearch
 from everybody.relat import Relat
 from everybody.personsearch import PersonSearch
 from tkit.widgethelper import WidgetHelper
 
 class RelatDialog(simpledialog.Dialog, WidgetHelper):
-    def __init__(self, parent, genRelats1):
-        self.genRelats = genRelats1
-        simpledialog.Dialog.__init__(self, parent)
-
-    def body(self, master):
+    def __init__(self, parent, genRelats, initValues=None):
+        self.genRelats = genRelats
+        self.initValues = initValues
+        # we can't set the initial values until body() is called to create the widgets
         self.relatSpec = ""
         self.instId = ""
         self.selector = ""
@@ -25,7 +24,9 @@ class RelatDialog(simpledialog.Dialog, WidgetHelper):
         }
         self.errorMsgs = {}
         self.tolerateBlank = True
-        
+        simpledialog.Dialog.__init__(self, parent)
+
+    def body(self, master):
         for row in range(0, 4):
             master.rowconfigure(row, pad=10)
         for column in range(0, 3):
@@ -53,6 +54,12 @@ class RelatDialog(simpledialog.Dialog, WidgetHelper):
 
         self.statusLabel = ttk.Label(master)
         self.statusLabel.grid(row=3, column=0, columnspan=3, sticky=W)
+
+        if self.initValues is not None:
+            self.relatSpec, self.instId, self.selector = self.initValues
+            self.set_relat(self.relatSpec)
+            self.set_person(self.instId)
+            self.set_version(self.selector)
         return self.relatCbx
 
     def buttonbox(self):
@@ -85,6 +92,15 @@ class RelatDialog(simpledialog.Dialog, WidgetHelper):
         else:
             self.set_error_message(key, "")
 
+    def set_relat(self, relatSpec):
+        try:
+            self.relatSpec = Relat.check_relat(relatSpec)
+            self.relatCbx.set(Relat.format_relat(self.relatSpec))
+            self.update_error_message('relatSpec')
+        except ValueError as e:
+            self.relatSpec = ""
+            self.set_error_message('relatSpec', str(e))
+
     def set_person(self, instId):
         if instId:
             person = services.database().lookup(instId)
@@ -92,7 +108,7 @@ class RelatDialog(simpledialog.Dialog, WidgetHelper):
                 # different person?
                 change = instId != self.instId
                 # set up person
-                self.instId = instId
+                self.instId = person.instId
                 self.personCbx.set(person.label)
                 self.set_error_message('instId', "")
                 # move to top of recent people list
@@ -114,28 +130,38 @@ class RelatDialog(simpledialog.Dialog, WidgetHelper):
             self.personCbx.set("")
             self.update_error_message('instId')
 
-    def do_search(self):
-        instId = PersonSearch(services.tkRoot()).result
-        if instId:
-            self.set_person(instId)
-        self.update_status()
-          
-    def on_relat_big_change(self, event):
+    def set_version(self, selector):
         try:
-            self.relatSpec = Relat.check_relat(self.relatCbx.get())
-            self.relatCbx.set(Relat.format_relat(self.relatSpec))
-            self.update_error_message('relatSpec')
+            self.selector = services.database().check_selector(selector)
+            self.versionCbx.set(self.selector)
+            self.update_error_message('selector')
         except ValueError as e:
-            self.relatSpec = ""
-            self.set_error_message('relatSpec', str(e))
+            self.selector = ""
+            self.set_error_message('selector', str(e))
+        if self.selector and self.instId:
+            person = services.database().lookup(self.instId)
+            if person is not None and not person.has_version(self.selector):
+                self.set_error_message('selector', "Version {} not found".format(self.selector))
+
+    def on_relat_big_change(self, event):
+        self.set_relat(self.relatCbx.get())
         self.update_status()
 
     def on_person_big_change(self, event):
         label = self.personCbx.get().strip()
         if label:
+            # Order of search:
+            # 1. Check for match in recent person list
+            # 2. Accept database ID if typed perfectly
+            # 3. General search by name
             instId = clipboard.find_recent_person_by_label(label)
             if instId:
                 self.set_person(instId)
+            elif services.database().lookup(label):
+                instId, selector = services.database().split_id(label)
+                self.set_person(instId)
+                if selector:
+                    self.set_version(selector)
             else:
                 self.set_status("Searching...")
                 self.update_idletasks()
@@ -149,18 +175,14 @@ class RelatDialog(simpledialog.Dialog, WidgetHelper):
             self.set_person("")
         self.update_status()
 
+    def do_search(self):
+        instId = PersonSearch(services.tkRoot()).result
+        if instId:
+            self.set_person(instId)
+        self.update_status()
+
     def on_version_big_change(self, event):
-        try:
-            self.selector = services.database().check_selector(self.versionCbx.get())
-            self.versionCbx.set(self.selector)
-            self.update_error_message('selector')
-        except ValueError as e:
-            self.selector = ""
-            self.set_error_message('selector', str(e))
-        if self.selector and self.instId:
-            person = services.database().lookup(self.instId)
-            if person is not None and not person.has_version(self.selector):
-                self.set_error_message('selector', "Version {} not found".format(self.selector))
+        self.set_version(self.versionCbx.get())
         self.update_status()
 
     def validate(self):
@@ -176,4 +198,4 @@ class RelatDialog(simpledialog.Dialog, WidgetHelper):
             return True
 
     def apply(self):
-        self.result = (self.relatSpec, services.database().join_id(self.instId, self.selector))
+        self.result = self.relatSpec, self.instId, self.selector

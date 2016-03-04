@@ -8,8 +8,19 @@ from basic_services import log_info, log_error, log_debug
 def format_version(version):
     return ".".join(str(part) if part is not None else "*" for part in version)
 
+def split_id(varId):
+    parts = varId.split("-", 1)
+    if len(parts) == 1:
+        parts.append("")
+    return parts
+
 def join_id(*parts):
-    return "-".join(parts)
+    if len(parts) > 2:
+        raise ValueError("FileCity: ID cannot have more than two parts")
+    elif len(parts) == 2 and not parts[1]:
+        return parts[0]
+    else:
+        return "-".join(parts)
 
 class Variant:
     def __init__(self, inst, version, fileName="", hint=""):
@@ -154,6 +165,14 @@ class FileCitySoul(Soul):
     @staticmethod
     def is_same_minor_series(version1, version2):
         return version1[0] == version2[0]
+
+    @staticmethod
+    def split_id(varId):
+        return split_id(varId)
+
+    @staticmethod
+    def join_id(*parts):
+        return join_id(*parts)
 
 class Instance:
     def __init__(self, myType, instNum):
@@ -392,7 +411,7 @@ class FileCity:
     # the latest version on major branch 1.
     # "Per0123-*.*" returns the latest version, same as "Per0123" by itself.
     def lookup(self, instOrVarId):
-        parts = instOrVarId.split("-", 2)
+        parts = instOrVarId.split("-", 1)
         if len(parts) == 1:
            # argument is an instance id
            instId = instOrVarId
@@ -426,7 +445,11 @@ class FileCity:
     @staticmethod
     def format_version(version):
         return format_version(version)
-      
+
+    @staticmethod
+    def split_id(varId):
+        return split_id(varId)
+
     @staticmethod
     def join_id(*parts):
         return join_id(*parts)

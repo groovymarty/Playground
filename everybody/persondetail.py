@@ -68,6 +68,7 @@ class PersonDetail(ttk.Frame, WidgetGarden):
         self.diffVersion = None
         self.readOnly = person is None
         self.addrTabIds = {}
+        self.relatCache = {}
         self.make_styles()
         self.make_images()
         self.make_widgets()
@@ -193,17 +194,16 @@ class PersonDetail(ttk.Frame, WidgetGarden):
         self.grid_widget(relatFrame, rowspan=2, sticky=(N,W,E,S))
         relatFrame.grid_columnconfigure(0, weight=1)
         relatFrame.grid_rowconfigure(0, weight=1)
-        self.relatTree = ttk.Treeview(relatFrame, height=5, show='tree', columns='who')
+
+        self.relatTree = ttk.Treeview(relatFrame, height=5, show='tree', columns=('person', 'version'))
         self.relatTree.grid(row=0, column=0, sticky=(N,W,E,S))
         self.relatTree.column('#0', width=90)
-        #self.relatTree.heading('#0', text="Relationship")
-        self.relatTree.column('who', width=200)
-        #self.relatTree.heading('who', text="Person")
-        #self.relatTree.column('version', width=60)
-        #self.relatTree.heading('version', text="Version")
+        self.relatTree.column('person', width=200)
+        self.relatTree.column('version', width=30)
         sb = ttk.Scrollbar(relatFrame, orient=VERTICAL, command=self.relatTree.yview)
         sb.grid(row=0, column=1, sticky=(N,S))
         self.relatTree['yscrollcommand'] = sb.set
+        self.relatTree.bind("<Double-1>", self.on_relat_double_click)
         self.next_col()
 
     def make_msg_frame(self):
@@ -352,23 +352,77 @@ class PersonDetail(ttk.Frame, WidgetGarden):
                 if key in self.vars:
                     self.write_var(key, value)
 
-    def load_relats(self):
-        self.relatTree.delete(*self.relatTree.get_children())
-        if self.person is not None:
-            for relat in Relat.simpleRelats:
-                who = self.person.get_value(relat)
-                if who is not None:
-                    self.relatTree.insert('', END, iid=relat, text=Relat.relatNames[relat], values=who)
-
     def load_all(self):
         self.load_vars()
         self.load_addr_vars(self.get_cur_addr_tab())
         self.load_relats()
 
+    def load_relats(self):
+        self.relatTree.delete(*self.relatTree.get_children())
+        self.relatCache = {}
+        if self.person is not None:
+            for spec in self.person.generate_relat_specs():
+                whoId = self.person.get_value(spec)
+                if whoId is not None:
+                    who = services.database().lookup(whoId)
+                    self.relatCache[spec] = who
+                    self.relatTree.insert("", END, iid=spec, text=Relat.format_relat(spec),
+                                          values=self.make_relat_values(spec))
+
+    def make_relat_values(self, spec):
+        whoId = self.person.get_value(spec)
+        instId, selector = self.person.split_id(whoId)
+        who = self.relatCache.get(spec, None)
+        if who is not None:
+            return who.label, selector
+        else:
+            return instId, selector
+
     def do_add_relat(self):
         if self.person is not None:
-            result = RelatDialog(services.tkRoot(), self.person.generate_relat_specs(extra=3)).result
-            print(result)
+            self.do_relat_dialog()
+
+    def on_relat_double_click(self, event):
+        if self.person is not None:
+            spec = self.relatTree.focus()
+            if spec:
+                self.do_relat_dialog(spec)
+
+    def do_relat_dialog(self, oldSpec=""):
+        db = services.database()
+        initValues = None
+        if oldSpec:
+            oldWhoId = self.person.get_value(oldSpec)
+            if oldWhoId is not None:
+                oldInstId, oldSelector = db.split_id(oldWhoId)
+                initValues = oldSpec, oldInstId, oldSelector
+        result = RelatDialog(services.tkRoot(), self.person.generate_relat_specs(extra=3), initValues).result
+        if result is not None:
+            spec, instId, selector = result
+            whoId = db.join_id(instId, selector)
+            if oldSpec and spec != oldSpec:
+                self.person.set_value(oldSpec, None)
+                self.relatCache[oldSpec] = None
+                self.relatTree.delete(oldSpec)
+            self.person.set_relat(spec, whoId)
+            who = db.lookup(whoId)
+            self.relatCache[spec] = who
+            if self.relatTree.exists(spec):
+                self.relatTree.item(spec, values=self.make_relat_values(spec))
+            else:
+                i = self.find_relat_insertion_point(spec)
+                self.relatTree.insert("", i, iid=spec, text=Relat.format_relat(spec),
+                                      values=self.make_relat_values(spec))
+
+    def find_relat_insertion_point(self, specToInsert):
+        i = 0
+        for spec in self.person.generate_relat_specs():
+            if spec == specToInsert:
+                return i
+            elif self.relatTree.exists(spec):
+                i += 1
+        log_error("PersonDetail.find_relat_insertion_point: No such relationship:", specToInsert)
+        return END
 
     def do_discard(self):
         if self.person is not None:

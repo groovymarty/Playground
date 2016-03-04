@@ -139,6 +139,12 @@ class Body:
     def is_same_minor_series(self, version1, version2):
         return self.soul.is_same_minor_series(version1, version2)
 
+    def split_id(self, varId):
+        return self.soul.split_id(varId)
+
+    def join_id(self, *parts):
+        return self.soul.join_id(*parts)
+
     def has_value(self, key):
         self.ensure_loaded()
         return key in self.newValues or key in self.protoValues or key in self.soul.values
@@ -319,6 +325,14 @@ class Soul:
     @staticmethod
     def is_same_minor_series(version1, version2):
         return version1[0] == version2[0]
+
+    @staticmethod
+    def split_id(varId):
+        return varId.split("-")
+
+    @staticmethod
+    def join_id(*parts):
+        return "-".join(*parts)
 
 # Functions for handling structured keys like "work.phone" and "child.3"
 def join_key(*parts):

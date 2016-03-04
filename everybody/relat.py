@@ -30,7 +30,7 @@ class Relat:
         if not spec:
             return ""
         elif "." in spec:
-            (relat, index) = spec.split(".", 2)
+            (relat, index) = spec.split(".", 1)
             return "{} {}".format(Relat.relatNames[relat], index)
         else:
             return Relat.relatNames[spec]
@@ -39,10 +39,10 @@ class Relat:
     def check_relat(value, maxIndex=100):
         # accept relat key names (dotted) as well as formatted ones (space separated)
         if "." in value:
-            parts = value.strip().split(".", 2)
+            parts = value.strip().split(".", 1)
         else:
             # split used this way will split at whitespace and strip extra whitespace
-            parts = value.split(maxsplit=2)
+            parts = value.split(maxsplit=1)
         if len(parts) == 0:
             return ""
         elif len(parts) == 1:
@@ -86,7 +86,7 @@ class RelatHelper:
         maximums = {Relat.maxIndexKeys[relat]: 0 for relat in Relat.indexedRelats}
         for key in self.soul.values:
             if key not in self.keyToAddrFlavor and "." in key:
-                relat, index = key.split(".", 2)
+                relat, index = key.split(".", 1)
                 if relat in Relat.indexedRelats:
                     maxKey = Relat.maxIndexKeys[relat]
                     try:
@@ -120,3 +120,16 @@ class RelatHelper:
             n = maximum
         for i in range(1, n+1):
             yield join_key(relat, str(i))
+
+    def set_relat(self, spec, whoId):
+        self.set_value(spec, whoId)
+        if "." in spec:
+            relat, index = spec.split(".", 1)
+            if relat in Relat.indexedRelats:
+                maxKey = Relat.maxIndexKeys[relat]
+                try:
+                    index = int(index)
+                    if index > self.get_value(maxKey):
+                        self.set_value(maxKey, index)
+                except ValueError:
+                    log_error("RelatHelper.set_relat: index is not a number, ignoring: {}".format(spec))
