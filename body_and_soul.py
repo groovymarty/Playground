@@ -164,18 +164,26 @@ class Body:
 
     def set_value(self, key, value):
         self.ensure_loaded()
-        if key not in self.soul.values or value != self.soul.values[key]:
-            if key not in self.protoValues or value != self.protoValues[key]:
-                self.newValues[key] = value
-            else:
-                # Value just written matches proto value, so delete new value if any
-                if key in self.newValues:
-                    del self.newValues[key]
-        else:
-            # Value just written matches soul value, so delete our value if any
-            # No worry about proto value because key in soul.values means key not in protoValues
+        if value is None and key not in self.soul.values:
+            # Special case that lets you "undo" a previous set_value() for a key that
+            # doesn't exist in soul_values.  Leaves key not defined in any of the three dicts.
             if key in self.newValues:
                 del self.newValues[key]
+            if key in self.protoValues:
+                del self.protoValues[key]
+        else:
+            if key not in self.soul.values or value != self.soul.values[key]:
+                if key not in self.protoValues or value != self.protoValues[key]:
+                    self.newValues[key] = value
+                else:
+                    # Value just written matches proto value, so delete new value if any
+                    if key in self.newValues:
+                        del self.newValues[key]
+            else:
+                # Value just written matches soul value, so delete our value if any
+                # No worry about proto value because key in soul.values means key not in protoValues
+                if key in self.newValues:
+                    del self.newValues[key]
 
     # Proto values must be set to their default value (can be changed with set_value)
     # Note you cannot set a proto value for an existing field!
