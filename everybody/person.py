@@ -183,7 +183,7 @@ class Person(Body, RelatHelper):
 
     def set_addr_value(self, flavor, key, value):
         self.touch_address(flavor)
-        self.set_value(join_key(flavor, value))
+        self.set_value(join_key(flavor, key), value)
 
     def build_address(self, flavor='home'):
         lines = []

@@ -4,7 +4,7 @@ from tkinter import *
 from tkinter import ttk
 from tkinter import simpledialog
 from everybody import clipboard, services, personsearch
-from everybody.relat import Relat
+from everybody.relat import check_relat, format_relat
 from everybody.personsearch import PersonSearch
 from tkit.widgethelper import WidgetHelper
 
@@ -34,7 +34,7 @@ class RelatDialog(simpledialog.Dialog, WidgetHelper):
 
         ttk.Label(master, text="Relationship").grid(row=0, column=0, sticky=W)
         self.relatCbx = ttk.Combobox(master,
-                                     values=[Relat.format_relat(key) for key in self.genRelats])
+                                     values=[format_relat(key) for key in self.genRelats])
         self.relatCbx.grid(row=0, column=1, sticky=(W,E))
         self.bind_combobox_big_change(self.relatCbx, self.on_relat_big_change)
 
@@ -94,8 +94,8 @@ class RelatDialog(simpledialog.Dialog, WidgetHelper):
 
     def set_relat(self, relatSpec):
         try:
-            self.relatSpec = Relat.check_relat(relatSpec)
-            self.relatCbx.set(Relat.format_relat(self.relatSpec))
+            self.relatSpec = check_relat(relatSpec)
+            self.relatCbx.set(format_relat(self.relatSpec))
             self.update_error_message('relatSpec')
         except ValueError as e:
             self.relatSpec = ""

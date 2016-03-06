@@ -58,11 +58,15 @@ class PersonList(ttk.Frame):
         self.event_generate("<<PersonSelect>>")
 
     def get_selected(self):
-        iid = self.tree.focus()
-        if iid in self.people:
-            return self.people[iid]
+        sel = self.tree.selection()
+        if sel:
+            iid = sel[0]
+            if iid in self.people:
+                return self.people[iid]
+            else:
+                log_debug("PersonList.get_selected", "No such iid:", iid)
+                return None
         else:
-            log_debug("PersonList.get_selected", "No such iid:", iid)
             return None
 
     def on_person_change(self, person):

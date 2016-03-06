@@ -5,7 +5,7 @@ from tkinter import ttk
 from tkinter import messagebox
 from everybody import services, clipboard
 from everybody.person import Person
-from everybody.relat import Relat
+from everybody.relat import format_relat
 from everybody.relatdialog import RelatDialog
 from body_and_soul import join_key, make_flavored
 from basic_data import gender, us_state, maritalstatus
@@ -66,6 +66,7 @@ class PersonDetail(ttk.Frame, WidgetGarden):
         self.person = person
         self.diffs = set()
         self.diffVersion = None
+        self.diffMaxIndex = 0
         self.readOnly = person is None
         self.addrTabIds = {}
         self.relatCache = {}
@@ -186,8 +187,14 @@ class PersonDetail(ttk.Frame, WidgetGarden):
         self.next_col()
 
     def make_relat_heading(self):
-        self.addRelatButton = ttk.Button(self.curParent, text="Add Relationship", command=self.do_add_relat)
-        self.grid_widget(self.addRelatButton, sticky=(S,W))
+        relatHeadFrame = ttk.Frame(self.curParent)
+        self.grid_widget(relatHeadFrame, sticky=(S,W,E))
+        relatHeadFrame.grid_columnconfigure(0, weight=1)
+        relatHeadFrame.grid_columnconfigure(1, weight=1)
+        self.addRelatButton = ttk.Button(relatHeadFrame, text="Add Relationship", command=self.do_add_relat)
+        self.addRelatButton.grid(row=0, column=0, sticky=W)
+        self.delRelatButton = ttk.Button(relatHeadFrame, text="Delete Relationship", command=self.do_del_relat)
+        self.delRelatButton.grid(row=0, column=1, sticky=W)
 
     def make_relat_frame(self):
         relatFrame = ttk.Frame(self.curParent)
@@ -203,7 +210,12 @@ class PersonDetail(ttk.Frame, WidgetGarden):
         sb = ttk.Scrollbar(relatFrame, orient=VERTICAL, command=self.relatTree.yview)
         sb.grid(row=0, column=1, sticky=(N,S))
         self.relatTree['yscrollcommand'] = sb.set
+        self.relatTree.bind("<<TreeviewSelect>>", self.on_relat_select)
+        self.relatTree.bind("<Button-1>", self.on_relat_click)
         self.relatTree.bind("<Double-1>", self.on_relat_double_click)
+        self.relatTree.tag_configure('changed', background='yellow')
+        self.relatTree.tag_configure('error', background='orange')
+        self.relatTree.tag_configure('delta', background='lightblue')
         self.next_col()
 
     def make_msg_frame(self):
@@ -361,13 +373,28 @@ class PersonDetail(ttk.Frame, WidgetGarden):
         self.relatTree.delete(*self.relatTree.get_children())
         self.relatCache = {}
         if self.person is not None:
-            for spec in self.person.generate_relat_specs():
+            if self.diffs:
+                # This is a brute-force way to make sure generator covers
+                # all relationships in the two people being compared.
+                # It could generate many more specs than needed, but it won't
+                # miss any and they will be in the correct order.
+                extra = max(self.person.find_max_index(), self.diffMaxIndex)
+            else:
+                extra = 0
+            for spec in self.person.generate_relat_specs(extra):
                 whoId = self.person.get_value(spec)
                 if whoId is not None:
                     who = services.database().lookup(whoId)
                     self.relatCache[spec] = who
-                    self.relatTree.insert("", END, iid=spec, text=Relat.format_relat(spec),
+                    self.relatTree.insert("", END, iid=spec, text=format_relat(spec),
                                           values=self.make_relat_values(spec))
+                elif spec in self.diffs:
+                    if self.diffVersion < self.person.version:
+                        phrase = "(Deleted)"
+                    else:
+                        phrase = "(None)"
+                    self.relatTree.insert("", END, iid=spec, text=format_relat(spec),
+                                          values=(phrase, ""))
 
     def make_relat_values(self, spec):
         whoId = self.person.get_value(spec)
@@ -382,11 +409,26 @@ class PersonDetail(ttk.Frame, WidgetGarden):
         if self.person is not None:
             self.do_relat_dialog()
 
+    def do_del_relat(self):
+        if self.person is not None:
+            sel = self.relatTree.selection()
+            if sel:
+                self.delete_relat(sel[0])
+
+    def on_relat_select(self, event):
+        self.update_relat_buttons()
+
+    # if you click on any blank area inside the relationship tree widget,
+    # remove the current selection
+    def on_relat_click(self, event):
+        if not self.relatTree.identify_row(event.y):
+            self.relatTree.selection_remove(self.relatTree.selection())
+
     def on_relat_double_click(self, event):
         if self.person is not None:
-            spec = self.relatTree.focus()
-            if spec:
-                self.do_relat_dialog(spec)
+            sel = self.relatTree.selection()
+            if sel:
+                self.do_relat_dialog(sel[0])
 
     def do_relat_dialog(self, oldSpec=""):
         db = services.database()
@@ -396,14 +438,14 @@ class PersonDetail(ttk.Frame, WidgetGarden):
             if oldWhoId is not None:
                 oldInstId, oldSelector = db.split_id(oldWhoId)
                 initValues = oldSpec, oldInstId, oldSelector
+            else:
+                initValues = oldSpec, "", ""
         result = RelatDialog(services.tkRoot(), self.person.generate_relat_specs(extra=3), initValues).result
         if result is not None:
             spec, instId, selector = result
             whoId = db.join_id(instId, selector)
             if oldSpec and spec != oldSpec:
-                self.person.set_value(oldSpec, None)
-                self.relatCache[oldSpec] = None
-                self.relatTree.delete(oldSpec)
+                self.delete_relat(oldSpec)
             self.person.set_relat(spec, whoId)
             who = db.lookup(whoId)
             self.relatCache[spec] = who
@@ -411,8 +453,36 @@ class PersonDetail(ttk.Frame, WidgetGarden):
                 self.relatTree.item(spec, values=self.make_relat_values(spec))
             else:
                 i = self.find_relat_insertion_point(spec)
-                self.relatTree.insert("", i, iid=spec, text=Relat.format_relat(spec),
+                self.relatTree.insert("", i, iid=spec, text=format_relat(spec),
                                       values=self.make_relat_values(spec))
+            self.update_relat_item(spec)
+            self.update_save_buttons()
+
+    def delete_relat(self, spec):
+        self.person.set_value(spec, None)
+        if spec in self.relatCache:
+            del self.relatCache[spec]
+        if self.person.is_changed(spec) or spec in self.diffs:
+            self.relatTree.item(spec, values=("(Deleted)", ""))
+            self.update_relat_item(spec)
+        else:
+            self.relatTree.delete(spec)
+        self.update_relat_buttons()
+        self.update_save_buttons()
+
+    def update_relat_tree(self):
+        for spec in self.relatTree.get_children():
+            self.update_relat_item(spec)
+
+    def update_relat_item(self, spec):
+        if self.person.is_error(spec):
+            self.relatTree.item(spec, tags='error')
+        elif self.person.is_changed(spec):
+            self.relatTree.item(spec, tags='changed')
+        elif spec in self.diffs:
+            self.relatTree.item(spec, tags='delta')
+        else:
+            self.relatTree.item(spec, tags="")
 
     def find_relat_insertion_point(self, specToInsert):
         i = 0
@@ -462,6 +532,7 @@ class PersonDetail(ttk.Frame, WidgetGarden):
                 prior.touch_addresses(self.person.get_addresses())
                 self.diffs = self.person.compare(prior)
                 self.diffVersion = prior.version
+                self.diffMaxIndex = prior.find_max_index()
             else:
                 self.person.load(selector)
                 self.clear_diffs()
@@ -566,6 +637,7 @@ class PersonDetail(ttk.Frame, WidgetGarden):
 
     def update_relat_buttons(self):
         self.disable_widget(self.addRelatButton, self.readOnly)
+        self.disable_widget(self.delRelatButton, self.readOnly or not self.relatTree.selection())
 
     def update_all(self):
         self.readOnly = self.is_read_only()
@@ -577,6 +649,7 @@ class PersonDetail(ttk.Frame, WidgetGarden):
         self.update_nav_buttons()
         self.update_version_label()
         self.update_relat_buttons()
+        self.update_relat_tree()
 
     def confirm_save_with_errors(self):
         if self.person is not None and self.person.is_any_error():
