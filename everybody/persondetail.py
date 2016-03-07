@@ -72,6 +72,7 @@ class PersonDetail(ttk.Frame, WidgetGarden):
         self.readOnly = person is None
         self.addrTabIds = {}
         self.relatCache = {}
+        self.useSharedSet = set()
         self.make_styles()
         self.make_images()
         self.make_widgets()
@@ -265,10 +266,13 @@ class PersonDetail(ttk.Frame, WidgetGarden):
     def on_var_change(self, key):
         if self.person is not None:
             self.person.set_value(key, self.read_var(key))
-            if key in Person.useSharedKeys:
+            if key in Person.useSharedGroups:
                 self.update_widgets()
             else:
                 self.update_widget_style(key)
+                if key in Person.keyToUseShared:
+                    self.update_use_shared_set()
+                    self.update_widget(Person.keyToUseShared[key])
             if key in Person.keyToAddrFlavor:
                 self.update_addr_tab(Person.keyToAddrFlavor[key])
             self.update_top()
@@ -288,18 +292,29 @@ class PersonDetail(ttk.Frame, WidgetGarden):
             self.person.set_value_error(key, e)
             self.update_error_msgs()
 
-    def update_widgets(self):
+    def update_use_shared_set(self):
         if self.person is not None:
-            useShared = {key for key in Person.useSharedKeys if self.person.get_value(key)}
+            self.useSharedSet = {key for key in Person.useSharedGroups if self.person.get_value(key)}
         else:
-            useShared = set()
+            self.useSharedSet.clear()
+
+    def update_widgets(self):
+        self.update_use_shared_set()
         for key in self.vars:
-            self.update_widget_style(key)
-            if key in Person.keyToUseShared:
-                shared = Person.keyToUseShared[key] in useShared
-            else:
-                shared = False
-            self.set_widget_enable(key, not self.readOnly and not shared)
+            self.update_widget(key)
+
+    def update_widget(self, key):
+        self.update_widget_style(key)
+        if self.readOnly:
+            self.set_widget_disable(key)
+        elif key in Person.keyToUseShared:
+            # widget is under the jurisdiction of a "use shared" checkbox
+            self.set_widget_disable(key, Person.keyToUseShared[key] in self.useSharedSet)
+        elif key in Person.useSharedGroups and self.person is not None and not self.person.get_value(key):
+            # widget is a "use shared" checkbox that's not checked
+            self.set_widget_disable(key, self.person.is_changed_set(Person.useSharedGroups[key]))
+        else:
+            self.set_widget_enable(key)
 
     def update_widget_style(self, key):
         if self.person is not None:

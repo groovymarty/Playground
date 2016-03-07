@@ -99,8 +99,13 @@ class Person(Body, RelatHelper):
     # Mapping from key to address flavor, for example 'home.addrLine1' maps to 'home'
     keyToAddrFlavor = None
 
-    # Keys of "Use Shared" values (more added below)
-    useSharedKeys = ['useSharedAnniv']
+    # Keys governed by a "Use Shared Address" key
+    useSharedAddrKeys = set(addrDefaults.keys())
+    useSharedAddrKeys.remove('useSharedAddr')
+    useSharedAddrKeys.add('phone')
+
+    # Keys governed by each "Use Shared" key (more added below)
+    useSharedGroups = {'useSharedAnniv': set('anniversary')}
 
     # Mapping from key to the corresponding "Use Shared" key (more added below)
     keyToUseShared = {
@@ -240,8 +245,10 @@ for flavor in Person.addrFlavors:
 # Mapping from key to address flavor, for example 'home.addrLine1' maps to 'home'
 Person.keyToAddrFlavor = {key: flavor for flavor, d in Person.addrKeysByFlavor.items() for key in d}
 
-# Keys of "Use Shared" checkboxes
-Person.useSharedKeys.extend(join_key(flavor, 'useSharedAddr') for flavor in Person.addrFlavors)
+
+for flavor in Person.addrFlavors:
+    Person.useSharedGroups.update({join_key(flavor, 'useSharedAddr'): make_flavored(flavor, Person.useSharedAddrKeys)})
+
 
 # Mapping from key to the corresponding "Use Shared" key
 Person.keyToUseShared.update({join_key(flavor, key): join_key(flavor, 'useSharedAddr')

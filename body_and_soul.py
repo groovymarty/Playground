@@ -346,5 +346,12 @@ class Soul:
 def join_key(*parts):
     return ".".join(parts)
 
-def make_flavored(flavor, d):
-    return {join_key(flavor, key): value for key, value in d.items()}
+def make_flavored(flavor, x):
+    if isinstance(x, set):
+        return {join_key(flavor, key) for key in x}
+    elif isinstance(x, dict):
+        return {join_key(flavor, key): value for key, value in x.items()}
+    elif isinstance(x, str):
+        return join_key(flavor, x)
+    else:
+        raise ValueError("make_flavored: expected set, dict or string, got this: {}".format(x))

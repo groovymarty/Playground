@@ -102,6 +102,10 @@ class WidgetGarden(LayoutHelper, WidgetHelper):
         if key in self.widgets:
             self.enable_widget(self.widgets[key], enable, recursive=True)
 
+    def set_widget_disable(self, key, disable=True):
+        if key in self.widgets:
+            self.disable_widget(self.widgets[key], disable, recursive=True)
+
     def read_var(self, key):
         var = self.vars[key]
         if key in self.mappers:
