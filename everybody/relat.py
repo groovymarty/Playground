@@ -7,7 +7,7 @@ from basic_services import log_error
 # or a dotted form for indexed relationships (like "son.1" or "parent.2")
 # Relationship specs are directly used as value keys in Person objects
 
-simpleRelats = 'father', 'mother', 'husband', 'wife', 'spouse'
+simpleRelats = 'father', 'mother', 'husband', 'wife', 'spouse', 'livesWith'
 indexedRelats = 'parent', 'child', 'son', 'daughter'
 relatNames = {
     'father': "Father",
@@ -15,6 +15,7 @@ relatNames = {
     'husband': "Husband",
     'wife': "Wife",
     'spouse': "Spouse",
+    'livesWith': "Lives With",
     'parent': "Parent",
     'child': "Child",
     'son': "Son",
@@ -39,7 +40,7 @@ def check_relat(value, maxIndex=100):
         parts = value.strip().split(".", 1)
     else:
         # split used this way will split at whitespace and strip extra whitespace
-        parts = value.split(maxsplit=1)
+        parts = value.rsplit(maxsplit=1)
     if len(parts) == 0:
         return ""
     elif len(parts) == 1:
@@ -48,14 +49,21 @@ def check_relat(value, maxIndex=100):
     else:
         (name, index) = parts
     if name in relatNames:
-        # relat names may be used if typed perfectly
+        # relat key names may be used if typed perfectly
         relat = name
     else:
         ucName = name.upper()
         if ucName in ucNameToRelat:
             relat = ucNameToRelat[ucName]
         else:
-            raise ValueError('"{}" is not a valid relationship'.format(value))
+            # Might be a simple relationship written as two words, like "Lives With",
+            # in which case splitting was a mistake.  Join again and see if name is recognized.
+            ucName = " ".join(parts).upper()
+            if ucName in ucNameToRelat:
+                relat = ucNameToRelat[ucName]
+                index = None
+            else:
+                raise ValueError('"{}" is not a valid relationship'.format(value))
     if index is None:
         if relat in simpleRelats:
             return relat
@@ -66,7 +74,7 @@ def check_relat(value, maxIndex=100):
             try:
                 i = int(index)
             except ValueError:
-                raise ValueError('"{}" is not a valid indexed relationship'.format(value))
+                raise ValueError('"{}" index is not a number'.format(value))
             if i > maxIndex:
                 raise ValueError('"{}" index is too high'.format(value))
             return join_key(relat, str(i))
@@ -104,6 +112,7 @@ class RelatHelper:
         yield 'husband'
         yield 'wife'
         yield 'spouse'
+        yield 'livesWith'
         yield from self.generate_indexed_relat('son', extra)
         yield from self.generate_indexed_relat('daughter', extra)
         yield from self.generate_indexed_relat('child', extra)

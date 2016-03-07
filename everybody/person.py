@@ -23,6 +23,7 @@ class Person(Body, RelatHelper):
         'birthday': "",
         'maritalStatus': "",
         'anniversary': "",
+        'useSharedAnniv': False,
         'deceased': False,
         'deathDate': "",
         'home.phone': "",
@@ -45,6 +46,8 @@ class Person(Body, RelatHelper):
         'deathDate': date.check_date,
         'home.phone': phone.check_phone,
         'work.phone': phone.check_phone,
+        'seasonal.phone': phone.check_phone,
+        'other.phone': phone.check_phone,
         'mobile.phone': phone.check_phone,
         'email': str.strip
     }
@@ -74,7 +77,8 @@ class Person(Body, RelatHelper):
         'state': "",
         'zipCode': "",
         'country': "USA",
-        'useCountry': False
+        'useCountry': False,
+        'useSharedAddr': False
     }
     addrCheckers = {
         'addrLine1': str.strip,
@@ -94,6 +98,18 @@ class Person(Body, RelatHelper):
 
     # Mapping from key to address flavor, for example 'home.addrLine1' maps to 'home'
     keyToAddrFlavor = None
+
+    # Keys of "Use Shared" values (more added below)
+    useSharedKeys = ['useSharedAnniv']
+
+    # Mapping from key to the corresponding "Use Shared" key (more added below)
+    keyToUseShared = {
+        'anniversary': 'useSharedAnniv',
+        'home.phone': 'home.useSharedAddr',
+        'work.phone': 'work.useSharedAddr',
+        'seasonal.phone': 'seasonal.useSharedAddr',
+        'other.phone': 'other.useSharedAddr'
+    }
 
     def post_load(self):
         # Fill in missing defaults for all existing address flavors
@@ -223,3 +239,11 @@ for flavor in Person.addrFlavors:
 
 # Mapping from key to address flavor, for example 'home.addrLine1' maps to 'home'
 Person.keyToAddrFlavor = {key: flavor for flavor, d in Person.addrKeysByFlavor.items() for key in d}
+
+# Keys of "Use Shared" checkboxes
+Person.useSharedKeys.extend(join_key(flavor, 'useSharedAddr') for flavor in Person.addrFlavors)
+
+# Mapping from key to the corresponding "Use Shared" key
+Person.keyToUseShared.update({join_key(flavor, key): join_key(flavor, 'useSharedAddr')
+                              for key in Person.addrDefaults.keys() if key != 'useSharedAddr'
+                                  for flavor in Person.addrFlavors})

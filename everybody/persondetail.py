@@ -30,6 +30,7 @@ class PersonDetail(ttk.Frame, WidgetGarden):
         'birthday': "Birthday",
         'maritalStatus': "Marital Status",
         'anniversary': "Anniversary",
+        'useSharedAnniv': "Use Shared",
         'deathDate': "DOD",
         'deceased': "Deceased",
         'home.phone': "Home Phone",
@@ -49,6 +50,7 @@ class PersonDetail(ttk.Frame, WidgetGarden):
         'zipCode': "ZIP Code",
         'country': "Country",
         'useCountry': "Use Country",
+        'useSharedAddr': "Use Shared"
     }
     mappers = {
         'gender': gender.GenderMapper,
@@ -146,6 +148,7 @@ class PersonDetail(ttk.Frame, WidgetGarden):
         self.make_combobox('maritalStatus', maritalstatus.maritalStatusNames+["Unknown"], width=10)
         self.next_row()
         self.make_date('anniversary')
+        self.make_checkbutton('useSharedAnniv')
         self.next_row()
         self.make_date('deathDate')
         self.make_checkbutton('deceased')
@@ -167,6 +170,7 @@ class PersonDetail(ttk.Frame, WidgetGarden):
             self.begin_layout(childFrame, 3)
             childFrame.grid_columnconfigure(1, weight=1)
             self.make_entry(join_key(flavor, 'addrLine1'))
+            self.make_checkbutton(join_key(flavor, 'useSharedAddr'))
             self.next_row()
             self.make_entry(join_key(flavor, 'addrLine2'))
             self.next_row()
@@ -261,7 +265,10 @@ class PersonDetail(ttk.Frame, WidgetGarden):
     def on_var_change(self, key):
         if self.person is not None:
             self.person.set_value(key, self.read_var(key))
-            self.update_widget_style(key)
+            if key in Person.useSharedKeys:
+                self.update_widgets()
+            else:
+                self.update_widget_style(key)
             if key in Person.keyToAddrFlavor:
                 self.update_addr_tab(Person.keyToAddrFlavor[key])
             self.update_top()
@@ -282,9 +289,17 @@ class PersonDetail(ttk.Frame, WidgetGarden):
             self.update_error_msgs()
 
     def update_widgets(self):
+        if self.person is not None:
+            useShared = {key for key in Person.useSharedKeys if self.person.get_value(key)}
+        else:
+            useShared = set()
         for key in self.vars:
             self.update_widget_style(key)
-            self.set_widget_enable(key, not self.readOnly)
+            if key in Person.keyToUseShared:
+                shared = Person.keyToUseShared[key] in useShared
+            else:
+                shared = False
+            self.set_widget_enable(key, not self.readOnly and not shared)
 
     def update_widget_style(self, key):
         if self.person is not None:
@@ -349,6 +364,7 @@ class PersonDetail(ttk.Frame, WidgetGarden):
     def clear_diffs(self):
         self.diffs = set()
         self.diffVersion = None
+        self.diffMaxIndex = 0
 
     def load_vars(self, defaults=Person.defaultValues):
         if self.person is not None:
@@ -508,6 +524,7 @@ class PersonDetail(ttk.Frame, WidgetGarden):
             if not self.confirm_save_with_errors():
                 return
             self.person.save(selector)
+            self.clear_diffs()
             self.update_all()
             self.event_generate('<<PersonSave>>')
             clipboard.add_recent_person(self.person)
