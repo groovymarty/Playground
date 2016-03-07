@@ -5,6 +5,73 @@ from basic_data import checkers, gender, us_state, maritalstatus, phone, date
 from basic_services import log_error
 from everybody.relat import RelatHelper
 
+# Address flavors
+addrFlavors = 'home', 'work', 'seasonal', 'other'
+addrNames = {
+    'home': "Home",
+    'work': "Work",
+    'seasonal': "Seasonal",
+    'other': "Other"
+}
+addrDefaults = {
+    'addrLine1': "",
+    'addrLine2': "",
+    'addrLine3': "",
+    'useLine3': False,
+    'city': "",
+    'state': "",
+    'zipCode': "",
+    'country': "USA",
+    'useCountry': False,
+    'useSharedAddr': False
+}
+addrCheckers = {
+    'addrLine1': str.strip,
+    'addrLine2': str.strip,
+    'addrLine3': str.strip,
+    'city': str.strip,
+    'state': us_state.check_state,
+    'zipCode': str.strip,
+    'country': str.strip
+}
+
+# If sentinel key for a flavor is present, then all other address fields must be present also
+# Two functions, post_load and touch_address, are responsible for ensuring this
+addrSentinelKeys = { flavor: join_key(flavor, 'addrLine1')
+                     for flavor in addrFlavors }
+
+# Default value dictionary with flavored keys for each address flavor
+addrDefaultsByFlavor = { flavor: make_flavored(flavor, addrDefaults)
+                         for flavor in addrFlavors }
+
+# Set of flavored keys for each address flavor
+addrKeysByFlavor = { flavor: set(d.keys())
+                     for flavor, d in addrDefaultsByFlavor.items() }
+
+# Mapping from key to address flavor
+# For example 'home.addrLine1' maps to 'home'
+keyToAddrFlavor = { key: flavor
+                    for flavor, d in addrKeysByFlavor.items()
+                        for key in d}
+
+# Set of unflavored keys governed by a "Use Shared Address" key
+useSharedAddrKeys = set(addrDefaults.keys())
+useSharedAddrKeys.remove('useSharedAddr')
+useSharedAddrKeys.add('phone')
+
+# Set of keys governed by each "Use Shared" key
+# For example this dictionary maps 'home.useSharedAddr' to a set containing 'home.addrLine1', 'home.phone', etc.
+useSharedGroups = {'useSharedAnniv': {'anniversary'}}
+useSharedGroups.update({ join_key(flavor, 'useSharedAddr'): make_flavored(flavor, useSharedAddrKeys)
+                                for flavor in addrFlavors })
+    
+# Mapping from key to the corresponding "Use Shared" key, if any
+# For example this dictionary maps 'home.addrLine1' to 'home.useSharedAddr'
+# But keys with no sharing, like 'birthday', are not in the dictionary
+keyToUseShared = { key: usKey
+                   for usKey, usGroup in useSharedGroups.items()
+                       for key in usGroup }
+
 class Person(Body, RelatHelper):
     # Note all phone numbers are included here, so they exist even if address counterpart does not
     defaultValues = {
@@ -52,85 +119,21 @@ class Person(Body, RelatHelper):
         'email': str.strip
     }
 
-    # Address flavors
-    addrFlavors = 'home', 'work', 'seasonal', 'other'
-    addrNames = {
-        'home': "Home",
-        'work': "Work",
-        'seasonal': "Seasonal",
-        'other': "Other"
-    }
-    # If sentinel key for a flavor is present, then all other address fields must be present also
-    # Two functions, post_load and touch_address, are responsible for ensuring this
-    addrSentinelKeys = {
-        'home': 'home.addrLine1',
-        'work': 'work.addrLine1',
-        'seasonal': 'seasonal.addrLine1',
-        'other': 'other.addrLine1'
-    }
-    addrDefaults = {
-        'addrLine1': "",
-        'addrLine2': "",
-        'addrLine3': "",
-        'useLine3': False,
-        'city': "",
-        'state': "",
-        'zipCode': "",
-        'country': "USA",
-        'useCountry': False,
-        'useSharedAddr': False
-    }
-    addrCheckers = {
-        'addrLine1': str.strip,
-        'addrLine2': str.strip,
-        'addrLine3': str.strip,
-        'city': str.strip,
-        'state': us_state.check_state,
-        'zipCode': str.strip,
-        'country': str.strip
-    }
-
-    # Set of flavored keys for each address flavor (built below)
-    addrKeysByFlavor = None
-
-    # Default values with flavored keys for each address flavor (built below)
-    addrDefaultsByFlavor = None
-
-    # Mapping from key to address flavor, for example 'home.addrLine1' maps to 'home'
-    keyToAddrFlavor = None
-
-    # Keys governed by a "Use Shared Address" key
-    useSharedAddrKeys = set(addrDefaults.keys())
-    useSharedAddrKeys.remove('useSharedAddr')
-    useSharedAddrKeys.add('phone')
-
-    # Keys governed by each "Use Shared" key (more added below)
-    useSharedGroups = {'useSharedAnniv': set('anniversary')}
-
-    # Mapping from key to the corresponding "Use Shared" key (more added below)
-    keyToUseShared = {
-        'anniversary': 'useSharedAnniv',
-        'home.phone': 'home.useSharedAddr',
-        'work.phone': 'work.useSharedAddr',
-        'seasonal.phone': 'seasonal.useSharedAddr',
-        'other.phone': 'other.useSharedAddr'
-    }
-
     def post_load(self):
         # Fill in missing defaults for all existing address flavors
         # But don't add any new address flavors
-        for flavor, sentinelKey in self.addrSentinelKeys.items():
+        for flavor, sentinelKey in addrSentinelKeys.items():
             if sentinelKey in self.soul.values:
-                self.soul.values.update((key, value) for key, value in self.addrDefaultsByFlavor[flavor].items()
+                self.soul.values.update((key, value) for key, value in addrDefaultsByFlavor[flavor].items()
                                         if not key in self.soul.values)
         self.count_indexed_relats()
 
     def pre_save(self):
         # If an address flavor (other than home) is all defaults, remove it before saving to storage
-        for flavor, sentinelKey in self.addrSentinelKeys.items():
+        for flavor, sentinelKey in addrSentinelKeys.items():
             if sentinelKey in self.soul.values and flavor != 'home':
-                if all(self.soul.values[key] == value for key, value in self.addrDefaultsByFlavor[flavor].items()):
-                    for key in self.addrKeysByFlavor[flavor]:
+                if all(self.soul.values[key] == value for key, value in addrDefaultsByFlavor[flavor].items()):
+                    for key in addrKeysByFlavor[flavor]:
                         del self.soul.values[key]
         self.remove_deleted_relats()
 
@@ -181,18 +184,18 @@ class Person(Body, RelatHelper):
         return self.sortName
 
     def has_address(self, flavor):
-        return self.has_value(self.addrSentinelKeys[flavor])
+        return self.has_value(addrSentinelKeys[flavor])
 
     def is_ok_to_save(self):
         return not any(key in self.valueErrors for key in ('firstName', 'lastName'))
 
     def touch_address(self, flavor):
         if not self.has_address(flavor):
-            self.protoValues.update((key, value) for key, value in self.addrDefaultsByFlavor[flavor].items()
+            self.protoValues.update((key, value) for key, value in addrDefaultsByFlavor[flavor].items()
                                     if key not in self.newValues)
 
     def get_addresses(self):
-        return [flavor for flavor in self.addrFlavors if self.has_address(flavor)]
+        return [flavor for flavor in addrFlavors if self.has_address(flavor)]
 
     def touch_addresses(self, flavors):
         for flavor in flavors:
@@ -228,29 +231,9 @@ class Person(Body, RelatHelper):
 # Add properties for all non-flavored fields
 Person.make_all_properties()
 
-# Build default value dictionary with flavored keys for each address flavor
-Person.addrDefaultsByFlavor = {flavor: make_flavored(flavor, Person.addrDefaults)
-                               for flavor in Person.addrFlavors}
-
-# Built set of flavored keys for each address flavor
-Person.addrKeysByFlavor = {flavor: set(d.keys()) for flavor, d in Person.addrDefaultsByFlavor.items()}
-
 # Include home address fields in defaultValues so person will always have home address
-Person.defaultValues.update(Person.addrDefaultsByFlavor['home'])
+Person.defaultValues.update(addrDefaultsByFlavor['home'])
 
 # Add checkers for each address flavor
-for flavor in Person.addrFlavors:
-    Person.checkers.update(make_flavored(flavor, Person.addrCheckers))
-
-# Mapping from key to address flavor, for example 'home.addrLine1' maps to 'home'
-Person.keyToAddrFlavor = {key: flavor for flavor, d in Person.addrKeysByFlavor.items() for key in d}
-
-
-for flavor in Person.addrFlavors:
-    Person.useSharedGroups.update({join_key(flavor, 'useSharedAddr'): make_flavored(flavor, Person.useSharedAddrKeys)})
-
-
-# Mapping from key to the corresponding "Use Shared" key
-Person.keyToUseShared.update({join_key(flavor, key): join_key(flavor, 'useSharedAddr')
-                              for key in Person.addrDefaults.keys() if key != 'useSharedAddr'
-                                  for flavor in Person.addrFlavors})
+for flavor in addrFlavors:
+    Person.checkers.update(make_flavored(flavor, addrCheckers))

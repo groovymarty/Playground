@@ -3,7 +3,7 @@
 from tkinter import *
 from tkinter import ttk
 from tkinter import messagebox
-from everybody import services, clipboard
+from everybody import services, clipboard, person
 from everybody.person import Person
 from everybody.relat import format_relat
 from everybody.relatdialog import RelatDialog
@@ -164,9 +164,9 @@ class PersonDetail(ttk.Frame, WidgetGarden):
         self.addrNb = ttk.Notebook(self.curParent)
         self.grid_widget(self.addrNb, sticky=(N,W,E))
         self.addrNb.bind("<<NotebookTabChanged>>", self.on_addr_tab_change)
-        for i, flavor in enumerate(Person.addrFlavors):
+        for i, flavor in enumerate(person.addrFlavors):
             childFrame = ttk.Frame(self.addrNb)
-            self.addrNb.add(childFrame, text=Person.addrNames[flavor], compound=LEFT)
+            self.addrNb.add(childFrame, text=person.addrNames[flavor], compound=LEFT)
             self.addrTabIds[flavor] = i
             self.begin_layout(childFrame, 3)
             childFrame.grid_columnconfigure(1, weight=1)
@@ -266,15 +266,15 @@ class PersonDetail(ttk.Frame, WidgetGarden):
     def on_var_change(self, key):
         if self.person is not None:
             self.person.set_value(key, self.read_var(key))
-            if key in Person.useSharedGroups:
+            if key in person.useSharedGroups:
                 self.update_widgets()
             else:
                 self.update_widget_style(key)
-                if key in Person.keyToUseShared:
+                if key in person.keyToUseShared:
                     self.update_use_shared_set()
-                    self.update_widget(Person.keyToUseShared[key])
-            if key in Person.keyToAddrFlavor:
-                self.update_addr_tab(Person.keyToAddrFlavor[key])
+                    self.update_widget(person.keyToUseShared[key])
+            if key in person.keyToAddrFlavor:
+                self.update_addr_tab(person.keyToAddrFlavor[key])
             self.update_top()
             self.update_save_buttons()
             self.event_generate('<<PersonChange>>')
@@ -294,7 +294,7 @@ class PersonDetail(ttk.Frame, WidgetGarden):
 
     def update_use_shared_set(self):
         if self.person is not None:
-            self.useSharedSet = {key for key in Person.useSharedGroups if self.person.get_value(key)}
+            self.useSharedSet = {key for key in person.useSharedGroups if self.person.get_value(key)}
         else:
             self.useSharedSet.clear()
 
@@ -307,12 +307,12 @@ class PersonDetail(ttk.Frame, WidgetGarden):
         self.update_widget_style(key)
         if self.readOnly:
             self.set_widget_disable(key)
-        elif key in Person.keyToUseShared:
+        elif key in person.keyToUseShared:
             # widget is under the jurisdiction of a "use shared" checkbox
-            self.set_widget_disable(key, Person.keyToUseShared[key] in self.useSharedSet)
-        elif key in Person.useSharedGroups and self.person is not None and not self.person.get_value(key):
+            self.set_widget_disable(key, person.keyToUseShared[key] in self.useSharedSet)
+        elif key in person.useSharedGroups and self.person is not None and not self.person.get_value(key):
             # widget is a "use shared" checkbox that's not checked
-            self.set_widget_disable(key, self.person.is_changed_set(Person.useSharedGroups[key]))
+            self.set_widget_disable(key, self.person.is_changed_set(person.useSharedGroups[key]))
         else:
             self.set_widget_enable(key)
 
@@ -337,20 +337,20 @@ class PersonDetail(ttk.Frame, WidgetGarden):
         self.update_top()
 
     def get_cur_addr_tab(self):
-        return Person.addrFlavors[self.addrNb.index(self.addrNb.select())]
+        return person.addrFlavors[self.addrNb.index(self.addrNb.select())]
 
     def load_addr_vars(self, flavor):
         if self.person is not None:
             self.person.touch_address(flavor)
-        self.load_vars(Person.addrDefaultsByFlavor[flavor])
+        self.load_vars(person.addrDefaultsByFlavor[flavor])
 
     def update_addr_tabs(self):
-        for flavor in Person.addrFlavors:
+        for flavor in person.addrFlavors:
             self.update_addr_tab(flavor)
 
     def update_addr_tab(self, flavor):
         if self.person is not None:
-            keys = Person.addrKeysByFlavor[flavor]
+            keys = person.addrKeysByFlavor[flavor]
             if self.person.is_error_set(keys):
                 self.set_addr_tab_image(flavor, self.tabImageError)
             elif self.person.is_changed_set(keys):
@@ -610,8 +610,8 @@ class PersonDetail(ttk.Frame, WidgetGarden):
                 self.errorMsgs['style'] = 'TLabel'
 
     def format_error_msg(self, key, msg):
-        if key in Person.keyToAddrFlavor:
-            return "{} {}: {}".format(Person.addrNames[Person.keyToAddrFlavor[key]], self.labelText[key], msg)
+        if key in person.keyToAddrFlavor:
+            return "{} {}: {}".format(person.addrNames[person.keyToAddrFlavor[key]], self.labelText[key], msg)
         else:
             return "{}: {}".format(self.labelText[key], msg)
 
@@ -734,6 +734,6 @@ Click "No" to go back to where you were without losing anything.""".format(what)
             else:
                 return self.person.is_same_minor_series(self.person.version, nextVersion)
 
-for flavor in Person.addrFlavors:
+for flavor in person.addrFlavors:
     PersonDetail.labelText.update(make_flavored(flavor, PersonDetail.addrLabelText))
     PersonDetail.mappers.update(make_flavored(flavor, PersonDetail.addrMappers))

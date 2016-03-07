@@ -87,7 +87,7 @@ class RelatHelper:
     def count_indexed_relats(self):
         maximums = {maxIndexKeys[relat]: 0 for relat in indexedRelats}
         for key in self.soul.values:
-            if key not in self.keyToAddrFlavor and "." in key:
+            if "." in key:
                 relat, index = key.split(".", 1)
                 if relat in indexedRelats:
                     maxKey = maxIndexKeys[relat]
