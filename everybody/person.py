@@ -29,6 +29,8 @@ class Person(Body, RelatHelper, AddrHelper):
         'deathDate': "",
         'home.phone': "",
         'work.phone': "",
+        'seasonal.phone': "",
+        'other.phone': "",
         'mobile.phone': "",
         'email': ""
     }

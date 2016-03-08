@@ -72,7 +72,7 @@ class PersonDetail(ttk.Frame, WidgetGarden):
         self.readOnly = person is None
         self.addrTabIds = {}
         self.relatCache = {}
-        self.useSharedSet = set()
+        self.usingShared = set()
         self.make_styles()
         self.make_images()
         self.make_widgets()
@@ -266,13 +266,14 @@ class PersonDetail(ttk.Frame, WidgetGarden):
     def on_var_change(self, key):
         if self.person is not None:
             self.person.set_value(key, self.read_var(key))
+            self.update_widget_style(key)
             if key in sharing.useSharedGroups:
-                self.update_widgets()
-            else:
-                self.update_widget_style(key)
-                if key in sharing.keyToUseShared:
-                    self.update_use_shared_set()
-                    self.update_widget(sharing.keyToUseShared[key])
+                self.update_using_shared()
+                self.load_vars(sharing.useSharedGroups[key])
+                self.update_widgets(sharing.useSharedGroups[key])
+            elif key in sharing.keyToUseShared:
+                self.update_using_shared()
+                self.update_widget(sharing.keyToUseShared[key])
             if key in addr.keyToAddrFlavor:
                 self.update_addr_tab(addr.keyToAddrFlavor[key])
             self.update_top()
@@ -292,24 +293,25 @@ class PersonDetail(ttk.Frame, WidgetGarden):
             self.person.set_value_error(key, e)
             self.update_error_msgs()
 
-    def update_use_shared_set(self):
+    def update_using_shared(self):
         if self.person is not None:
-            self.useSharedSet = {key for key in sharing.useSharedGroups if self.person.get_value(key)}
+            self.usingShared = {key for key in sharing.useSharedGroups if self.person.get_value(key)}
         else:
-            self.useSharedSet.clear()
+            self.usingShared.clear()
 
-    def update_widgets(self):
-        self.update_use_shared_set()
-        for key in self.vars:
+    # update usingShared before calling
+    def update_widgets(self, keys=None):
+        for key in keys or self.vars:
             self.update_widget(key)
 
+    # update usingShared before calling
     def update_widget(self, key):
         self.update_widget_style(key)
         if self.readOnly:
             self.set_widget_disable(key)
         elif key in sharing.keyToUseShared:
             # widget is under the jurisdiction of a "use shared" checkbox
-            self.set_widget_disable(key, sharing.keyToUseShared[key] in self.useSharedSet)
+            self.set_widget_disable(key, sharing.keyToUseShared[key] in self.usingShared)
         elif key in sharing.useSharedGroups and self.person is not None and not self.person.get_value(key):
             # widget is a "use shared" checkbox that's not checked
             self.set_widget_disable(key, self.person.is_changed_set(sharing.useSharedGroups[key]))
@@ -331,6 +333,7 @@ class PersonDetail(ttk.Frame, WidgetGarden):
 
     def on_addr_tab_change(self, event):
         flavor = self.get_cur_addr_tab()
+        self.update_using_shared()
         self.load_addr_vars(flavor)
         # Do this to prevent focus from jumping to first widget in address frame when you click tab
         self.entries[join_key(flavor, 'addrLine1')].state(['!focus'])
@@ -339,10 +342,11 @@ class PersonDetail(ttk.Frame, WidgetGarden):
     def get_cur_addr_tab(self):
         return addr.addrFlavors[self.addrNb.index(self.addrNb.select())]
 
+    # update usingShared before calling
     def load_addr_vars(self, flavor):
         if self.person is not None:
             self.person.touch_address(flavor)
-        self.load_vars(addr.addrDefaultsByFlavor[flavor])
+        self.load_vars(addr.addrKeysByFlavor[flavor])
 
     def update_addr_tabs(self):
         for flavor in addr.addrFlavors:
@@ -381,21 +385,31 @@ class PersonDetail(ttk.Frame, WidgetGarden):
         self.diffVersion = None
         self.diffMaxIndex = 0
 
-    def load_vars(self, defaults=Person.defaultValues):
+    # update usingShared before calling
+    def load_vars(self, keys=None):
         if self.person is not None:
             # Clear person temporarily to block the activity of on_trace_write()
             person = self.person
             self.person = None
-            for key in defaults:
-                if key in self.vars:
+            for key in keys or self.vars:
+                if key in sharing.keyToUseShared and sharing.keyToUseShared[key] in self.usingShared:
+                    if key in self.checkbuttons:
+                        self.write_var(key, False)
+                    else:
+                        self.write_var(key, "xxx")
+                else:
                     self.write_var(key, person.get_value(key))
             self.person = person
         else:
-            for key, value in defaults.items():
-                if key in self.vars:
-                    self.write_var(key, value)
+            for key in keys or self.vars:
+                if key in addr.keyToAddrFlavor:
+                    flavor = addr.keyToAddrFlavor[key]
+                    self.write_var(key, addr.addrDefaultsByFlavor[flavor][key])
+                else:
+                    self.write_var(key, Person.defaultValues[key])
 
     def load_all(self):
+        self.update_using_shared()
         self.load_vars()
         self.load_addr_vars(self.get_cur_addr_tab())
         self.load_relats()
@@ -673,6 +687,7 @@ class PersonDetail(ttk.Frame, WidgetGarden):
 
     def update_all(self):
         self.readOnly = self.is_read_only()
+        self.update_using_shared()
         self.update_widgets()
         self.update_addr_tabs()
         self.update_top()
