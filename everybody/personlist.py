@@ -23,7 +23,7 @@ class PersonList(ttk.Frame):
 
     def make_widgets(self):
         self.grid_columnconfigure(0, weight=1)
-        self.grid_rowconfigure(0, weight=1)
+        self.grid_rowconfigure(0, weight=1, minsize=500)
 
         self.tree = ttk.Treeview(self, height=5, show='tree')
         self.tree.grid(column=0, row=0, sticky=(N,W,E,S))

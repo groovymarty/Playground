@@ -212,14 +212,14 @@ class Instance:
         if isinstance(selector, str):
             if selector == 'current':
                 return curVariant
-            elif selector == 'previous':
-                return self.get_previous(curVariant)
-            elif selector == 'next':
-                return self.get_next(curVariant)
-            elif selector == 'first':
-                return self.get_first()
             elif selector == 'latest' or selector == "*.*" or not selector:
                 return self.get_latest()
+            elif selector == 'next':
+                return self.get_next(curVariant)
+            elif selector == 'previous':
+                return self.get_previous(curVariant)
+            elif selector == 'first':
+                return self.get_first()
             elif selector == 'advance' or selector == 'advance_minor':
                 return self.add_next_minor_version(curVariant)
             elif selector == 'advance_major':

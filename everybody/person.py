@@ -2,9 +2,9 @@
 
 from body_and_soul import *
 from basic_data import checkers, gender, maritalstatus, phone, date
-from everybody import addr
-from everybody.addr import AddrHelper
-from everybody.relat import RelatHelper
+from everybody import address
+from everybody.address import AddrHelper
+from everybody.relationship import RelatHelper
 
 class Person(Body, RelatHelper, AddrHelper):
     # Note all phone numbers are included here, so they exist even if address counterpart does not
@@ -116,8 +116,8 @@ class Person(Body, RelatHelper, AddrHelper):
 Person.make_all_properties()
 
 # Include home address fields in defaultValues so person will always have home address
-Person.defaultValues.update(addr.addrDefaultsByFlavor['home'])
+Person.defaultValues.update(address.addrDefaultsByFlavor['home'])
 
 # Add checkers for each address flavor
-for flavor in addr.addrFlavors:
-    Person.checkers.update(make_flavored(flavor, addr.addrCheckers))
+for flavor in address.addrFlavors:
+    Person.checkers.update(make_flavored(flavor, address.addrCheckers))

@@ -3,17 +3,18 @@
 from tkinter import *
 from tkinter import ttk
 from tkinter import messagebox
-from everybody import services, clipboard, addr, sharing
+from everybody import services, clipboard, address, relationship, sharing
 from everybody.person import Person
-from everybody.relat import format_relat
+from everybody.relationship import format_relat
 from everybody.relatdialog import RelatDialog
+from everybody.sharing import SharingHelper
 from body_and_soul import join_key, make_flavored
 from basic_data import gender, us_state, maritalstatus
 from basic_services import log_error
 from tkit.widgetgarden import WidgetGarden
 from PIL import Image, ImageTk
 
-class PersonDetail(ttk.Frame, WidgetGarden):
+class PersonDetail(ttk.Frame, WidgetGarden, SharingHelper):
     labelText = {
         'namePrefix': "Name Prefix",
         'usePrefix': "Use Prefix",
@@ -164,9 +165,9 @@ class PersonDetail(ttk.Frame, WidgetGarden):
         self.addrNb = ttk.Notebook(self.curParent)
         self.grid_widget(self.addrNb, sticky=(N,W,E))
         self.addrNb.bind("<<NotebookTabChanged>>", self.on_addr_tab_change)
-        for i, flavor in enumerate(addr.addrFlavors):
+        for i, flavor in enumerate(address.addrFlavors):
             childFrame = ttk.Frame(self.addrNb)
-            self.addrNb.add(childFrame, text=addr.addrNames[flavor], compound=LEFT)
+            self.addrNb.add(childFrame, text=address.addrNames[flavor], compound=LEFT)
             self.addrTabIds[flavor] = i
             self.begin_layout(childFrame, 3)
             childFrame.grid_columnconfigure(1, weight=1)
@@ -274,8 +275,8 @@ class PersonDetail(ttk.Frame, WidgetGarden):
             elif key in sharing.keyToUseShared:
                 self.update_using_shared()
                 self.update_widget(sharing.keyToUseShared[key])
-            if key in addr.keyToAddrFlavor:
-                self.update_addr_tab(addr.keyToAddrFlavor[key])
+            if key in address.keyToAddrFlavor:
+                self.update_addr_tab(address.keyToAddrFlavor[key])
             self.update_top()
             self.update_save_buttons()
             self.event_generate('<<PersonChange>>')
@@ -340,21 +341,21 @@ class PersonDetail(ttk.Frame, WidgetGarden):
         self.update_top()
 
     def get_cur_addr_tab(self):
-        return addr.addrFlavors[self.addrNb.index(self.addrNb.select())]
+        return address.addrFlavors[self.addrNb.index(self.addrNb.select())]
 
     # update usingShared before calling
     def load_addr_vars(self, flavor):
         if self.person is not None:
             self.person.touch_address(flavor)
-        self.load_vars(addr.addrKeysByFlavor[flavor])
+        self.load_vars(address.addrKeysByFlavor[flavor])
 
     def update_addr_tabs(self):
-        for flavor in addr.addrFlavors:
+        for flavor in address.addrFlavors:
             self.update_addr_tab(flavor)
 
     def update_addr_tab(self, flavor):
         if self.person is not None:
-            keys = addr.addrKeysByFlavor[flavor]
+            keys = address.addrKeysByFlavor[flavor]
             if self.person.is_error_set(keys):
                 self.set_addr_tab_image(flavor, self.tabImageError)
             elif self.person.is_changed_set(keys):
@@ -388,31 +389,34 @@ class PersonDetail(ttk.Frame, WidgetGarden):
     # update usingShared before calling
     def load_vars(self, keys=None):
         if self.person is not None:
-            # Clear person temporarily to block the activity of on_trace_write()
-            person = self.person
-            self.person = None
+            # Temporarily block the activity of on_trace_write()
+            self.ignoreWrite = True
             for key in keys or self.vars:
                 if key in sharing.keyToUseShared and sharing.keyToUseShared[key] in self.usingShared:
-                    if key in self.checkbuttons:
-                        self.write_var(key, False)
-                    else:
-                        self.write_var(key, "xxx")
+                    self.write_var(key, self.find_shared_value(key))
                 else:
-                    self.write_var(key, person.get_value(key))
-            self.person = person
+                    self.write_var(key, self.person.get_value(key))
+            self.ignoreWrite = False
         else:
             for key in keys or self.vars:
-                if key in addr.keyToAddrFlavor:
-                    flavor = addr.keyToAddrFlavor[key]
-                    self.write_var(key, addr.addrDefaultsByFlavor[flavor][key])
+                if key in address.keyToAddrFlavor:
+                    flavor = address.keyToAddrFlavor[key]
+                    self.write_var(key, address.addrDefaultsByFlavor[flavor][key])
                 else:
                     self.write_var(key, Person.defaultValues[key])
 
+    # update usingShared before calling
+    def load_dependent_vars(self, spec):
+        relat = relationship.extract_relat(spec)
+        if relat in sharing.relatToUseShared:
+            for usKey in sharing.relatToUseShared[relat]:
+                self.load_vars(sharing.useSharedGroups[usKey])
+
     def load_all(self):
         self.update_using_shared()
+        self.load_relats()
         self.load_vars()
         self.load_addr_vars(self.get_cur_addr_tab())
-        self.load_relats()
 
     def load_relats(self):
         self.relatTree.delete(*self.relatTree.get_children())
@@ -501,6 +505,8 @@ class PersonDetail(ttk.Frame, WidgetGarden):
                 self.relatTree.insert("", i, iid=spec, text=format_relat(spec),
                                       values=self.make_relat_values(spec))
             self.update_relat_item(spec)
+            self.update_using_shared()
+            self.load_dependent_vars(spec)
             self.update_save_buttons()
 
     def delete_relat(self, spec):
@@ -512,6 +518,8 @@ class PersonDetail(ttk.Frame, WidgetGarden):
             self.update_relat_item(spec)
         else:
             self.relatTree.delete(spec)
+        self.update_using_shared()
+        self.load_dependent_vars(spec)
         self.update_relat_buttons()
         self.update_save_buttons()
 
@@ -624,8 +632,8 @@ class PersonDetail(ttk.Frame, WidgetGarden):
                 self.errorMsgs['style'] = 'TLabel'
 
     def format_error_msg(self, key, msg):
-        if key in addr.keyToAddrFlavor:
-            return "{} {}: {}".format(addr.addrNames[addr.keyToAddrFlavor[key]], self.labelText[key], msg)
+        if key in address.keyToAddrFlavor:
+            return "{} {}: {}".format(address.addrNames[address.keyToAddrFlavor[key]], self.labelText[key], msg)
         else:
             return "{}: {}".format(self.labelText[key], msg)
 
@@ -749,6 +757,6 @@ Click "No" to go back to where you were without losing anything.""".format(what)
             else:
                 return self.person.is_same_minor_series(self.person.version, nextVersion)
 
-for flavor in addr.addrFlavors:
+for flavor in address.addrFlavors:
     PersonDetail.labelText.update(make_flavored(flavor, PersonDetail.addrLabelText))
     PersonDetail.mappers.update(make_flavored(flavor, PersonDetail.addrMappers))

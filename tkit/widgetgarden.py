@@ -21,6 +21,7 @@ class WidgetGarden(LayoutHelper, WidgetHelper):
         self.tkNameToKey = {}
         self.widgets = {}
         self.widgetToKey = {}
+        self.ignoreWrite = False
 
     def make_var(self, key, varClass):
         newVar = varClass()
@@ -121,7 +122,8 @@ class WidgetGarden(LayoutHelper, WidgetHelper):
             var.set(value)
 
     def on_trace_write(self, tkName, tkIndx, mode):
-        self.on_var_change(self.tkNameToKey[tkName])
+        if not self.ignoreWrite:
+            self.on_var_change(self.tkNameToKey[tkName])
 
     def on_var_change(self, key):
         pass

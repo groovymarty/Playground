@@ -1,4 +1,4 @@
-# everybody.relat
+# everybody.relationship
 
 from body_and_soul import join_key
 from basic_services import log_error
@@ -24,6 +24,9 @@ relatNames = {
 
 maxIndexKeys = {relat: relat+"_N" for relat in indexedRelats}
 ucNameToRelat = {name.upper(): relat for relat, name in relatNames.items()}
+
+def extract_relat(spec):
+    return spec.split(".", 1)[0]
 
 def format_relat(spec):
     if not spec:

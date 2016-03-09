@@ -4,7 +4,7 @@ from tkinter import *
 from tkinter import ttk
 from tkinter import simpledialog
 from everybody import clipboard, services, personsearch
-from everybody.relat import check_relat, format_relat
+from everybody.relationship import check_relat, format_relat
 from everybody.personsearch import PersonSearch
 from tkit.widgethelper import WidgetHelper
 
