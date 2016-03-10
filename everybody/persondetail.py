@@ -3,7 +3,7 @@
 from tkinter import *
 from tkinter import ttk
 from tkinter import messagebox
-from everybody import services, clipboard, address, relationship, sharing
+from everybody import services, clipboard, person, address, relationship, sharing
 from everybody.person import Person
 from everybody.relationship import format_relat
 from everybody.relatdialog import RelatDialog
@@ -125,7 +125,7 @@ class PersonDetail(ttk.Frame, WidgetGarden, SharingHelper):
         self.grid_widget(nameFrame, sticky=(N,W,E))
         self.begin_layout(nameFrame, 3)
         nameFrame.grid_columnconfigure(1, weight=1)
-        self.make_entry('namePrefix')
+        self.make_combobox('namePrefix', person.namePrefixes)
         self.make_checkbutton('usePrefix')
         self.next_row()
         self.make_entry('firstName')

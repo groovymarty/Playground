@@ -6,6 +6,8 @@ from everybody import address
 from everybody.address import AddrHelper
 from everybody.relationship import RelatHelper
 
+namePrefixes = "Mr.", "Ms.", "Mrs.", "Miss", "Dr.", "Rev."
+
 class Person(Body, RelatHelper, AddrHelper):
     # Note all phone numbers are included here, so they exist even if address counterpart does not
     defaultValues = {
