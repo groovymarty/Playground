@@ -89,6 +89,7 @@ class PersonDetail(ttk.Frame, WidgetGarden, SharingHelper):
         s.configure('Error.TCheckbutton', background='orange')
         s.configure('Delta.TLabel', background='lightblue')
         s.configure('Delta.TCheckbutton', background='lightblue')
+        s.configure('Status.TLabel', foreground='blue')
 
     def make_images(self):
         self.tabImageChanged = ImageTk.PhotoImage(Image.new('RGB', (15,15), color='yellow'))
@@ -227,6 +228,9 @@ class PersonDetail(ttk.Frame, WidgetGarden, SharingHelper):
     def make_msg_frame(self):
         self.errorMsgs = ttk.Label(self.curParent)
         self.grid_widget(self.errorMsgs, columnspan=self.numCols, sticky=(N,W,E))
+        self.next_row()
+        self.statusMsgs = ttk.Label(self.curParent)
+        self.grid_widget(self.statusMsgs, columnspan=self.numCols, sticky=(N,W,E))
 
     def make_nav_frame(self):
         navFrame = ttk.Frame(self.curParent)
@@ -450,8 +454,10 @@ class PersonDetail(ttk.Frame, WidgetGarden, SharingHelper):
         instId, selector = self.person.split_id(whoId)
         who = self.relatCache.get(spec, None)
         if who is not None:
+            self.person.set_value_error(spec, None)
             return who.label, selector
         else:
+            self.person.set_value_error(spec, "{} {} not found".format(instId, selector))
             return instId, selector
 
     def do_add_relat(self):
@@ -508,11 +514,13 @@ class PersonDetail(ttk.Frame, WidgetGarden, SharingHelper):
             self.update_using_shared()
             self.load_dependent_vars(spec)
             self.update_save_buttons()
+            self.update_error_msgs()
 
     def delete_relat(self, spec):
         self.person.set_value(spec, None)
         if spec in self.relatCache:
             del self.relatCache[spec]
+            self.person.set_value_error(spec, None)
         if self.person.is_changed(spec) or spec in self.diffs:
             self.relatTree.item(spec, values=("(Deleted)", ""))
             self.update_relat_item(spec)
@@ -522,6 +530,7 @@ class PersonDetail(ttk.Frame, WidgetGarden, SharingHelper):
         self.load_dependent_vars(spec)
         self.update_relat_buttons()
         self.update_save_buttons()
+        self.update_error_msgs()
 
     def update_relat_tree(self):
         for spec in self.relatTree.get_children():
@@ -630,12 +639,24 @@ class PersonDetail(ttk.Frame, WidgetGarden, SharingHelper):
             else:
                 self.errorMsgs['text'] = ""
                 self.errorMsgs['style'] = 'TLabel'
+                
+    def update_status_msgs(self):
+        if self.person is not None:
+            self.statusMsgs['text'] = "Selected: {}".format(self.person.instId)
+            self.statusMsgs['style'] = 'Status.TLabel'
+        else:
+            self.statusMsgs['text'] = ""
+            self.statusMsgs['style'] = 'TLabel'
 
     def format_error_msg(self, key, msg):
         if key in address.keyToAddrFlavor:
             return "{} {}: {}".format(address.addrNames[address.keyToAddrFlavor[key]], self.labelText[key], msg)
-        else:
+        elif key in self.labelText:
             return "{}: {}".format(self.labelText[key], msg)
+        elif relationship.is_relat(key):
+            return "{}: {}".format(relationship.format_relat(key), msg)
+        else:
+            return "{}: {}".format(key, msg)
 
     def update_save_buttons(self):
         if self.person is not None:
@@ -700,6 +721,7 @@ class PersonDetail(ttk.Frame, WidgetGarden, SharingHelper):
         self.update_addr_tabs()
         self.update_top()
         self.update_error_msgs()
+        self.update_status_msgs()
         self.update_save_buttons()
         self.update_nav_buttons()
         self.update_version_label()
