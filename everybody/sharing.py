@@ -1,7 +1,7 @@
 # everybody.sharing
 
 from body_and_soul import join_key, make_flavored
-from everybody import address, relationship
+from everybody import address, relationship, person
 from everybody.person import Person
 
 # Set of unflavored keys governed by a "Use Shared Address" key
@@ -39,32 +39,44 @@ relatToUseShared = {
 }
 
 class SharingHelper:
-    def find_shared_anniv(self):
+    def find_shared_value(self, key):
+        usKey = keyToUseShared[key]
+        sharer = self.find_sharer(usKey)
+        if sharer is not None:
+            return sharer.get_value(key)
+        else:
+            return person.get_default_value(key)
+
+    def find_sharer(self, usKey):
+        if usKey in self.sharerCache:
+            return self.sharerCache[usKey]
+        elif usKey == 'useSharedAnniv':
+            sharer = self.find_anniv_sharer()
+        elif usKey in address.keyToAddrFlavor:
+            flavor = address.keyToAddrFlavor[usKey]
+            sharer = self.find_addr_sharer(flavor)
+        else:
+            return None
+        self.sharerCache[usKey] = sharer
+        return sharer
+
+    def find_anniv_sharer(self):
         for spec in 'husband', 'wife', 'spouse':
             if spec in self.relatCache:
                 who = self.relatCache[spec]
                 if not who.get_value('useSharedAnniv'):
-                    return who.get_value('anniversary')
-        return Person.defaultValues['anniversary']
+                    return who
+        return None
+
+    def find_addr_sharer(self, flavor):
+        for spec in self.generate_shared_addr_specs():
+            if spec in self.relatCache:
+                who = self.relatCache[spec]
+                if not who.get_addr_value(flavor, 'useSharedAddr'):
+                    return who
+        return None
 
     def generate_shared_addr_specs(self):
         for spec in 'livesWith', 'husband', 'wife', 'spouse', 'father', 'mother':
             yield spec
         yield from self.person.generate_indexed_relat('parent')
-
-    def find_shared_addr_value(self, flavor, addrKey):
-        for spec in self.generate_shared_addr_specs():
-            if spec in self.relatCache:
-                who = self.relatCache[spec]
-                if not who.get_addr_value(flavor, 'useSharedAddr'):
-                    return who.get_addr_value(flavor, addrKey)
-        return address.addrDefaults[addrKey]
-
-    def find_shared_value(self, key):
-        if key == 'anniversary':
-            return self.find_shared_anniv()
-        elif key in address.keyToAddrFlavor:
-            flavor, addrKey = key.split(".", 1)
-            return self.find_shared_addr_value(flavor, addrKey)
-        else:
-            return Person.defaultValues[key]

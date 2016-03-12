@@ -123,3 +123,10 @@ Person.defaultValues.update(address.addrDefaultsByFlavor['home'])
 # Add checkers for each address flavor
 for flavor in address.addrFlavors:
     Person.checkers.update(make_flavored(flavor, address.addrCheckers))
+
+def get_default_value(key):
+    if key in address.keyToAddrFlavor:
+        flavor = address.keyToAddrFlavor[key]
+        return address.addrDefaultsByFlavor[flavor].get(key, None)
+    else:
+        return Person.defaultValues.get(key, None)
