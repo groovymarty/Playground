@@ -60,6 +60,10 @@ class PersonDetail(ttk.Frame, WidgetGarden, SharingHelper):
         'state': us_state.StateMapper
     }
 
+    sharerText = {
+        'useSharedAnniv': "Anniversary"
+    }
+
     # Quantum mode lets you edit and save any version
     quantumMode = False
 
@@ -277,6 +281,9 @@ class PersonDetail(ttk.Frame, WidgetGarden, SharingHelper):
                 self.update_using_shared()
                 self.load_vars(sharing.useSharedGroups[key])
                 self.update_widgets(sharing.useSharedGroups[key])
+                self.update_using_shared_widgets()
+                self.update_status_msgs()
+                self.update_error_msgs()
             elif key in sharing.keyToUseShared:
                 self.update_using_shared()
                 self.update_widget(sharing.keyToUseShared[key])
@@ -304,6 +311,17 @@ class PersonDetail(ttk.Frame, WidgetGarden, SharingHelper):
             self.usingShared = {key for key in sharing.useSharedGroups if self.person.get_value(key)}
         else:
             self.usingShared.clear()
+
+    # this is a catch-all for various widget updates that need to happen because of
+    # dependencies on relationships, use shared checkboxes, etc.
+    def update_using_shared_widgets(self):
+        if self.person is not None:
+            for key in sharing.useSharedGroups:
+                if key not in self.usingShared:
+                    # can't be error if not checked
+                    self.person.set_value_error(key, None)
+                self.update_widget_style(key)
+            self.update_addr_tabs()
 
     # update usingShared before calling
     def update_widgets(self, keys=None):
@@ -517,7 +535,9 @@ class PersonDetail(ttk.Frame, WidgetGarden, SharingHelper):
             self.update_relat_item(spec)
             self.update_using_shared()
             self.load_dependent_vars(spec)
+            self.update_using_shared_widgets()
             self.update_save_buttons()
+            self.update_status_msgs()
             self.update_error_msgs()
 
     def delete_relat(self, spec):
@@ -533,8 +553,10 @@ class PersonDetail(ttk.Frame, WidgetGarden, SharingHelper):
             self.relatTree.delete(spec)
         self.update_using_shared()
         self.load_dependent_vars(spec)
+        self.update_using_shared_widgets()
         self.update_relat_buttons()
         self.update_save_buttons()
+        self.update_status_msgs()
         self.update_error_msgs()
 
     def update_relat_tree(self):
@@ -645,23 +667,31 @@ class PersonDetail(ttk.Frame, WidgetGarden, SharingHelper):
                 self.errorMsgs['text'] = ""
                 self.errorMsgs['style'] = 'TLabel'
 
+    def format_error_msg(self, key, msg):
+        if key in sharing.useSharedGroups:
+            return "{}:  {}".format(self.sharerText[key], msg)
+        elif key in address.keyToAddrFlavor:
+            return "{} {}:  {}".format(address.addrNames[address.keyToAddrFlavor[key]], self.labelText[key], msg)
+        elif key in self.labelText:
+            return "{}:  {}".format(self.labelText[key], msg)
+        elif relationship.is_relat(key):
+            return "{}:  {}".format(relationship.format_relat(key), msg)
+        else:
+            return "{}:  {}".format(key, msg)
+
     def update_status_msgs(self):
         if self.person is not None:
-            self.statusMsgs['text'] = "Selected: {}".format(self.person.instId)
+            lines = []
+            for usKey, sharer in self.sharerCache.items():
+                if self.person.get_value(usKey):
+                    lines.append("{}:  Using {}  ({})".format(self.sharerText[usKey], sharer.label,
+                                                              sharer.format_version(sharer.version)))
+            lines.append("This is {}".format(self.person.instId))
+            self.statusMsgs['text'] = "\n".join(lines)
             self.statusMsgs['style'] = 'Status.TLabel'
         else:
             self.statusMsgs['text'] = ""
             self.statusMsgs['style'] = 'TLabel'
-
-    def format_error_msg(self, key, msg):
-        if key in address.keyToAddrFlavor:
-            return "{} {}: {}".format(address.addrNames[address.keyToAddrFlavor[key]], self.labelText[key], msg)
-        elif key in self.labelText:
-            return "{}: {}".format(self.labelText[key], msg)
-        elif relationship.is_relat(key):
-            return "{}: {}".format(relationship.format_relat(key), msg)
-        else:
-            return "{}: {}".format(key, msg)
 
     def update_save_buttons(self):
         if self.person is not None:
@@ -787,3 +817,4 @@ Click "No" to go back to where you were without losing anything.""".format(what)
 for flavor in address.addrFlavors:
     PersonDetail.labelText.update(make_flavored(flavor, PersonDetail.addrLabelText))
     PersonDetail.mappers.update(make_flavored(flavor, PersonDetail.addrMappers))
+    PersonDetail.sharerText[join_key(flavor, 'useSharedAddr')] = "{} Address".format(address.addrNames[flavor])

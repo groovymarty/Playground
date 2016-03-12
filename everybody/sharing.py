@@ -43,8 +43,10 @@ class SharingHelper:
         usKey = keyToUseShared[key]
         sharer = self.find_sharer(usKey)
         if sharer is not None:
+            self.person.set_value_error(usKey, None)
             return sharer.get_value(key)
         else:
+            self.person.set_value_error(usKey, "Sharer not found")
             return person.get_default_value(key)
 
     def find_sharer(self, usKey):
@@ -56,8 +58,9 @@ class SharingHelper:
             flavor = address.keyToAddrFlavor[usKey]
             sharer = self.find_addr_sharer(flavor)
         else:
-            return None
-        self.sharerCache[usKey] = sharer
+            sharer = None
+        if sharer is not None:
+            self.sharerCache[usKey] = sharer
         return sharer
 
     def find_anniv_sharer(self):
