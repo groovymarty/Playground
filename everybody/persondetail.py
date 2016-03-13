@@ -4,7 +4,6 @@ from tkinter import *
 from tkinter import ttk
 from tkinter import messagebox
 from everybody import services, clipboard, person, address, relationship, sharing
-from everybody.person import Person
 from everybody.relationship import format_relat
 from everybody.relatdialog import RelatDialog
 from everybody.sharing import SharingHelper
@@ -75,9 +74,12 @@ class PersonDetail(ttk.Frame, WidgetGarden, SharingHelper):
         self.diffVersion = None
         self.diffMaxIndex = 0
         self.readOnly = person is None
+        self.isLatestMajor = False
         self.addrTabIds = {}
         self.relatCache = {}
         self.sharerCache = {}
+        self.sharerRelat = {}
+        self.forcedLatest = set()
         self.usingShared = set()
         self.make_styles()
         self.make_images()
@@ -432,6 +434,7 @@ class PersonDetail(ttk.Frame, WidgetGarden, SharingHelper):
                 # clear cached sharer to force finding again using current relationships
                 if usKey in self.sharerCache:
                     del self.sharerCache[usKey]
+                    del self.sharerRelat[usKey]
                 self.load_vars(sharing.useSharedGroups[usKey])
 
     def load_all(self):
@@ -443,7 +446,9 @@ class PersonDetail(ttk.Frame, WidgetGarden, SharingHelper):
     def load_relats(self):
         self.relatTree.delete(*self.relatTree.get_children())
         self.relatCache.clear()
+        self.forcedLatest.clear()
         self.sharerCache.clear()
+        self.sharerRelat.clear()
         if self.person is not None:
             if self.diffs:
                 # This is a brute-force way to make sure generator covers
@@ -456,8 +461,7 @@ class PersonDetail(ttk.Frame, WidgetGarden, SharingHelper):
             for spec in self.person.generate_relat_specs(extra):
                 whoId = self.person.get_value(spec)
                 if whoId is not None:
-                    who = services.database().lookup(whoId)
-                    self.relatCache[spec] = who
+                    self.lookup_relat(spec, whoId)
                     self.relatTree.insert("", END, iid=spec, text=format_relat(spec),
                                           values=self.make_relat_values(spec))
                 elif spec in self.diffs or self.person.is_changed(spec):
@@ -470,6 +474,23 @@ class PersonDetail(ttk.Frame, WidgetGarden, SharingHelper):
                         phrase = "(Deleted)"
                     self.relatTree.insert("", END, iid=spec, text=format_relat(spec),
                                           values=(phrase, ""))
+
+    def lookup_relat(self, spec, whoId=None):
+        if whoId is None:
+            whoId = self.person.get_value(spec)
+        db = services.database()
+        who = db.lookup(whoId)
+        if who is not None and self.is_latest_major():
+            instId, selector = db.split_id(whoId)
+            if db.is_wild(selector):
+                who.load('latest')
+                self.forcedLatest.add(spec)
+            else:
+                self.forcedLatest.discard(spec)
+        else:
+            self.forcedLatest.discard(spec)
+        self.relatCache[spec] = who
+        return who
 
     def make_relat_values(self, spec):
         whoId = self.person.get_value(spec)
@@ -524,8 +545,7 @@ class PersonDetail(ttk.Frame, WidgetGarden, SharingHelper):
             if oldSpec and spec != oldSpec:
                 self.delete_relat(oldSpec)
             self.person.set_relat(spec, whoId)
-            who = db.lookup(whoId)
-            self.relatCache[spec] = who
+            self.lookup_relat(spec, whoId)
             if self.relatTree.exists(spec):
                 self.relatTree.item(spec, values=self.make_relat_values(spec))
             else:
@@ -685,8 +705,9 @@ class PersonDetail(ttk.Frame, WidgetGarden, SharingHelper):
             lines = []
             for usKey, sharer in self.sharerCache.items():
                 if self.person.get_value(usKey):
-                    lines.append("{}:  Using {}  ({})".format(self.sharerText[usKey], sharer.label,
-                                                              sharer.format_version(sharer.version)))
+                    phrase = "Using latest" if self.sharerRelat[usKey] in self.forcedLatest else "Using"
+                    lines.append("{}:  {} {}  ({})".format(self.sharerText[usKey], phrase, sharer.label,
+                                                           sharer.format_version(sharer.version)))
             lines.append("This is {}".format(self.person.instId))
             self.statusMsgs['text'] = "\n".join(lines)
             self.statusMsgs['style'] = 'Status.TLabel'
@@ -752,6 +773,7 @@ class PersonDetail(ttk.Frame, WidgetGarden, SharingHelper):
 
     def update_all(self):
         self.readOnly = self.is_read_only()
+        self.isLatestMajor = self.is_latest_major()
         self.update_using_shared()
         self.update_widgets()
         self.update_addr_tabs()
@@ -814,6 +836,13 @@ Click "No" to go back to where you were without losing anything.""".format(what)
                 return False
             else:
                 return self.person.is_same_minor_series(self.person.version, nextVersion)
+
+    def is_latest_major(self):
+        if self.person is None:
+            return False
+        else:
+            latestVersion = self.person.get_version('latest')
+            return self.person.is_same_minor_series(self.person.version, latestVersion)
 
 for flavor in address.addrFlavors:
     PersonDetail.labelText.update(make_flavored(flavor, PersonDetail.addrLabelText))

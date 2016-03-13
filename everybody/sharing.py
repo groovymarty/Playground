@@ -53,14 +53,15 @@ class SharingHelper:
         if usKey in self.sharerCache:
             return self.sharerCache[usKey]
         elif usKey == 'useSharedAnniv':
-            sharer = self.find_anniv_sharer()
+            sharer, spec = self.find_anniv_sharer()
         elif usKey in address.keyToAddrFlavor:
             flavor = address.keyToAddrFlavor[usKey]
-            sharer = self.find_addr_sharer(flavor)
+            sharer, spec = self.find_addr_sharer(flavor)
         else:
             sharer = None
         if sharer is not None:
             self.sharerCache[usKey] = sharer
+            self.sharerRelat[usKey] = spec
         return sharer
 
     def find_anniv_sharer(self):
@@ -68,16 +69,16 @@ class SharingHelper:
             if spec in self.relatCache:
                 who = self.relatCache[spec]
                 if not who.get_value('useSharedAnniv'):
-                    return who
-        return None
+                    return who, spec
+        return None, None
 
     def find_addr_sharer(self, flavor):
         for spec in self.generate_shared_addr_specs():
             if spec in self.relatCache:
                 who = self.relatCache[spec]
                 if not who.get_addr_value(flavor, 'useSharedAddr'):
-                    return who
-        return None
+                    return who, spec
+        return None, None
 
     def generate_shared_addr_specs(self):
         for spec in 'livesWith', 'husband', 'wife', 'spouse', 'father', 'mother':

@@ -159,6 +159,10 @@ class FileCitySoul(Soul):
         return VersionChecker().check_selector(value)
 
     @staticmethod
+    def is_wild(selector):
+        return "*" in selector
+
+    @staticmethod
     def format_version(version):
         return format_version(version)
 
@@ -441,6 +445,10 @@ class FileCity:
     @staticmethod
     def check_selector(value):
         return VersionChecker().check_selector(value)
+
+    @staticmethod
+    def is_wild(selector):
+        return "*" in selector
 
     @staticmethod
     def format_version(version):

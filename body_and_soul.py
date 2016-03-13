@@ -133,6 +133,10 @@ class Body:
     def check_selector(self, value):
         return self.soul.check_selector(value)
 
+    # Return true if selector has any wildcard components (asterisks)
+    def is_wild(self, selector):
+        return self.soul.is_wild(selector)
+
     def format_version(self, version):
         return self.soul.format_version(version)
 
@@ -325,6 +329,10 @@ class Soul:
     @staticmethod
     def check_selector(value):
         return len(value.split(".")) == 2
+
+    @staticmethod
+    def is_wild(selector):
+        return "*" in selector
 
     @staticmethod
     def format_version(version):
