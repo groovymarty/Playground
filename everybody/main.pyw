@@ -37,5 +37,10 @@ with BasicLogger(baseDir, "Everybody.log", echoStdout=debugMode) as logger:
     personListAndDetail = PersonListAndDetail(root, people)
     personListAndDetail.grid(column=0, row=0, sticky=(N,W,E,S))
 
+    def on_exit():
+        if personListAndDetail.check_unsaved_changes():
+            root.destroy()
+
+    root.protocol("WM_DELETE_WINDOW", on_exit)
     root.mainloop()
     logger.log_info("Everybody: exiting")

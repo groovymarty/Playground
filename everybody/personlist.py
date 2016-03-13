@@ -69,6 +69,9 @@ class PersonList(ttk.Frame):
         else:
             return None
 
+    def get_all_unsaved(self):
+        return [person for person in self.peopleSorted if person.is_any_changed() or person.is_new()]
+
     def on_person_change(self, person):
         self.update_tags(person)
         if self.changeyLabel:

@@ -1,7 +1,7 @@
 # personlist_and_detail
 
 from tkinter import *
-from tkinter import ttk
+from tkinter import ttk, messagebox
 from everybody import services
 from everybody.personlist import PersonList
 from everybody.persondetail import PersonDetail
@@ -47,3 +47,19 @@ class PersonListAndDetail(ttk.Frame):
         person = services.database().make_new("Per", "New Person")
         self.personList.add_person(person)
         self.personList.select(person)
+
+    def check_unsaved_changes(self):
+        unsaved = self.personList.get_all_unsaved()
+        if not unsaved:
+            return True
+        else:
+            names = [person.label for person in unsaved]
+            return messagebox.askyesno(message=
+"""The following people have unsaved changes:
+
+{}
+
+If you exit now, these changes will be lost.  Are you sure you want to continue?
+
+Click "Yes" to discard your changes and exit the program.
+Click "No" to go back to where you were without losing anything.""".format("\n".join(names)))

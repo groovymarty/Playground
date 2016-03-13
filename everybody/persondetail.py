@@ -1,8 +1,7 @@
 # persondetail
 
 from tkinter import *
-from tkinter import ttk
-from tkinter import messagebox
+from tkinter import ttk, messagebox
 from everybody import services, clipboard, person, address, relationship, sharing
 from everybody.relationship import format_relat
 from everybody.relatdialog import RelatDialog
