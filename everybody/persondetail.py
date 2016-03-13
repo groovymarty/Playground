@@ -422,11 +422,7 @@ class PersonDetail(ttk.Frame, WidgetGarden, SharingHelper):
             self.ignoreWrite = False
         else:
             for key in keys or self.vars:
-                if key in address.keyToAddrFlavor:
-                    flavor = address.keyToAddrFlavor[key]
-                    self.write_var(key, address.addrDefaultsByFlavor[flavor][key])
-                else:
-                    self.write_var(key, Person.defaultValues[key])
+                self.write_var(key, person.get_default_value(key))
 
     # update usingShared before calling
     def load_dependent_vars(self, spec):
@@ -464,11 +460,14 @@ class PersonDetail(ttk.Frame, WidgetGarden, SharingHelper):
                     self.relatCache[spec] = who
                     self.relatTree.insert("", END, iid=spec, text=format_relat(spec),
                                           values=self.make_relat_values(spec))
-                elif spec in self.diffs:
-                    if self.diffVersion < self.person.version:
-                        phrase = "(Deleted)"
-                    else:
+                elif spec in self.diffs or self.person.is_changed(spec):
+                    # insert spec even though relationship is None, to show difference
+                    # with previous/next version, or because relationship has been deleted
+                    # detect latter by is_changed test (changed by having been set to None)
+                    if spec in self.diffs and self.diffVersion > self.person.version:
                         phrase = "(None)"
+                    else:
+                        phrase = "(Deleted)"
                     self.relatTree.insert("", END, iid=spec, text=format_relat(spec),
                                           values=(phrase, ""))
 
@@ -540,6 +539,7 @@ class PersonDetail(ttk.Frame, WidgetGarden, SharingHelper):
             self.update_save_buttons()
             self.update_status_msgs()
             self.update_error_msgs()
+            self.event_generate('<<PersonChange>>')
 
     def delete_relat(self, spec):
         self.person.set_value(spec, None)
@@ -558,6 +558,7 @@ class PersonDetail(ttk.Frame, WidgetGarden, SharingHelper):
         self.update_save_buttons()
         self.update_status_msgs()
         self.update_error_msgs()
+        self.event_generate('<<PersonChange>>')
 
     def update_relat_tree(self):
         for spec in self.relatTree.get_children():

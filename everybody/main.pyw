@@ -10,7 +10,7 @@ from everybody import services
 from everybody.person import Person
 from everybody.personlist_and_detail import PersonListAndDetail
 
-debugMode = True
+debugMode = False
 
 baseDir = os.path.join(os.path.expanduser("~"), "Documents", "Everybody")
 
