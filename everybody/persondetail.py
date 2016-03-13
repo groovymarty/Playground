@@ -433,6 +433,9 @@ class PersonDetail(ttk.Frame, WidgetGarden, SharingHelper):
         relat = relationship.extract_relat(spec)
         if relat in sharing.relatToUseShared:
             for usKey in sharing.relatToUseShared[relat]:
+                # clear cached sharer to force finding again using current relationships
+                if usKey in self.sharerCache:
+                    del self.sharerCache[usKey]
                 self.load_vars(sharing.useSharedGroups[usKey])
 
     def load_all(self):
@@ -523,9 +526,7 @@ class PersonDetail(ttk.Frame, WidgetGarden, SharingHelper):
                 self.delete_relat(oldSpec)
             self.person.set_relat(spec, whoId)
             who = db.lookup(whoId)
-            # any relationship change could affect source of shared data, so always clear sharer cache
             self.relatCache[spec] = who
-            self.sharerCache.clear()
             if self.relatTree.exists(spec):
                 self.relatTree.item(spec, values=self.make_relat_values(spec))
             else:
@@ -544,7 +545,6 @@ class PersonDetail(ttk.Frame, WidgetGarden, SharingHelper):
         self.person.set_value(spec, None)
         if spec in self.relatCache:
             del self.relatCache[spec]
-            self.sharerCache.clear()
             self.person.set_value_error(spec, None)
         if self.person.is_changed(spec) or spec in self.diffs:
             self.relatTree.item(spec, values=("(Deleted)", ""))
