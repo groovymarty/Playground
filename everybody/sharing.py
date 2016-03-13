@@ -38,13 +38,18 @@ relatToUseShared = {
     'parent': useSharedAddrFlavors
 }
 
+class Sharer:
+    def __init__(self, who, spec):
+        self.who = who
+        self.relatSpec = spec
+
 class SharingHelper:
     def find_shared_value(self, key):
         usKey = keyToUseShared[key]
         sharer = self.find_sharer(usKey)
         if sharer is not None:
             self.person.set_value_error(usKey, None)
-            return sharer.get_value(key)
+            return sharer.who.get_value(key)
         else:
             self.person.set_value_error(usKey, "Sharer not found")
             return person.get_default_value(key)
@@ -53,15 +58,14 @@ class SharingHelper:
         if usKey in self.sharerCache:
             return self.sharerCache[usKey]
         elif usKey == 'useSharedAnniv':
-            sharer, spec = self.find_anniv_sharer()
+            sharer = self.find_anniv_sharer()
         elif usKey in address.keyToAddrFlavor:
             flavor = address.keyToAddrFlavor[usKey]
-            sharer, spec = self.find_addr_sharer(flavor)
+            sharer = self.find_addr_sharer(flavor)
         else:
             sharer = None
         if sharer is not None:
             self.sharerCache[usKey] = sharer
-            self.sharerRelat[usKey] = spec
         return sharer
 
     def find_anniv_sharer(self):
@@ -69,16 +73,16 @@ class SharingHelper:
             if spec in self.relatCache:
                 who = self.relatCache[spec]
                 if not who.get_value('useSharedAnniv'):
-                    return who, spec
-        return None, None
+                    return Sharer(who, spec)
+        return None
 
     def find_addr_sharer(self, flavor):
         for spec in self.generate_shared_addr_specs():
             if spec in self.relatCache:
                 who = self.relatCache[spec]
                 if not who.get_addr_value(flavor, 'useSharedAddr'):
-                    return who, spec
-        return None, None
+                    return Sharer(who, spec)
+        return None
 
     def generate_shared_addr_specs(self):
         for spec in 'livesWith', 'husband', 'wife', 'spouse', 'father', 'mother':

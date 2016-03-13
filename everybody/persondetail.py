@@ -78,7 +78,6 @@ class PersonDetail(ttk.Frame, WidgetGarden, SharingHelper):
         self.addrTabIds = {}
         self.relatCache = {}
         self.sharerCache = {}
-        self.sharerRelat = {}
         self.forcedLatest = set()
         self.usingShared = set()
         self.make_styles()
@@ -434,7 +433,6 @@ class PersonDetail(ttk.Frame, WidgetGarden, SharingHelper):
                 # clear cached sharer to force finding again using current relationships
                 if usKey in self.sharerCache:
                     del self.sharerCache[usKey]
-                    del self.sharerRelat[usKey]
                 self.load_vars(sharing.useSharedGroups[usKey])
 
     def load_all(self):
@@ -448,7 +446,6 @@ class PersonDetail(ttk.Frame, WidgetGarden, SharingHelper):
         self.relatCache.clear()
         self.forcedLatest.clear()
         self.sharerCache.clear()
-        self.sharerRelat.clear()
         if self.person is not None:
             if self.diffs:
                 # This is a brute-force way to make sure generator covers
@@ -705,9 +702,9 @@ class PersonDetail(ttk.Frame, WidgetGarden, SharingHelper):
             lines = []
             for usKey, sharer in self.sharerCache.items():
                 if self.person.get_value(usKey):
-                    phrase = "Using latest" if self.sharerRelat[usKey] in self.forcedLatest else "Using"
-                    lines.append("{}:  {} {}  ({})".format(self.sharerText[usKey], phrase, sharer.label,
-                                                           sharer.format_version(sharer.version)))
+                    phrase = "Using latest" if sharer.relatSpec in self.forcedLatest else "Using"
+                    lines.append("{}:  {} {}  ({})".format(self.sharerText[usKey], phrase, sharer.who.label,
+                                                           sharer.who.format_version(sharer.who.version)))
             lines.append("This is {}".format(self.person.instId))
             self.statusMsgs['text'] = "\n".join(lines)
             self.statusMsgs['style'] = 'Status.TLabel'
