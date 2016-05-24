@@ -1,8 +1,9 @@
 import os, re, fnmatch, glob
 picBaseDir = "\\Users\\Marty\\Pictures"
-num = 19
-prefix = "D16E"
-workdir = "DScratch"
+num = 10
+bump = 10
+prefix = "D16G"
+workdir = "D16G"
 
 def findPicDir(name):
     match = re.match(r"([A-Z]+\d+[A-Z]+)(\d*).*", name)
@@ -20,7 +21,9 @@ def findPicDir(name):
         result = dirs[0]
         if match.group(2) != "":
             childDir = match.group(1)+match.group(2)
-            dirs = glob.glob(os.path.join(result, childDir+"*"))
+            # TODO: the following glob matches "D16I1 xx" and "D16I10 yy", which is wrong
+            # Space below is temp fix, improve someday..
+            dirs = glob.glob(os.path.join(result, childDir+" *"))
             if len(dirs) == 0:
                 raise Exception("Child directory not found: "+childDir)
             if len(dirs) > 1:
@@ -58,8 +61,11 @@ for file in os.listdir("."):
         #temp wedding comment = ""
         #temp wedding match = re.match(r".*-(\d*)", file)
         #temp wedding num = int(match.group(1))
-        newfile = prefix + ("-%03d" % num)
-        num += 1
+        if bump <= 2:
+            newfile = prefix + ("-%03d" % num)
+        else:
+            newfile = prefix + ("-%04d" % num)
+        num += bump
         if comment:
             newfile += "-" + comment
         newfile += ".jpg"
