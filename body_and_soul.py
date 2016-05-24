@@ -91,6 +91,10 @@ class Body:
     def instId(self):
         return self.soul.get_inst_id()
 
+    @property
+    def instNum(self):
+        return self.soul.get_inst_num()
+
     def __eq__(self, other):
         return self.instId == other.instId
 
@@ -307,6 +311,9 @@ class Soul:
 
     def get_inst_id(self):
         return ""
+
+    def get_inst_num(self):
+        return 0
 
     def get_hint_label(self):
         return ""

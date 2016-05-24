@@ -22,6 +22,9 @@ def join_id(*parts):
     else:
         return "-".join(parts)
 
+def join_tag_and_num(tag, instNum):
+    return "%s%04d" % (tag, instNum)
+
 class Variant:
     def __init__(self, inst, version, fileName="", hint=""):
         self.inst = inst
@@ -131,6 +134,9 @@ class FileCitySoul(Soul):
     def get_inst_id(self):
         return self.inst.instId
 
+    def get_inst_num(self):
+        return self.inst.instNum
+
     def is_new(self):
         return self.curVariant.is_new()
 
@@ -186,7 +192,7 @@ class Instance:
 
     @property
     def instId(self):
-        return "%s%04d" % (self.type.tag, self.instNum)
+        return join_tag_and_num(self.type.tag, self.instNum)
 
     def add_variant(self, version, fileName="", hint=""):
         newVar = Variant(self, version, fileName, hint)
@@ -435,6 +441,17 @@ class FileCity:
                     if var is not None:
                         return inst.make_body(var)
         return None
+
+    # This is provided so you can work directly with instance numbers.
+    # Why not use instance id strings?  Because sometimes we want to refer to an
+    # instance (such as a person) but all we have at our disposal is an integer.
+    # For example tkinter events have parameters like x,y mouse position.
+    # You might want to generate a virtual event, say <<NewPerson>>, and
+    # use x to pass the instance number.  Tkinter validation won't let you
+    # do this with a string.  It's a kludge but necessary if we want to
+    # take advantage of the tkinter event system.
+    def lookup_with_tag_and_num(self, tag, instNum):
+        return self.lookup(join_tag_and_num(tag, instNum))
 
     def generate_all(self, tag):
         return self.get_type(tag).generate_all()
