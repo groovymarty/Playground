@@ -9,7 +9,7 @@ from everybody.relationship import RelatHelper
 namePrefixes = "Mr.", "Ms.", "Mrs.", "Miss", "Dr.", "Rev."
 
 class Person(Body, RelatHelper, AddrHelper):
-    # Note all phone numbers are included here, so they exist even if address counterpart does not
+    # Note all phone numbers and emails are included here, so they exist even if address counterpart does not
     defaultValues = {
         'namePrefix': "",
         'usePrefix': False,
@@ -34,7 +34,11 @@ class Person(Body, RelatHelper, AddrHelper):
         'seasonal.phone': "",
         'other.phone': "",
         'mobile.phone': "",
-        'email': ""
+        'home.email': "",
+        'work.email': "",
+        'seasonal.email': "",
+        'other.email': "",
+        'email': "",
     }
     checkers = {
         'namePrefix': str.strip,
@@ -54,6 +58,10 @@ class Person(Body, RelatHelper, AddrHelper):
         'seasonal.phone': phone.check_phone,
         'other.phone': phone.check_phone,
         'mobile.phone': phone.check_phone,
+        'home.email': str.strip,
+        'work.email': str.strip,
+        'seasonal.email': str.strip,
+        'other.email': str.strip,
         'email': str.strip
     }
 
