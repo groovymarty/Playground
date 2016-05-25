@@ -2,9 +2,10 @@
 
 from tkinter import *
 from tkinter import ttk, messagebox
-from everybody import services
+from everybody import services, newperson
 from everybody.personlist import PersonList
 from everybody.persondetail import PersonDetail
+from basic_services import log_debug
 
 class PersonListAndDetail(ttk.Frame):
     def __init__(self, parent, peopleIter):
@@ -24,6 +25,7 @@ class PersonListAndDetail(ttk.Frame):
         self.personList.bind("<<PersonSelect>>", self.on_person_select)
         self.personDetail.bind("<<PersonChange>>", self.on_person_change)
         self.personDetail.bind("<<PersonSave>>", self.on_person_save)
+        services.tkRoot().bind("<<NewPerson>>", self.on_new_person)
 
         self.grid_columnconfigure(1, weight=1, minsize=500)
         self.grid_rowconfigure(1, weight=1)
@@ -47,6 +49,13 @@ class PersonListAndDetail(ttk.Frame):
         person = services.database().make_new("Per", "New Person")
         self.personList.add_person(person)
         self.personList.select(person)
+        newperson.generate_new_person_event(person)
+
+    def on_new_person(self, event):
+        log_debug("Events", "got new person event")
+        person = newperson.get_person_from_event(event)
+        if person is not None and not self.personList.has_person(person):
+            self.personList.add_person(person)
 
     def check_unsaved_changes(self):
         unsaved = self.personList.get_all_unsaved()

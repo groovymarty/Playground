@@ -47,6 +47,9 @@ class PersonList(ttk.Frame):
         self.tree.insert("", i, iid=person.instId, text=person.label)
         self.update_tags(person)
 
+    def has_person(self, person):
+        return person.instId in self.people
+
     def on_tree_select(self, event):
         self.event_generate("<<PersonSelect>>")
 

@@ -17,7 +17,7 @@ baseDir = os.path.join(os.path.expanduser("~"), "Documents", "Everybody")
 with BasicLogger(baseDir, "Everybody.log", echoStdout=debugMode) as logger:
     logger.log_info("Everybody: starting")
     if debugMode:
-        logger.enable_debug("PersonList", "PersonDetail", "FileCity")
+        logger.enable_debug("PersonList", "PersonDetail", "FileCity", "Events")
         logger.enable_debug("DateChooser", "Body")
     basic_services.set_logger(logger)
 

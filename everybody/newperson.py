@@ -60,4 +60,4 @@ def generate_new_person_event(person):
     services.tkRoot().event_generate("<<NewPerson>>", x=person.instNum)
 
 def get_person_from_event(event):
-    services.database().lookup_with_tag_and_num("Per", event.x)
+    return services.database().lookup_with_tag_and_num("Per", event.x)
