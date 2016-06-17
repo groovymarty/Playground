@@ -2,7 +2,7 @@
 
 from tkinter import *
 from tkinter import ttk, messagebox
-from everybody import services, clipboard, person, address, relationship, sharing
+from everybody import services, clipboard, person, address, relationship, sharing, personsearch
 from everybody.relationship import format_relat
 from everybody.relatdialog import RelatDialog
 from everybody.sharing import SharingHelper
@@ -617,13 +617,12 @@ class PersonDetail(ttk.Frame, WidgetGarden, SharingHelper):
 
     def do_save(self, selector="current"):
         if self.person is not None:
-            if not self.confirm_save_with_errors():
-                return
-            self.person.save(selector)
-            self.clear_diffs()
-            self.update_all()
-            self.event_generate('<<PersonSave>>')
-            clipboard.add_recent_person(self.person)
+            if self.confirm_save_with_errors() and self.confirm_save_duplicate():
+                self.person.save(selector)
+                self.clear_diffs()
+                self.update_all()
+                self.event_generate('<<PersonSave>>')
+                clipboard.add_recent_person(self.person)
 
     def do_save_minor(self):
         if self.person is not None:
@@ -822,6 +821,15 @@ Click "Cancel" to go back without saving.""")
 
 Click "Yes" to save anyway, with the errors.
 Click "No" to go back without saving.  You can correct the errors and try again.""")
+        else:
+            return True
+
+    def confirm_save_duplicate(self):
+        if self.person is not None:
+            if personsearch.find_person_by_label(self.person.label, self.person):
+                return personsearch.confirm_save_duplicate()
+            else:
+                return True
         else:
             return True
 

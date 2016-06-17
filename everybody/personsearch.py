@@ -1,7 +1,7 @@
 # everybody.personsearch
 
 from tkinter import *
-from tkinter import ttk
+from tkinter import ttk, messagebox
 from tkinter import simpledialog
 from everybody import services, newperson
 from everybody.personlist import PersonList
@@ -31,9 +31,10 @@ class PersonSearch(simpledialog.Dialog):
     def do_add(self):
         result = NewPersonDialog(services.tkRoot()).result
         if result is not None:
-            self.newPerson = newperson.make_new_person(result)
-            newperson.generate_new_person_event(self.newPerson)
-            self.ok()
+            if not find_person_by_name_parts(result) or confirm_save_duplicate():
+                self.newPerson = newperson.make_new_person(result)
+                newperson.generate_new_person_event(self.newPerson)
+                self.ok()
 
     def on_double_click(self, event):
         self.ok()
@@ -45,6 +46,22 @@ class PersonSearch(simpledialog.Dialog):
         else:
             self.result = ''
 
-def find_person_by_label(label):
+def find_person_by_label(label, otherThan=None):
     people = services.database().generate_all('Per')
-    return next((person.instId for person in people if person.label == label), '')
+    return next((person.instId for person in people
+        if person.label == label and person is not otherThan), '')
+
+def find_person_by_name_parts(nameParts, otherThan=None):
+    people = services.database().generate_all('Per')
+    return next((person.instId for person in people
+        if person.firstName == nameParts[0] and person.lastName == nameParts[1] and person is not otherThan), '')
+
+def confirm_save_duplicate():
+    return messagebox.askyesno(message=
+"""Duplicate name warning.  Are you sure you want to continue?
+
+The name you've entered matches another person in the database.
+This is allowed, and it may be exactly what you intended to do.  Or it may be a mistake.
+
+Click "Yes" to continue saving.  Let me use the same name twice.
+Click "No" to go back without saving.""")
