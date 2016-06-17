@@ -8,6 +8,7 @@ def scanone(srctail, targtail):
 
 scanone("Documents\\Business", "Marty\\Business")
 scanone("Documents\\Family Archives", "Family Archives")
+scanone("Documents\\Family History", "Family History")
 scanone("Documents\\Grace", "Grace")
 scanone("Documents\\Heidi", "Heidi")
 scanone("Documents\\Jeff", "Jeff")
