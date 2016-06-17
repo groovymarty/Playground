@@ -56,26 +56,31 @@ def targisnewer(srcpath, targpath):
     newer.append(targpath)
     #shutil.copystat(srcpath, targpath)
 
-def skipdir(folder, dname):
+# usually we skip files and dirs only on the source side (local disk, not dropbox)
+# this way they'll be cleaned up (not skipped) if they show up on dropbox
+def skipdir(folder, dname, isSrc=True):
     if "iTunes" in folder:
         if dname == "Podcasts" or dname == "Album Artwork":
-            return True
+            return isSrc
     if folder.endswith("SlideShows"):
-        return True
+        return isSrc
     if folder.endswith("Documents"):
         if dname == "My Music" or dname == "My Pictures" or dname == "My Videos":
-            return True
+            return isSrc
     if dname == ".git" or dname == "__pycache__":
-        return True
+        return isSrc
     return False
 
-def skipfile(folder, fname):
+def skipfile(folder, fname, isSrc=True):
     if fname == "desktop.ini" or fname == "Thumbs.db":
-        return True
+        return isSrc
     if "SlideShows" in folder:
         ext = os.path.splitext(fname)[1]
         if ext == ".pxc" or ext.startswith(".b"):
-            return True
+            return isSrc
+    if folder.endswith("Pictures"):
+        if fname.endswith(".php"):
+            return True #always skip .php file (never delete them)
     return False
 
 def movetowaste(targpath):
@@ -166,9 +171,11 @@ def scandir(srcdir, targdir):
         if not item in srclist:
             targpath = os.path.join(targdir, item)
             if os.path.isdir(targpath):
-                extradir(targpath)
+                if not skipdir(targdir, item):
+                    extradir(targpath)
             else:
-                extrafile(targpath)
+                if not skipfile(targdir, item):
+                    extrafile(targpath)
 
 def finish():
     if sizelimited:
