@@ -37,7 +37,11 @@ class PersonDetail(ttk.Frame, WidgetGarden, SharingHelper):
         'seasonal.phone': "Seasonal Phone",
         'other.phone': "Other Phone",
         'mobile.phone': "Mobile Phone",
-        'email': "Email"
+        'home.email': "Home Email",
+        'work.email': "Work Email",
+        'seasonal.email': "Seasonal Email",
+        'other.email': "Other Email",
+        'email': "Primary Email"
     }
     addrLabelText = {
         'addrLine1': "Address Line 1",
@@ -195,6 +199,8 @@ class PersonDetail(ttk.Frame, WidgetGarden, SharingHelper):
             self.make_checkbutton(join_key(flavor, 'useCountry'))
             self.next_row()
             self.make_entry(join_key(flavor, 'phone'))
+            self.next_row()
+            self.make_entry(join_key(flavor, 'email'))
             self.end_layout()
         self.next_col()
 
@@ -662,7 +668,21 @@ class PersonDetail(ttk.Frame, WidgetGarden, SharingHelper):
     def update_top(self):
         if self.person is not None:
             lines = [self.person.fullName]
-            lines.extend(self.person.build_address(self.get_cur_addr_tab()))
+            addrWho = None
+
+            # Using shared address?
+            flavor = self.get_cur_addr_tab()
+            usKey = join_key(flavor, 'useSharedAddr')
+            if usKey in self.usingShared:
+                sharer = self.find_sharer(usKey)
+                if sharer is not None:
+                    addrWho = sharer.who
+            else:
+                addrWho = self.person
+
+            # Build address using my values or sharer's values
+            if addrWho is not None:
+                lines.extend(addrWho.build_address(flavor))
         else:
             lines = [""]
         if len(lines) < 4:
