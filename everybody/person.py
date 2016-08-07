@@ -14,6 +14,7 @@ class Person(Body, RelatHelper, AddrHelper):
         'namePrefix': "",
         'usePrefix': False,
         'firstName': "",
+        'useFirstName': True,
         'middleName': "",
         'useMiddleName': False,
         'lastName': "",
@@ -84,8 +85,13 @@ class Person(Body, RelatHelper, AddrHelper):
                 words.append(self.namePrefix.rstrip("."))
         if self.nickName and self.useNickName and not formal:
             words.append(self.nickName)
-        elif self.firstName:
+        elif self.firstName and self.useFirstName:
             words.append(self.firstName)
+        elif self.firstName:
+            if formal or punct:
+                words.append(self.firstName[:1]+".")
+            else:
+                words.append(self.firstName[:1])
         if self.middleName and self.useMiddleName:
             words.append(self.middleName)
         elif self.middleName:

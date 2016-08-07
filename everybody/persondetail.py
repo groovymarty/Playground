@@ -17,6 +17,7 @@ class PersonDetail(ttk.Frame, WidgetGarden, SharingHelper):
         'namePrefix': "Name Prefix",
         'usePrefix': "Use Prefix",
         'firstName': "First Name",
+        'useFirstName': "Use First Name",
         'middleName': "Middle Name",
         'useMiddleName': "Use Middle Name",
         'lastName': "Last Name",
@@ -139,6 +140,7 @@ class PersonDetail(ttk.Frame, WidgetGarden, SharingHelper):
         self.make_checkbutton('usePrefix')
         self.next_row()
         self.make_entry('firstName')
+        self.make_checkbutton('useFirstName')
         self.next_row()
         self.make_entry('middleName')
         self.make_checkbutton('useMiddleName')
