@@ -1,9 +1,9 @@
 import os, re, fnmatch, glob
-picBaseDir = "\\Users\\Marty\\Pictures"
-num = 10
-bump = 10
-prefix = "D16G"
-workdir = "D16G"
+picBaseDir = "\\Users\\Msaus\\Pictures"
+num = 16
+bump = 1
+prefix = "FF"
+workdir = "_Scratch4"
 
 def findPicDir(name):
     match = re.match(r"([A-Z]+\d+[A-Z]+)(\d*).*", name)
@@ -32,6 +32,7 @@ def findPicDir(name):
     return result
 
 def getcomment(str):
+    return ""
     # Strip off extension
     str = os.path.splitext(str)[0]
     # Strip off IMG_ prefix or similar

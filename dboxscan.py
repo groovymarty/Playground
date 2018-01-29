@@ -67,7 +67,7 @@ def skipdir(folder, dname, isSrc=True):
     if folder.endswith("Documents"):
         if dname == "My Music" or dname == "My Pictures" or dname == "My Videos":
             return isSrc
-    if dname == ".git" or dname == "__pycache__":
+    if dname == ".git" or dname == "__pycache__" or dname == "node_modules" or dname == "cache":
         return isSrc
     return False
 

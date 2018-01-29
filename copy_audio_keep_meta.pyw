@@ -4,7 +4,7 @@ import sys, os, shutil, tkinter
 from tkinter import filedialog, messagebox
 from mutagen.mp4 import MP4
 
-musicDir="C:\\Users\\Marty\\Music\\iTunes\\iTunes Media\\Music"
+musicDir="C:\\Users\\Msaus\\Music\\iTunes\\iTunes Media\\Music"
 #root = tkinter.Tk()
 
 while True:

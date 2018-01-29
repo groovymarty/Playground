@@ -4,7 +4,7 @@ import sys, os, shutil, json
 from tkinter import *
 from tkinter import filedialog, messagebox
 
-picturesDir="C:\\Users\\Marty\\Pictures"
+picturesDir="C:\\Users\\Msaus\\Pictures"
 root = Tk()
 
 compileDir = filedialog.askdirectory(title="Select directory to compile", initialdir=os.path.join(picturesDir, "C01 Slide Shows"))
@@ -43,4 +43,5 @@ for item in os.listdir(compileDir):
 with open(contentsFile, mode='w', encoding='UTF-8') as f:
     json.dump(contents, f, indent=2)
 
-messagebox.showinfo("Done", "{} pictures added\n{} pictures already there\n{} files deleted".format(nAdded, nAlready, nDeleted))
+nTotal = len(contents['pictures'])
+messagebox.showinfo("Done", "{} pictures added\n{} pictures already there\n{} pictures total\n{} files deleted\n".format(nAdded, nAlready, nTotal, nDeleted))

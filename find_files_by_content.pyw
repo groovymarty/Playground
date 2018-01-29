@@ -4,7 +4,7 @@ import sys, os, shutil, hashlib
 from tkinter import *
 from tkinter import filedialog, messagebox
 
-picturesDir="C:\\Users\\Marty\\Pictures"
+picturesDir="C:\\Users\\Msaus\\Pictures"
 root = Tk()
 
 targetFiles = sorted(filedialog.askopenfilenames(title='Select files to find', initialdir=picturesDir))

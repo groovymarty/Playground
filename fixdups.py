@@ -1,52 +1,35 @@
 import os, re, fnmatch, glob
 picBaseDir = "\\Users\\Marty\\Pictures"
 
-fbat = open("\\Scratch\\undo_fixdups2.bat", "w")
+n = 0
 
 def scandir(path):
+    global n
     #print("Scanning "+path)
-    ids = dict()
-    list = os.listdir(path)
-    for item in list:
-        itempath = os.path.join(path, item)
-        if os.path.isdir(itempath):
-            scandir(itempath)
-        else:
-            match = re.match(r"^([A-Z]+[0-9]*[A-Z]*)(_?[0-9]*)-([A-Z]*)(0*)([1-9][0-9]*)([A-Z]*)([- ]*)([^.]*)(.*)", item)
-            if match:
-                (parent, child, type, zeros, num, ver, sep, comment, ext) = match.groups()
-                id = parent + child + "-" + type + num + ver
-                #print(id)
-                if id in ids:
-                    #print("found duplicate "+id)
-                    ids[id].append(item)
-                else:
-                    ids[id] = [item];
-    n = 0
-    for id in ids:
-        if len(ids[id]) > 1:
-            items = ids[id]
-            #print("duplicates:")
-            items.sort(key=len)
-            items.pop(0)
-            i = ord('A')
-            for item in items:
-                #print(chr(i)+": "+item)
-                match = re.match(r"^([A-Z]+[0-9]*[A-Z]*)(_?[0-9]*)-([A-Z]*)(0*)([1-9][0-9]*)([A-Z]*)([- ]*)([^.]*)(.*)",
-                                 item)
+    printScanning = True
+    dname = os.path.basename(path).split()[0]
+    if not (dname == "D14S" or dname == "D14Z" or dname == "D16S" or dname == "D17B" or dname == "D17G" or dname == "DOC"):
+        list = os.listdir(path)
+        #num = 1
+        for item in list:
+            itempath = os.path.join(path, item)
+            if os.path.isdir(itempath):
+                scandir(itempath)
+            else:
+                name, ext = os.path.splitext(item)
+                ext = ext.lower()
+                match = re.match(r"(D[0-9A-Z]+-[0-9]+-.*)(-[0-9]{1,2})$", name)
                 if match:
-                    (parent, child, type, zeros, num, ver, sep, comment, ext) = match.groups()
-                    if ver:
-                        print("# ALREADY HAS VERSION: "+item)
-                    newitem = parent + child + "-" + type + zeros + num + ver + chr(i) + sep + comment + ext
-                    #print(newitem)
-                    if n == 0:
-                        print("cd "+path, file=fbat)
-                    print("ren \""+newitem+"\" \""+item+"\"", file=fbat)
-                    os.rename(os.path.join(path, item), os.path.join(path, newitem))
+                    if printScanning:
+                        print("Scanning "+path)
+                        printScanning = False
+                    os.chdir(path)
+                    newname = match.groups()[0] + ext
+                    os.rename(item, newname)
+                    print("renaming {} to {}".format(item, newname))
+                    #num += 1
                     n += 1
-                    i += 1
-
 
 scandir(picBaseDir)
-fbat.close()
+
+print("did {} items".format(n))
