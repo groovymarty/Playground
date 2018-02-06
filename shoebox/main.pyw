@@ -5,23 +5,30 @@ from tkinter import *
 from tkinter import ttk
 from shoebox import services
 from shoebox.medit import Medit
+from shoebox.px import Px
 
 root = Tk()
 root.title("Shoebox")
-#root.geometry("750x650")
-root.grid_columnconfigure(0, weight=1)
-root.grid_rowconfigure(0, weight=1)
+lab = ttk.Label(root, text="Shoebox Launcher")
+lab.pack(side=TOP, expand=True, ipady=10)
+
+def launch_px():
+    Px()
+pxButton = ttk.Button(root, text="Px", command=launch_px)
+pxButton.pack(side=LEFT, fill=X, expand=True)
 
 def launch_medit():
-    Medit();
+    Medit()
 meditButton = ttk.Button(root, text="Medit", command=launch_medit)
-meditButton.grid(column=0, row=0, sticky=(N, W))
+meditButton.pack(side=LEFT, fill=X, expand=True)
 
-def destroy_medits():
+def close_all():
+    for px in services.get_pxs():
+        px.destroy()
     for medit in services.get_medits():
         medit.destroy()
-destroyButton = ttk.Button(root, text="Destroy Medits", command=destroy_medits)
-destroyButton.grid(column=1, row=0, sticky=(N, W))
+closeAllButton = ttk.Button(root, text="Close All", command=close_all)
+closeAllButton.pack(side=LEFT, fill=X, expand=True)
 
 def on_exit():
     root.destroy()
