@@ -6,6 +6,7 @@ from tkinter import ttk
 from shoebox import services
 from shoebox.medit import Medit
 from shoebox.px import Px
+import shoebox
 
 root = Tk()
 root.title("Shoebox")
@@ -23,9 +24,9 @@ meditButton = ttk.Button(root, text="Medit", command=launch_medit)
 meditButton.pack(side=LEFT, fill=X, expand=True)
 
 def close_all():
-    for px in services.get_pxs():
+    for px in list(shoebox.px.instances):
         px.destroy()
-    for medit in services.get_medits():
+    for medit in list(shoebox.medit.instances):
         medit.destroy()
 closeAllButton = ttk.Button(root, text="Close All", command=close_all)
 closeAllButton.pack(side=LEFT, fill=X, expand=True)
