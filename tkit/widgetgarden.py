@@ -115,11 +115,12 @@ class WidgetGarden(LayoutHelper, WidgetHelper):
             return var.get()
 
     def write_var(self, key, value):
-        var = self.vars[key]
-        if key in self.mappers:
-            var.set(self.mappers[key].map_out(value))
-        else:
-            var.set(value)
+        if value is not None:
+            var = self.vars[key]
+            if key in self.mappers:
+                var.set(self.mappers[key].map_out(value))
+            else:
+                var.set(value)
 
     def on_trace_write(self, tkName, tkIndx, mode):
         if not self.ignoreWrite:
