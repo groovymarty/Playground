@@ -3,6 +3,8 @@
 import os
 from tkinter import *
 from tkinter import ttk
+from PIL import Image
+import ImageTk
 
 instances = []
 nextInstNum = 1
@@ -28,9 +30,13 @@ class Px:
         self.treeScroll.pack(side=RIGHT, fill=Y)
         self.tree = ttk.Treeview(self.treeFrame, show='tree')
         self.tree.pack(side=RIGHT, fill=BOTH, expand=True)
+        self.tree.bind("<<TreeviewSelect>>", self.on_tree_select)
         self.tree.configure(yscrollcommand=self.treeScroll.set)
         self.treeScroll.configure(command=self.tree.yview)
         self.panedWin.add(self.treeFrame)
+
+        self.treeItems = {}
+        self.photos = []
 
         self.canvasFrame = Frame(self.panedWin)
         self.canvasScroll = Scrollbar(self.canvasFrame)
@@ -42,6 +48,12 @@ class Px:
         self.panedWin.add(self.canvasFrame)
 
         self.canvas.create_line(0,0,300,1000)
+        self.imgSz = (244, 244)
+        self.tileGap = 15
+        self.x = 0
+        self.y = 0
+        self.canvasWidth = self.canvas.winfo_width()
+        self.canvas.bind('<Configure>', self.on_canvas_resize)
 
         self.populate_tree("", ".")
         instances.append(self)
@@ -74,4 +86,44 @@ class Px:
         for ent in os.scandir(path):
             if ent.is_dir():
                 iid = self.tree.insert(parent, 'end', text=ent.name)
+                self.treeItems[iid] = ent
                 self.populate_tree(iid, ent.path)
+
+    # when user clicks tree item
+    def on_tree_select(self, event):
+        sel = self.tree.selection()
+        if sel:
+            ent = self.treeItems[sel[0]]
+            if ent:
+                self.clear_canvas()
+                self.populate_canvas(ent.path)
+
+    def on_canvas_resize(self, event):
+        if self.canvas.winfo_width() != self.canvasWidth:
+            self.canvasWidth = self.canvas.winfo_width()
+
+    def clear_canvas(self):
+        self.canvas.addtag_all('xx')
+        self.canvas.delete('xx')
+        self.x = 0
+        self.y = 0
+
+    def populate_canvas(self, path):
+        for ent in os.scandir(path):
+            if ent.is_file():
+                self.add_tile(ent)
+        self.canvas.configure(scrollregion=(0, 0, 1000, self.y))
+
+    def add_tile(self, ent):
+        ext = os.path.splitext(ent.name)[1]
+        if ext.lower() == ".jpg":
+            print("adding tile for {}".format(ent.name))
+            im = Image.open(ent.path)
+            im.thumbnail(self.imgSz)
+            photo = ImageTk.PhotoImage(im)
+            self.photos.append(photo)
+            self.canvas.create_image(self.x, self.y, image=photo, anchor=NW)
+            self.x += self.imgSz[0] + self.tileGap
+            if self.x + self.imgSz[0] > self.canvasWidth:
+                self.x = 0
+                self.y += self.imgSz[1] + self.tileGap
