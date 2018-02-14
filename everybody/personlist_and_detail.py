@@ -6,6 +6,7 @@ from everybody import services, newperson
 from everybody.personlist import PersonList
 from everybody.persondetail import PersonDetail
 from basic_services import log_debug
+from basic_data import date
 
 class PersonListAndDetail(ttk.Frame):
     def __init__(self, parent, peopleIter):
@@ -13,8 +14,12 @@ class PersonListAndDetail(ttk.Frame):
         self.make_widgets(peopleIter)
 
     def make_widgets(self, peopleIter):
-        self.addButton = ttk.Button(self, text="Add Person", command=self.do_add)
-        self.addButton.grid(column=0, columnspan=2, row=0, sticky=(N,W))
+        self.topBar = Frame(self)
+        self.topBar.grid(column=0, columnspan=2, row=0, sticky=(N,W))
+        self.addButton = ttk.Button(self.topBar, text="Add Person", command=self.do_add)
+        self.addButton.pack(side=LEFT)
+        self.printButton = ttk.Button(self.topBar, text="Print", command=self.do_print)
+        self.printButton.pack(side=LEFT)
 
         self.personList = PersonList(self, peopleIter)
         self.personList.grid(column=0, row=1, sticky=(N,W,E,S))
@@ -50,6 +55,21 @@ class PersonListAndDetail(ttk.Frame):
         self.personList.add_person(person)
         self.personList.select(person)
         newperson.generate_new_person_event(person)
+
+    def do_print(self):
+        top = Toplevel()
+        top.title("Everybody - Print")
+        text = Text(top)
+        text.pack(fill=BOTH, expand=True)
+        text.configure(font=("helvetica", 12), tabs=("3i", "6i"))
+        def print_person(person):
+            addrLines = person.build_address()
+            addrLines.extend([""] * (3 - len(addrLines)))
+            text.insert(END, person.sortName+"\t"+addrLines[0]+"\tBDay:  "+date.format(person.birthday, slash=True)+"\n")
+            text.insert(END, "\t"+addrLines[1]+"\tAnniv:  "+date.format(person.anniversary, slash=True)+"\n")
+            text.insert(END, "\t"+addrLines[2]+"\n")
+            text.insert(END, "\n")
+        self.personList.for_each_person(print_person)
 
     def on_new_person(self, event):
         log_debug("Events", "got new person event")

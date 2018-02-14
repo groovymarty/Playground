@@ -102,7 +102,7 @@ class DateChecker:
                 if not tolerateIncomplete:
                     raise ValueError("Date is incomplete")
 
-    def format(self, asEntered=False):
+    def format(self, asEntered=False, slash=False):
         if self.unknown:
             return "Unknown"
         elif self.incomplete or asEntered:
@@ -110,13 +110,22 @@ class DateChecker:
         elif self.iyear is not None:
             if self.imonth is not None:
                 if self.iday is not None:
-                    return "{:04d}-{:02d}-{:02d}".format(self.iyear, self.imonth, self.iday)
+                    if slash:
+                        return "{:d}/{:d}/{:04d}".format(self.imonth, self.iday, self.iyear)
+                    else:
+                        return "{:04d}-{:02d}-{:02d}".format(self.iyear, self.imonth, self.iday)
                 else:
-                    return "{:04d}-{:02d}".format(self.iyear, self.imonth)
+                    if slash:
+                        return "{:d}/{:04d}".format(self.imonth, self.iyear)
+                    else:
+                        return "{:04d}-{:02d}".format(self.iyear, self.imonth)
             else:
                 return "{:04d}".format(self.iyear)
         elif self.imonth is not None and self.iday is not None:
-            return "{:02d}-{:02d}".format(self.imonth, self.iday)
+            if slash:
+                return "{:d}/{:d}".format(self.imonth, self.iday)
+            else:
+                return "{:02d}-{:02d}".format(self.imonth, self.iday)
         else:
             return ""
 
@@ -124,3 +133,8 @@ def check_date(value):
     dc = DateChecker()
     dc.check_date(value)
     return dc.format()
+
+def format(value, slash=False):
+    dc = DateChecker()
+    dc.check_date(value)
+    return dc.format(slash=slash)

@@ -124,3 +124,7 @@ class PersonList(ttk.Frame):
     def find_insertion_point(self, label):
         return next((i for i, person in enumerate(self.peopleSorted) if label <= person.label),
                     len(self.peopleSorted))
+
+    def for_each_person(self, func):
+        for person in self.peopleSorted:
+            func(person)
