@@ -6,6 +6,7 @@ from tkinter import ttk
 from shoebox import services
 from shoebox.medit import Medit
 from shoebox.px import Px
+from shoebox.nailer import Nailer
 import shoebox
 
 root = Tk()
@@ -23,11 +24,18 @@ def launch_medit():
 meditButton = ttk.Button(root, text="Medit", command=launch_medit)
 meditButton.pack(side=LEFT, fill=X, expand=True)
 
+def launch_nailer():
+    Nailer(".")
+nailerButton = ttk.Button(root, text="Nailer", command=launch_nailer)
+nailerButton.pack(side=LEFT, fill=X, expand=True)
+
 def close_all():
     for px in list(shoebox.px.instances):
         px.destroy()
     for medit in list(shoebox.medit.instances):
         medit.destroy()
+    for nailer in list(shoebox.nailer.instances):
+        nailer.destroy()
 closeAllButton = ttk.Button(root, text="Close All", command=close_all)
 closeAllButton.pack(side=LEFT, fill=X, expand=True)
 
