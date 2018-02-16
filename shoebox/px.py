@@ -112,6 +112,8 @@ class Px:
         for ent in os.scandir(path):
             if ent.is_file():
                 self.add_tile(ent)
+        if self.x != 0:
+            self.y += self.imgSz[1] + self.tileGap
         self.canvas.configure(scrollregion=(0, 0, 1000, self.y))
 
     def add_tile(self, ent):

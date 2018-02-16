@@ -1,12 +1,15 @@
 # shoebox.nailer
 
-import os
+import os, io
 from tkinter import *
 from tkinter import ttk, filedialog
 from tkit.widgetgarden import WidgetGarden
+from shoebox import pic
+from PIL import Image
 
 instances = []
 nextInstNum = 1
+delayMs = 15
 
 class Nailer:
     def __init__(self, path):
@@ -56,6 +59,9 @@ class Nailer:
         self.garden.write_var('recursive', self.recursive)
         self.foldersToScan = None
         self.curScan = None
+        self.curEnt = None
+        self.curSzIndx = 0
+        self.curImage = None
         self.curFolder = ""
         self.quit = False
 
@@ -98,8 +104,15 @@ class Nailer:
         self.foldersToScan = [self.absPath]
         self.curFolder = None
         self.curScan = None
+        self.curEnt = None
+        self.curSzIndx = 0
+        self.curImage = None
         self.quit = False
-        self.top.after_idle(self.do_next)
+        self.top.after(delayMs, self.do_next)
+
+    # when stop button clicked
+    def do_stop(self):
+        self.quit = True
 
     # do the next thing to do
     def do_next(self):
@@ -107,39 +120,73 @@ class Nailer:
         if self.quit:
             self.do_end()
             return
-        # possibly advance to next folder
-        if self.curScan is None:
-            if len(self.foldersToScan):
-                self.curFolder = self.foldersToScan.pop()
-                self.curFolderLabel.configure(text=self.curFolder)
-                self.curScan = os.scandir(self.curFolder)
-            else:
-                self.do_end()
-                return
-        # get next entry in current folder scan
-        ent = next(self.curScan, None)
-        if ent is None:
-            self.curScan = None
-        elif ent.is_dir():
-            if self.recursive:
-               self.foldersToScan.append(ent.path)
+        # do next size for current picture
+        elif self.curEnt and self.curSzIndx < len(pic.nailSizes):
+            self.do_picture()
+            self.curSzIndx += 1
+        # process next entry in current folder scan
+        elif self.curScan:
+            self.curEnt = next(self.curScan, None)
+            if self.curEnt is None:
+                # scan is done
+                self.finish_folder()
+                self.curScan = None
+                self.curImage = None
+            elif self.curEnt.is_dir():
+                # is a directory, remember for later if recursive
+                if self.recursive:
+                   self.foldersToScan.append(self.curEnt.path)
+            elif os.path.splitext(self.curEnt.path)[1] in pic.pictureExts:
+                # is a picture, set up size iteration
+                self.curPictureLabel.configure(text=self.curEnt.name)
+                self.curSzIndx = 0
+                self.curImage = None
+        # advance to next folder
+        elif len(self.foldersToScan):
+            self.curFolder = self.foldersToScan.pop()
+            self.curFolderLabel.configure(text=self.curFolder)
+            self.curScan = os.scandir(self.curFolder)
+            self.curEnt = None
+            self.begin_folder()
         else:
-            self.curPictureLabel.configure(text=ent.name)
+            self.do_end()
+            return
 
         # that's all for now, come back soon
-        self.top.after_idle(self.do_next)
+        self.top.after(delayMs, self.do_next)
+
+    # begin processing a folder
+    def begin_folder(self):
+        pass
+
+    # process one picture, one size
+    def do_picture(self):
+        if self.curImage is None:
+            self.curImage = Image.open(self.curEnt.path)
+        sz = pic.nailSizes[self.curSzIndx]
+        if self.curSzIndx < len(pic.nailSizes)-1:
+            imCopy = self.curImage.copy()
+        else:
+            imCopy = self.curImage
+        imCopy.thumbnail((sz, sz))
+        f = io.BytesIO()
+        imCopy.save(f, "png")
+        b = f.getvalue()
+        print("{} size {} is {} bytes".format(self.curEnt.name, sz, len(b)))
+        f.close()
+
+    # finish processing a folder
+    def finish_folder(self):
+        pass
 
     # when nothing more to do (or quitting because stop button clicked)
     def do_end(self):
         self.curScan = None
+        self.curImage = None
         self.foldersToScan = None
         self.curFolderLabel.configure(text="Stopped" if self.quit else "Complete")
         self.curPictureLabel.configure(text="")
         self.disable_widgets(False)
-
-    # when stop button clicked
-    def do_stop(self):
-        self.quit = True
 
     # disable most widgets during scan (or enable them afterward)
     def disable_widgets(self, disable=True):
