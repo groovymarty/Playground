@@ -14,7 +14,7 @@ class Nailer:
         self.instNum = nextInstNum
         nextInstNum += 1
         self.top = Toplevel()
-        self.top.geometry("500x100")
+        self.top.geometry("800x150")
         self.top.title("Nailer {}".format(self.instNum))
         self.top.bind('<Destroy>', self.on_destroy)
         instances.append(self)
@@ -22,8 +22,7 @@ class Nailer:
         self.garden = WidgetGarden()
         self.garden.labelText = {'path': "Starting Path", 'recursive': "Recursive"}
         self.garden.begin_layout(self.top, 3)
-        self.top.grid_columnconfigure(0, weight=1)
-        self.top.grid_columnconfigure(1, weight=10)
+        self.top.grid_columnconfigure(1, weight=1)
         self.garden.make_entry('path')
         self.pathButton = ttk.Button(self.garden.curParent, text="Browse", command=self.do_browse_path)
         self.garden.grid_widget(self.pathButton)
@@ -34,11 +33,31 @@ class Nailer:
         self.garden.next_col()
         self.startButton = ttk.Button(self.garden.curParent, text="Start", command=self.do_start)
         self.garden.grid_widget(self.startButton)
+        self.garden.next_row()
+        self.garden.grid_widget(ttk.Label(self.garden.curParent, text="Doing folder"))
+        self.garden.next_col()
+        self.curFolderLabel = ttk.Label(self.garden.curParent)
+        self.garden.grid_widget(self.curFolderLabel)
+        self.garden.next_row()
+        self.garden.grid_widget(ttk.Label(self.garden.curParent, text="Doing picture"))
+        self.garden.next_col()
+        self.curPictureLabel = ttk.Label(self.garden.curParent)
+        self.garden.grid_widget(self.curPictureLabel)
+        self.garden.next_row()
+        self.garden.next_col()
+        self.stopButton = ttk.Button(self.garden.curParent, text="Stop", command=self.do_stop)
+        self.garden.grid_widget(self.stopButton)
+        self.garden.disable_widget(self.stopButton)
         self.garden.end_layout()
 
         self.absPath = os.path.abspath(path)
         self.garden.write_var('path', self.absPath)
-        self.garden.write_var('recursive', True)
+        self.recursive = True
+        self.garden.write_var('recursive', self.recursive)
+        self.foldersToScan = None
+        self.curScan = None
+        self.curFolder = ""
+        self.quit = False
 
     # called when my top-level window is closed
     # this is the easiest and most common way to destroy Nailer,
@@ -73,8 +92,59 @@ class Nailer:
 
     # when start button is clicked
     def do_start(self):
-        self.garden.set_widget_disable('path')
-        self.garden.set_widget_disable('recursive')
-        self.garden.disable_widget(self.pathButton)
-        self.garden.disable_widget(self.startButton)
-        print("you clicked start")
+        self.disable_widgets()
+        self.absPath = self.garden.read_var('path')
+        self.recursive = self.garden.read_var('recursive')
+        self.foldersToScan = [self.absPath]
+        self.curFolder = None
+        self.curScan = None
+        self.quit = False
+        self.top.after_idle(self.do_next)
+
+    # do the next thing to do
+    def do_next(self):
+        # possibly quit
+        if self.quit:
+            self.do_end()
+            return
+        # possibly advance to next folder
+        if self.curScan is None:
+            if len(self.foldersToScan):
+                self.curFolder = self.foldersToScan.pop()
+                self.curFolderLabel.configure(text=self.curFolder)
+                self.curScan = os.scandir(self.curFolder)
+            else:
+                self.do_end()
+                return
+        # get next entry in current folder scan
+        ent = next(self.curScan, None)
+        if ent is None:
+            self.curScan = None
+        elif ent.is_dir():
+            if self.recursive:
+               self.foldersToScan.append(ent.path)
+        else:
+            self.curPictureLabel.configure(text=ent.name)
+
+        # that's all for now, come back soon
+        self.top.after_idle(self.do_next)
+
+    # when nothing more to do (or quitting because stop button clicked)
+    def do_end(self):
+        self.curScan = None
+        self.foldersToScan = None
+        self.curFolderLabel.configure(text="Stopped" if self.quit else "Complete")
+        self.curPictureLabel.configure(text="")
+        self.disable_widgets(False)
+
+    # when stop button clicked
+    def do_stop(self):
+        self.quit = True
+
+    # disable most widgets during scan (or enable them afterward)
+    def disable_widgets(self, disable=True):
+        self.garden.set_widget_disable('path', disable)
+        self.garden.set_widget_disable('recursive', disable)
+        self.garden.disable_widget(self.pathButton, disable)
+        self.garden.disable_widget(self.startButton, disable)
+        self.garden.disable_widget(self.stopButton, not disable)

@@ -1,9 +1,9 @@
 import os, re, fnmatch, glob
 picBaseDir = "\\Users\\Msaus\\Pictures"
-num = 16
-bump = 1
-prefix = "FF"
-workdir = "_Scratch4"
+num = 890
+bump = 10
+prefix = "D18A1"
+workdir = "_Scratch"
 
 def findPicDir(name):
     match = re.match(r"([A-Z]+\d+[A-Z]+)(\d*).*", name)
