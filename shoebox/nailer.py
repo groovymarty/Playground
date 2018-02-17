@@ -17,7 +17,7 @@ class Nailer:
         self.instNum = nextInstNum
         nextInstNum += 1
         self.top = Toplevel()
-        self.top.geometry("800x150")
+        self.top.geometry("800x160")
         self.top.title("Nailer {}".format(self.instNum))
         self.top.bind('<Destroy>', self.on_destroy)
         instances.append(self)
@@ -47,6 +47,11 @@ class Nailer:
         self.curPictureLabel = ttk.Label(self.garden.curParent)
         self.garden.grid_widget(self.curPictureLabel)
         self.garden.next_row()
+        self.garden.grid_widget(ttk.Label(self.garden.curParent, text="Total"))
+        self.garden.next_col()
+        self.totalLabel = ttk.Label(self.garden.curParent)
+        self.garden.grid_widget(self.totalLabel)
+        self.garden.next_row()
         self.garden.next_col()
         self.stopButton = ttk.Button(self.garden.curParent, text="Stop", command=self.do_stop)
         self.garden.grid_widget(self.stopButton)
@@ -64,6 +69,9 @@ class Nailer:
         self.curImage = None
         self.curFolder = ""
         self.quit = False
+        self.bufs = []
+        self.nFolders = 0
+        self.nPictures = 0
 
     # called when my top-level window is closed
     # this is the easiest and most common way to destroy Nailer,
@@ -108,6 +116,9 @@ class Nailer:
         self.curSzIndx = 0
         self.curImage = None
         self.quit = False
+        self.nFolders = 0
+        self.nPictures = 0
+        self.update_totals()
         self.top.after(delayMs, self.do_next)
 
     # when stop button clicked
@@ -130,6 +141,8 @@ class Nailer:
                 if len(self.foldersToScan):
                     self.curFolder = self.foldersToScan.pop()
                     self.curFolderLabel.configure(text=self.curFolder)
+                    self.nFolders += 1
+                    self.update_totals()
                     self.curScan = os.scandir(self.curFolder)
                     self.curEnt = None
                     self.begin_folder()
@@ -144,7 +157,7 @@ class Nailer:
                     self.curScan = None
                     self.curEnt = None
                     self.finish_folder()
-                    break;
+                    break
                 elif ent.is_dir():
                     # is a directory, remember for later if recursive
                     if self.recursive:
@@ -152,36 +165,68 @@ class Nailer:
                 elif os.path.splitext(ent.path)[1].lower() in pic.pictureExts:
                     # is a picture, set up size iteration
                     self.curPictureLabel.configure(text=ent.name)
+                    self.nPictures += 1
+                    self.update_totals()
                     self.curEnt = ent
                     self.curSzIndx = 0
                     self.curImage = None
-                    break;
+                    break
         # that's all for now, come back soon
         self.top.after(delayMs, self.do_next)
 
+    # update totals
+    def update_totals(self):
+        self.totalLabel.configure(text="{:d} folders, {:d} pictures".format(self.nFolders, self.nPictures))
+
     # begin processing a folder
     def begin_folder(self):
+        # bufs is array of (index dictionary, byte array of concatenated PNG files) for each thumbnail size
+        # index key is picture file name
+        # index value is (offset, length) of PNG file in byte array
+        self.bufs = [({}, bytearray()) for sz in pic.nailSizes]
         pass
 
     # process one picture, one size
     def do_picture(self):
+        (indx, buf) = self.bufs[self.curSzIndx]
+        sz = pic.nailSizes[self.curSzIndx]
+        # open and read picture file (this is expensive because pic files are a couple GB or larger)
         if self.curImage is None:
             self.curImage = Image.open(self.curEnt.path)
-        sz = pic.nailSizes[self.curSzIndx]
+        # make a copy (except last time) because thumbnail() operates on the image
         if self.curSzIndx < len(pic.nailSizes)-1:
             imCopy = self.curImage.copy()
         else:
             imCopy = self.curImage
+        # make thumbnail of desired size
         imCopy.thumbnail((sz, sz))
+        # write to PNG file in memory
         f = io.BytesIO()
         imCopy.save(f, "png")
-        b = f.getvalue()
-        print("{} size {} is {} bytes".format(self.curEnt.name, sz, len(b)))
+        # copy to byte array and compute offset, length
+        offset = len(buf)
+        buf.extend(f.getvalue())
+        length = len(buf) - offset
         f.close()
+        # add to index
+        indx[self.curEnt.name] = (offset, length)
 
     # finish processing a folder
     def finish_folder(self):
-        pass
+        for i, (indx, buf) in enumerate(self.bufs):
+            if len(buf) == 0:
+                break
+            sz = pic.nailSizes[i]
+            arr = ["{}\t{:d}\t{:d}".format(name, value[0], value[1]) for name, value in indx.items()]
+            indexBytes = "\n".join(arr).encode()
+            headerBytes = "XPNG0001{:08d}".format(len(indexBytes)).encode()
+            if len(headerBytes) != 16:
+                raise RuntimeError("Header length is {:d}, expected 16".format(len(headerBytes)))
+            fn = os.path.join(self.curFolder, "nails-{:d}.xpng".format(sz))
+            with open(fn, 'wb') as f:
+                f.write(headerBytes)
+                f.write(indexBytes)
+                f.write(buf)
 
     # when nothing more to do (or quitting because stop button clicked)
     def do_end(self):
