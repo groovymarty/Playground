@@ -120,38 +120,42 @@ class Nailer:
         if self.quit:
             self.do_end()
             return
-        # do next size for current picture
-        elif self.curEnt and self.curSzIndx < len(pic.nailSizes):
+        # possibly do next size for current picture
+        if self.curEnt and self.curSzIndx < len(pic.nailSizes):
             self.do_picture()
             self.curSzIndx += 1
-        # process next entry in current folder scan
-        elif self.curScan:
-            self.curEnt = next(self.curScan, None)
-            if self.curEnt is None:
-                # scan is done
-                self.finish_folder()
-                self.curScan = None
-                self.curImage = None
-            elif self.curEnt.is_dir():
-                # is a directory, remember for later if recursive
-                if self.recursive:
-                   self.foldersToScan.append(self.curEnt.path)
-            elif os.path.splitext(self.curEnt.path)[1] in pic.pictureExts:
-                # is a picture, set up size iteration
-                self.curPictureLabel.configure(text=self.curEnt.name)
-                self.curSzIndx = 0
-                self.curImage = None
-        # advance to next folder
-        elif len(self.foldersToScan):
-            self.curFolder = self.foldersToScan.pop()
-            self.curFolderLabel.configure(text=self.curFolder)
-            self.curScan = os.scandir(self.curFolder)
-            self.curEnt = None
-            self.begin_folder()
         else:
-            self.do_end()
-            return
-
+            # possibly advance to next folder
+            if self.curScan is None:
+                if len(self.foldersToScan):
+                    self.curFolder = self.foldersToScan.pop()
+                    self.curFolderLabel.configure(text=self.curFolder)
+                    self.curScan = os.scandir(self.curFolder)
+                    self.curEnt = None
+                    self.begin_folder()
+                else:
+                    self.do_end()
+                    return
+            # loop until we find next picture or end of scan
+            while self.curScan:
+                ent = next(self.curScan, None)
+                if ent is None:
+                    # scan is done
+                    self.curScan = None
+                    self.curEnt = None
+                    self.finish_folder()
+                    break;
+                elif ent.is_dir():
+                    # is a directory, remember for later if recursive
+                    if self.recursive:
+                       self.foldersToScan.append(ent.path)
+                elif os.path.splitext(ent.path)[1].lower() in pic.pictureExts:
+                    # is a picture, set up size iteration
+                    self.curPictureLabel.configure(text=ent.name)
+                    self.curEnt = ent
+                    self.curSzIndx = 0
+                    self.curImage = None
+                    break;
         # that's all for now, come back soon
         self.top.after(delayMs, self.do_next)
 
