@@ -4,7 +4,7 @@ import os, io
 from tkinter import *
 from tkinter import ttk, filedialog
 from tkit.widgetgarden import WidgetGarden
-from shoebox import pic
+from shoebox import pic, nails
 from PIL import Image
 
 instances = []
@@ -23,7 +23,7 @@ class Nailer:
         instances.append(self)
 
         self.garden = WidgetGarden()
-        self.garden.labelText = {'path': "Starting Path", 'recursive': "Recursive"}
+        self.garden.labelText = {'path': "Starting Path:", 'recursive': "Recursive"}
         self.garden.begin_layout(self.top, 3)
         self.top.grid_columnconfigure(1, weight=1)
         self.garden.make_entry('path')
@@ -37,17 +37,17 @@ class Nailer:
         self.startButton = ttk.Button(self.garden.curParent, text="Start", command=self.do_start)
         self.garden.grid_widget(self.startButton)
         self.garden.next_row()
-        self.garden.grid_widget(ttk.Label(self.garden.curParent, text="Doing folder"))
+        self.garden.grid_widget(ttk.Label(self.garden.curParent, text="Doing folder:"))
         self.garden.next_col()
         self.curFolderLabel = ttk.Label(self.garden.curParent)
         self.garden.grid_widget(self.curFolderLabel)
         self.garden.next_row()
-        self.garden.grid_widget(ttk.Label(self.garden.curParent, text="Doing picture"))
+        self.garden.grid_widget(ttk.Label(self.garden.curParent, text="Doing picture:"))
         self.garden.next_col()
         self.curPictureLabel = ttk.Label(self.garden.curParent)
         self.garden.grid_widget(self.curPictureLabel)
         self.garden.next_row()
-        self.garden.grid_widget(ttk.Label(self.garden.curParent, text="Total"))
+        self.garden.grid_widget(ttk.Label(self.garden.curParent, text="Total:"))
         self.garden.next_col()
         self.totalLabel = ttk.Label(self.garden.curParent)
         self.garden.grid_widget(self.totalLabel)
@@ -214,19 +214,9 @@ class Nailer:
     # finish processing a folder
     def finish_folder(self):
         for i, (indx, buf) in enumerate(self.bufs):
-            if len(buf) == 0:
-                break
-            sz = pic.nailSizes[i]
-            arr = ["{}\t{:d}\t{:d}".format(name, value[0], value[1]) for name, value in indx.items()]
-            indexBytes = "\n".join(arr).encode()
-            headerBytes = "XPNG0001{:08d}".format(len(indexBytes)).encode()
-            if len(headerBytes) != 16:
-                raise RuntimeError("Header length is {:d}, expected 16".format(len(headerBytes)))
-            fn = os.path.join(self.curFolder, "nails-{:d}.xpng".format(sz))
-            with open(fn, 'wb') as f:
-                f.write(headerBytes)
-                f.write(indexBytes)
-                f.write(buf)
+            # don't write empty files
+            if len(buf):
+                nails.write_nails(self.curFolder, pic.nailSizes[i], indx, buf)
 
     # when nothing more to do (or quitting because stop button clicked)
     def do_end(self):
