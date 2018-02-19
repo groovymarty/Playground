@@ -192,18 +192,21 @@ class Nailer:
         sz = pic.nailSizes[self.curSzIndx]
         # open and read picture file (this is expensive because pic files are a couple GB or larger)
         if self.curImage is None:
-            self.curImage = Image.open(self.curEnt.path)
-        # make a copy (except last time) because thumbnail() operates on the image
+            im = Image.open(self.curEnt.path)
+            # thumbnails don't contain EXIF information so correct the image orientation now
+            self.curImage = pic.fix_image_orientation(im)
+        # make a copy (except last time) because thumbnail() modifies the image
         if self.curSzIndx < len(pic.nailSizes)-1:
             imCopy = self.curImage.copy()
         else:
             imCopy = self.curImage
+
         # make thumbnail of desired size
         imCopy.thumbnail((sz, sz))
         # write to PNG file in memory
         f = io.BytesIO()
         imCopy.save(f, "png")
-        # copy to byte array and compute offset, length
+        # append to byte array and compute offset, length
         offset = len(buf)
         buf.extend(f.getvalue())
         length = len(buf) - offset

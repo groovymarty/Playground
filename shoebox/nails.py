@@ -11,7 +11,7 @@ def build_file_name(sz):
 def write_nails(folderPath, sz, indx, pngBytes):
     arr = ["{}\t{:d}\t{:d}".format(name, value[0], value[1]) for name, value in indx.items()]
     indexBytes = "\n".join(arr).encode()
-    headerBytes = "XPNG0001{:08d}".format(len(indexBytes)).encode()
+    headerBytes = "XPNG0100{:08d}".format(len(indexBytes)).encode()
     if len(headerBytes) != 16:
         raise RuntimeError("Header length is {:d}, expected 16".format(len(headerBytes)))
     path = os.path.join(folderPath, build_file_name(sz))
@@ -29,7 +29,7 @@ def read_nails(folderPath, sz):
         header = headerBytes.decode()
         if header[0:4] != "XPNG":
             raise RuntimeError("Header doesn't look like XPNG file")
-        elif header[4:7] != "000":
+        elif header[4:6] != "01":
             raise RuntimeError("Unsupported XPNG file version {}".format(header[4:8]))
         try:
             indexLen = int(header[8:16])

@@ -7,12 +7,12 @@ from PIL import Image
 import ImageTk
 from shoebox.nailer import Nailer
 from shoebox import pic, nails
-import base64
+from tkit.loghelper import LogHelper
 
 instances = []
 nextInstNum = 1
 
-class Px:
+class Px(LogHelper):
     def __init__(self):
         global nextInstNum
         self.instNum = nextInstNum
@@ -188,9 +188,10 @@ class Px:
             #TODO: more error handling......
             (offset, length) = self.nailIndx[ent.name]
             data = self.nailBuf[offset : offset+length]
-            photo = PhotoImage(data=base64.b64encode(data))
+            photo = PhotoImage(format="png", data=data)
         else:
             im = Image.open(ent.path)
+            im = pic.fix_image_orientation(im)
             im.thumbnail((self.nailSz, self.nailSz))
             photo = ImageTk.PhotoImage(im)
         self.photos.append(photo)
