@@ -44,6 +44,8 @@ class Px(LogHelper):
         # turn off border for all Treeviews.. see https://www.codeday.top/2017/10/26/52272.html
         s = ttk.Style()
         s.layout('Treeview', [('Treeview.field', {'border': 0})])
+        # style for error messages
+        s.configure('Error.TLabel', foreground='red')
 
         self.treeFrame = Frame(self.panedWin)
         self.treeScroll = Scrollbar(self.treeFrame)
@@ -110,8 +112,8 @@ class Px(LogHelper):
         self.destroy()
 
     # set status to specified string
-    def set_status(self, msg):
-        self.statusLabel.configure(text=msg)
+    def set_status(self, msg, error=False):
+        self.statusLabel.configure(text=msg, style="Error.TLabel" if error else "TLabel")
         self.top.update_idletasks()
 
     # set status to default message
@@ -124,7 +126,7 @@ class Px(LogHelper):
     # set status to default message or error
     def set_status_default_or_error(self):
         if self.lastError:
-            self.set_status("Ready / "+self.lastError)
+            self.set_status("Ready / "+self.lastError, True)
         else:
             self.set_status_default()
 
@@ -140,7 +142,7 @@ class Px(LogHelper):
     # show error message in status and log it
     def log_error(self, msg):
         self.lastError = msg
-        self.set_status(msg)
+        self.set_status(msg, True)
         super().log_error(msg)
 
     # when Refresh button clicked
