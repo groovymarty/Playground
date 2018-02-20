@@ -14,22 +14,27 @@ nextInstNum = 1
 
 class Px(LogHelper):
     def __init__(self):
+        LogHelper.__init__(self)
         global nextInstNum
         self.instNum = nextInstNum
         nextInstNum += 1
         self.top = Toplevel()
-        self.top.title("Px {}".format(self.instNum))
+        self.top.title("Px {:d}".format(self.instNum))
         self.top.bind('<Destroy>', self.on_destroy)
 
         self.topBar = Frame(self.top)
-        self.topBar.grid(column=0, row=0, sticky=(N,W))
+        self.topBar.grid(column=0, row=0, sticky=(N,W,E))
         self.refreshButton = ttk.Button(self.topBar, text="Refresh", command=self.do_refresh)
         self.refreshButton.pack(side=LEFT)
         self.nailerButton = ttk.Button(self.topBar, text="Nailer", command=self.do_nailer)
         self.nailerButton.pack(side=LEFT)
 
-        self.statusLabel = ttk.Label(self.top, text="")
-        self.statusLabel.grid(column=0, row=1, sticky=(N,W,E))
+        self.statusBar = Frame(self.top)
+        self.statusBar.grid(column=0, row=1, sticky=(N,W,E))
+        self.statusLabel = ttk.Label(self.statusBar, text="")
+        self.statusLabel.pack(side=LEFT, fill=X, expand=True)
+        self.logButton = ttk.Button(self.statusBar, text="Log", command=self.do_log)
+        self.logButton.pack(side=RIGHT)
 
         self.panedWin = PanedWindow(self.top, orient=HORIZONTAL, width=800, height=800, sashwidth=5, sashrelief=GROOVE)
         self.panedWin.grid(column=0, row=2, sticky=(N,W,E,S))
@@ -71,6 +76,7 @@ class Px(LogHelper):
         self.canvasWidth = self.canvas.winfo_width()
         self.canvas.bind('<Configure>', self.on_canvas_resize)
 
+        self.lastError = ""
         self.curFolder = None
         self.nailIndx = None
         self.nailBuf = None
@@ -83,6 +89,7 @@ class Px(LogHelper):
     # this is the easiest and most common way to destroy Px,
     # and includes the case where the entire shoebox application is shut down
     def on_destroy(self, ev):
+        LogHelper.__del__(self)
         self.top = None
         self.destroy()
 
@@ -114,6 +121,28 @@ class Px(LogHelper):
         else:
             self.set_status("Ready ({:d} pictures)".format(self.nPictures))
 
+    # set status to default message or error
+    def set_status_default_or_error(self):
+        if self.lastError:
+            self.set_status("Ready / "+self.lastError)
+        else:
+            self.set_status_default()
+
+    # clear last error
+    def clear_error(self):
+        self.lastError = ""
+
+    # show info message in status and log it
+    def log_info(self, msg):
+        self.set_status(msg)
+        super().log_info(msg)
+
+    # show error message in status and log it
+    def log_error(self, msg):
+        self.lastError = msg
+        self.set_status(msg)
+        super().log_error(msg)
+
     # when Refresh button clicked
     def do_refresh(self):
         self.clear_canvas()
@@ -125,6 +154,10 @@ class Px(LogHelper):
             Nailer(".")
         else:
             Nailer(self.curFolder)
+
+    # when Log button clicked
+    def do_log(self):
+        self.open_log_window("Log - Px {:d}".format(self.instNum))
 
     # populate tree
     def populate_tree(self, parent, path):
@@ -160,16 +193,17 @@ class Px(LogHelper):
     # add tiles for all pictures in current folder to canvas
     def populate_canvas(self):
         if self.curFolder is not None:
+            self.clear_error()
             self.set_status("Loading...")
             self.nPictures = 0
-            error = False
+            self.nailIndx = None
+            self.nailBuf = None
             try:
                 (self.nailIndx, self.nailBuf) = nails.read_nails(self.curFolder, self.nailSz)
             except FileNotFoundError:
-                self.set_status("No thumbnail file for size {}".format(self.nailSz))
-                error = True
-                self.nailIndx = None
-                self.nailBuf = None
+                self.log_error("No thumbnail file for size {}".format(self.nailSz))
+            except RuntimeError as e:
+                self.log_error(e.message)
 
             for ent in os.scandir(self.curFolder):
                 if ent.is_file() and os.path.splitext(ent.name)[1].lower() in pic.pictureExts:
@@ -178,18 +212,25 @@ class Px(LogHelper):
             if self.x != 0:
                 self.y += self.nailSz + self.tileGap
             self.canvas.configure(scrollregion=(0, 0, 1000, self.y))
-            if not error:
-                self.set_status_default()
+            self.set_status_default_or_error()
 
     # add a tile for specified directory entry
     def add_tile(self, ent):
-        print("adding tile for {}".format(ent.name))
-        if self.nailIndx is not None and ent.name in self.nailIndx:
-            #TODO: more error handling......
-            (offset, length) = self.nailIndx[ent.name]
-            data = self.nailBuf[offset : offset+length]
-            photo = PhotoImage(format="png", data=data)
-        else:
+        photo = None
+        if self.nailIndx is not None:
+            if ent.name in self.nailIndx:
+                (offset, length) = self.nailIndx[ent.name]
+                data = self.nailBuf[offset : offset+length]
+                if len(data) == length:
+                    try:
+                        photo = PhotoImage(format="png", data=data)
+                    except:
+                        self.log_error("Can't create image from XPNG for {}".format(ent.name))
+                else:
+                    self.log_error("Bad XPNG offset={:d}, length={:d} for {}".format(offset, length, ent.name))
+            else:
+                self.log_error("No thumbnail for {}".format(ent.name))
+        if photo is None:
             im = Image.open(ent.path)
             im = pic.fix_image_orientation(im)
             im.thumbnail((self.nailSz, self.nailSz))

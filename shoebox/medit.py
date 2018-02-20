@@ -13,7 +13,7 @@ class Medit:
         self.instNum = nextInstNum
         nextInstNum += 1
         self.top = tk.Toplevel()
-        self.top.title("Medit {}".format(self.instNum))
+        self.top.title("Medit {:d}".format(self.instNum))
         self.top.bind('<Destroy>', self.on_destroy)
         instances.append(self)
 

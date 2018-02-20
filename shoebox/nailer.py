@@ -18,7 +18,7 @@ class Nailer:
         nextInstNum += 1
         self.top = Toplevel()
         self.top.geometry("800x160")
-        self.top.title("Nailer {}".format(self.instNum))
+        self.top.title("Nailer {:d}".format(self.instNum))
         self.top.bind('<Destroy>', self.on_destroy)
         instances.append(self)
 
