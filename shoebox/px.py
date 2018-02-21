@@ -57,6 +57,8 @@ class Px(LogHelper):
         self.treeScroll.configure(command=self.tree.yview)
         self.panedWin.add(self.treeFrame)
 
+        self.tree.tag_configure('noncanon', background='lavender')
+
         self.treeItems = {}
         self.photos = []
 
@@ -167,6 +169,8 @@ class Px(LogHelper):
             if ent.is_dir():
                 iid = self.tree.insert(parent, 'end', text=ent.name)
                 self.treeItems[iid] = ent
+                if not pic.parseFolder(ent.name):
+                    self.tree.item(iid, tags='noncanon')
                 self.populate_tree(iid, ent.path)
 
     # when user clicks tree item
