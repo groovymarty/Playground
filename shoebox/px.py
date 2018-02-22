@@ -5,7 +5,8 @@ from tkinter import *
 from tkinter import ttk
 from PIL import Image
 import ImageTk
-from shoebox import pic, nails
+from shoebox import pic, nailcache
+from shoebox.nails import Nails, read_nails
 from shoebox.nailer import Nailer
 from shoebox.pxfolder import PxFolder
 from tkit.loghelper import LogHelper
@@ -83,8 +84,8 @@ class Px(LogHelper):
 
         self.lastError = ""
         self.curFolder = None
-        self.nailIndx = None
-        self.nailBuf = None
+        self.nails = None
+        self.nailsTried = False
         self.nPictures = 0
         self.rootFolder = PxFolder(None, "", ".", "")
         self.populate_tree(self.rootFolder)
@@ -204,14 +205,8 @@ class Px(LogHelper):
             self.clear_error()
             self.set_status("Loading...")
             self.nPictures = 0
-            self.nailIndx = None
-            self.nailBuf = None
-            try:
-                (self.nailIndx, self.nailBuf) = nails.read_nails(self.curFolder.path, self.nailSz)
-            except FileNotFoundError:
-                self.log_error("No thumbnail file for size {}".format(self.nailSz))
-            except RuntimeError as e:
-                self.log_error(e.message)
+            self.nails = None
+            self.nailsTried = False
 
             for ent in os.scandir(self.curFolder.path):
                 if ent.is_file() and os.path.splitext(ent.name)[1].lower() in pic.pictureExts:
@@ -225,27 +220,38 @@ class Px(LogHelper):
     # add a tile for specified directory entry
     def add_tile(self, ent):
         photo = None
-        if self.nailIndx is not None:
-            if ent.name in self.nailIndx:
-                (offset, length) = self.nailIndx[ent.name]
-                data = self.nailBuf[offset : offset+length]
-                if len(data) == length:
-                    try:
-                        photo = PhotoImage(format="png", data=data)
-                    except:
-                        self.log_error("Can't create image from XPNG for {}".format(ent.name))
-                else:
-                    self.log_error("Bad XPNG offset={:d}, length={:d} for {}".format(offset, length, ent.name))
-            else:
-                self.log_error("No thumbnail for {}".format(ent.name))
+        # try to get thumbnails if we haven't already tried
+        if self.nails is None and not self.nailsTried:
+            self.nailsTried = True
+            try:
+                self.nails = nailcache.get_nails(self.curFolder.path, self.nailSz)
+            except FileNotFoundError:
+                self.log_error("No thumbnail file for size {}".format(self.nailSz))
+            except RuntimeError as e:
+                self.log_error(e.message)
+        # try to get image from thumbnails
+        if self.nails is not None:
+            try:
+                data = self.nails.get_by_name(ent.name)
+                try:
+                    photo = PhotoImage(format="png", data=data)
+                except:
+                    raise RuntimeError("Can't create image from XPNG for {}".format(ent.name))
+            except RuntimeError as e:
+                self.log_error(str(e))
+        # if still no image, try to create thumbnail on the fly
         if photo is None:
-            im = Image.open(ent.path)
-            im = pic.fix_image_orientation(im)
-            im.thumbnail((self.nailSz, self.nailSz))
-            photo = ImageTk.PhotoImage(im)
-        self.photos.append(photo)
-        self.canvas.create_image(self.x, self.y, image=photo, anchor=NW)
-        self.x += self.nailSz + self.tileGap
-        if self.x + self.nailSz > self.canvasWidth:
-            self.x = 0
-            self.y += self.nailSz + self.tileGap
+            try:
+                im = Image.open(ent.path)
+                im = pic.fix_image_orientation(im)
+                im.thumbnail((self.nailSz, self.nailSz))
+                photo = ImageTk.PhotoImage(im)
+            except:
+                self.log_error("Can't create thumbnail for {}".format(ent.name))
+        if photo is not None:
+            self.photos.append(photo)
+            self.canvas.create_image(self.x, self.y, image=photo, anchor=NW)
+            self.x += self.nailSz + self.tileGap
+            if self.x + self.nailSz > self.canvasWidth:
+                self.x = 0
+                self.y += self.nailSz + self.tileGap

@@ -20,6 +20,7 @@ def write_nails(folderPath, sz, indx, pngBytes):
         f.write(indexBytes)
         f.write(pngBytes)
 
+# returns (index, pngByes) or raises exception
 def read_nails(folderPath, sz):
     path = os.path.join(folderPath, build_file_name(sz))
     with open(path, 'rb') as f:
@@ -54,3 +55,22 @@ def read_nails(folderPath, sz):
             indx[parts[0]] = (offset, length)
         pngBytes = f.read()
     return (indx, pngBytes)
+
+class Nails:
+    def __init__(self, indxAndBytes):
+        (self.indx, self.buf) = indxAndBytes
+        self.lastTouch = 0
+
+    def get_by_name(self, name):
+        if name in self.indx:
+            (offset, length) = self.indx[name]
+            data = self.buf[offset: offset + length]
+            if len(data) == length:
+                return data
+            else:
+                raise RuntimeError("Bad XPNG offset={:d}, length={:d} for {}".format(offset, length, name))
+        else:
+            raise RuntimeError("No thumbnail for {}".format(name))
+
+    def touch(self, value):
+        self.lastTouch = value
