@@ -20,19 +20,19 @@ folderPat = re.compile(r"^([A-Za-z]+\d*)([A-Za-z]*)(\d*(?:\+\d+)*)([- ]*)(.*)")
 filePat = re.compile(r"^([A-Za-z]+\d*)([A-Za-z]*)(\d*(?:\+\d+)*)-([A-Za-z]*)(0*)([1-9]\d*)([A-Za-z]*)([- ]*)(.*)")
 
 # leading plus unnecessary if parent has suffix (and therefore ends with a letter)
-def trimChild(mr):
+def trim_child(mr):
     if mr.group(3).startswith("+") and mr.group(2):
         print("***** Extra plus: "+mr.group())
         return mr.group(3)[1:]
     else:
         return mr.group(3)
 
-def parseFolder(name):
+def parse_folder(name):
     mr = folderPat.match(name)
     if mr:
         parts = [
             (mr.group(1) + mr.group(2)).upper(), #parent
-            trimChild(mr), #child
+            trim_child(mr), #child
             None, #type
             None, #zeros
             # child number for sorting or 0 if no child string
@@ -48,7 +48,7 @@ def parseFolder(name):
             return Parts._make(parts)
     return None
 
-def parseFile(name):
+def parse_file(name):
     mr = filePat.match(name)
     if mr:
         # find last dot for extension
@@ -58,7 +58,7 @@ def parseFile(name):
             idot = len(mr.group(9))
         parts = [
             (mr.group(1) + mr.group(2)).upper(), #parent
-            trimChild(mr), #child
+            trim_child(mr), #child
             mr.group(4).upper(), #type
             mr.group(5), #zeros
             int(mr.group(6)), #num

@@ -5,8 +5,9 @@ from tkinter import *
 from tkinter import ttk
 from PIL import Image
 import ImageTk
-from shoebox.nailer import Nailer
 from shoebox import pic, nails
+from shoebox.nailer import Nailer
+from shoebox.pxfolder import PxFolder
 from tkit.loghelper import LogHelper
 
 instances = []
@@ -85,7 +86,8 @@ class Px(LogHelper):
         self.nailIndx = None
         self.nailBuf = None
         self.nPictures = 0
-        self.populate_tree("", ".")
+        self.rootFolder = PxFolder(None, "", ".", "")
+        self.populate_tree(self.rootFolder)
         self.set_status_default()
         instances.append(self)
 
@@ -157,31 +159,31 @@ class Px(LogHelper):
         if self.curFolder is None:
             Nailer(".")
         else:
-            Nailer(self.curFolder)
+            Nailer(self.curFolder.path)
 
     # when Log button clicked
     def do_log(self):
         self.open_log_window("Log - Px {:d}".format(self.instNum))
 
     # populate tree
-    def populate_tree(self, parent, path):
-        for ent in os.scandir(path):
+    def populate_tree(self, parent):
+        for ent in os.scandir(parent.path):
             if ent.is_dir():
-                iid = self.tree.insert(parent, 'end', text=ent.name)
-                self.treeItems[iid] = ent
-                if not pic.parseFolder(ent.name):
+                iid = self.tree.insert(parent.iid, 'end', text=ent.name)
+                folder = PxFolder(parent, ent.name, ent.path, iid)
+                parent.add_child(folder)
+                self.treeItems[iid] = folder
+                if folder.noncanon:
                     self.tree.item(iid, tags='noncanon')
-                self.populate_tree(iid, ent.path)
+                self.populate_tree(folder)
 
     # when user clicks tree item
     def on_tree_select(self, event):
         sel = self.tree.selection()
-        if sel:
-            ent = self.treeItems[sel[0]]
-            if ent:
-                self.curFolder = ent.path
-                self.clear_canvas()
-                self.populate_canvas()
+        if sel and sel[0] in self.treeItems:
+            self.curFolder = self.treeItems[sel[0]]
+            self.clear_canvas()
+            self.populate_canvas()
 
     # when user resizes the window
     def on_canvas_resize(self, event):
@@ -205,13 +207,13 @@ class Px(LogHelper):
             self.nailIndx = None
             self.nailBuf = None
             try:
-                (self.nailIndx, self.nailBuf) = nails.read_nails(self.curFolder, self.nailSz)
+                (self.nailIndx, self.nailBuf) = nails.read_nails(self.curFolder.path, self.nailSz)
             except FileNotFoundError:
                 self.log_error("No thumbnail file for size {}".format(self.nailSz))
             except RuntimeError as e:
                 self.log_error(e.message)
 
-            for ent in os.scandir(self.curFolder):
+            for ent in os.scandir(self.curFolder.path):
                 if ent.is_file() and os.path.splitext(ent.name)[1].lower() in pic.pictureExts:
                     self.nPictures += 1
                     self.add_tile(ent)
