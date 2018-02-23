@@ -14,6 +14,8 @@ from tkit.loghelper import LogHelper
 instances = []
 nextInstNum = 1
 
+tileGap = 14
+
 class Px(LogHelper):
     def __init__(self):
         self.env = {}
@@ -73,11 +75,11 @@ class Px(LogHelper):
         self.panedWin.add(self.canvasFrame)
 
         self.nailSz = pic.nailSizes[-1]
-        self.tileGap = 15
         self.x = 0
         self.y = 0
         self.tiles = {}
         self.canvasWidth = 0
+        self.canvasBlank = True
         self.canvas.bind('<Configure>', self.on_canvas_resize)
 
         self.lastError = ""
@@ -194,7 +196,7 @@ class Px(LogHelper):
     def on_canvas_resize(self, event):
         if self.canvas.winfo_width() != self.canvasWidth:
             self.canvasWidth = self.canvas.winfo_width()
-        if self.x == 0 and self.y == 0:
+        if self.canvasBlank:
             self.clear_canvas()
             self.canvas.create_line(0, 0, self.canvasWidth, self.tree.winfo_height())
 
@@ -202,13 +204,14 @@ class Px(LogHelper):
     def clear_canvas(self):
         self.canvas.addtag_all('xx')
         self.canvas.delete('xx')
-        self.x = 0
-        self.y = 0
+        self.x = tileGap / 2;
+        self.y = tileGap / 2;
         self.tiles = {}
 
     # add tiles for all pictures in current folder to canvas
     def populate_canvas(self):
-        self.canvas.configure(background="lemonchiffon")
+        self.canvasBlank = False
+        self.canvas.configure(background="black")
         if self.curFolder is not None:
             self.clear_error()
             self.set_status("Loading...")
@@ -217,16 +220,23 @@ class Px(LogHelper):
             self.nailsTried = False
 
             for ent in os.scandir(self.curFolder.path):
-                if ent.is_file() and os.path.splitext(ent.name)[1].lower() in pic.pictureExts:
-                    self.nPictures += 1
-                    self.add_tile(ent)
-            if self.x != 0:
-                self.y += self.nailSz + self.tileGap
-            self.canvas.configure(scrollregion=(0, 0, 1000, self.y))
+                if ent.is_file():
+                    if os.path.splitext(ent.name)[1].lower() in pic.pictureExts:
+                        self.nPictures += 1
+                        self.add_pic_tile(ent)
+                    else:
+                        self.add_file_tile(ent)
+                    self.x += self.nailSz + tileGap
+                    if self.x + self.nailSz > self.canvasWidth:
+                        self.x = tileGap / 2
+                        self.y += self.nailSz + tileGap
+            if self.x > tileGap:
+                self.y += self.nailSz + tileGap
+            self.canvas.configure(scrollregion=(0, 0, 1, self.y))
             self.set_status_default_or_error()
 
-    # add a tile for specified directory entry
-    def add_tile(self, ent):
+    # add tile for a picture
+    def add_pic_tile(self, ent):
         photo = None
         # try to get thumbnails if we haven't already tried
         if self.nails is None and not self.nailsTried:
@@ -256,10 +266,17 @@ class Px(LogHelper):
                 photo = ImageTk.PhotoImage(im)
             except:
                 self.log_error("Can't create thumbnail for {}".format(ent.name))
-        if photo is not None:
+        # if still no image, give up and display as a file
+        if photo is None:
+            self.add_file_tile(ent)
+        else:
             oid = self.canvas.create_image(self.x, self.y, image=photo, anchor=NW)
             self.tiles[oid] = PxTile(photo)
-            self.x += self.nailSz + self.tileGap
-            if self.x + self.nailSz > self.canvasWidth:
-                self.x = 0
-                self.y += self.nailSz + self.tileGap
+
+    # add tile for a file
+    def add_file_tile(self, ent):
+        rectSz = 128
+        print(ent.name)
+        oid = self.canvas.create_rectangle(self.x, self.y, self.x+rectSz, self.y+rectSz, fill="gray")
+        self.canvas.create_line(self.x, self.y, self.x+rectSz, self.y+rectSz)
+        self.tiles[oid] = PxTile(None)
