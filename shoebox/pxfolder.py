@@ -3,13 +3,13 @@
 from shoebox import pic
 
 class PxFolder:
-    def __init__(self, parent, name, path, iid):
+    def __init__(self, parent, name, path, iid, env=None):
         self.parent = parent
         self.name = name
         self.path = path
         self.iid = iid
         self.children = []
-        parts = pic.parse_folder(self.name)
+        parts = pic.parse_folder(self.name, env)
         self.id = parts.id if parts else None
         # this folder is noncanonical if ID can't be parsed from name,
         # or if it lies in a subtree under a noncanonical parent

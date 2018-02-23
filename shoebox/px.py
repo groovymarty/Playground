@@ -16,7 +16,8 @@ nextInstNum = 1
 
 class Px(LogHelper):
     def __init__(self):
-        LogHelper.__init__(self)
+        self.env = {}
+        LogHelper.__init__(self, self.env)
         global nextInstNum
         self.instNum = nextInstNum
         nextInstNum += 1
@@ -89,7 +90,7 @@ class Px(LogHelper):
         self.nPictures = 0
         self.rootFolder = PxFolder(None, "", ".", "")
         self.populate_tree(self.rootFolder)
-        self.set_status_default()
+        self.set_status_default_or_error()
         instances.append(self)
 
     # called when my top-level window is closed
@@ -150,6 +151,12 @@ class Px(LogHelper):
         self.set_status(msg, True)
         super().log_error(msg)
 
+    # show warning message in status and log it
+    def log_warning(self, msg):
+        self.lastError = msg
+        self.set_status(msg, True)
+        super().log_warning(msg)
+
     # when Refresh button clicked
     def do_refresh(self):
         self.clear_canvas()
@@ -171,7 +178,7 @@ class Px(LogHelper):
         for ent in os.scandir(parent.path):
             if ent.is_dir():
                 iid = self.tree.insert(parent.iid, 'end', text=ent.name)
-                folder = PxFolder(parent, ent.name, ent.path, iid)
+                folder = PxFolder(parent, ent.name, ent.path, iid, env=self.env)
                 parent.add_child(folder)
                 self.treeItems[iid] = folder
                 if folder.noncanon:

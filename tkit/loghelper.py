@@ -3,6 +3,7 @@
 import time
 from tkinter import *
 from tkinter import ttk
+from tkit import environ
 
 class LogWindow:
     def __init__(self, title, instances):
@@ -36,15 +37,16 @@ class LogWindow:
     def add_entry(self, ent):
         (ts, kind, msg) = ent
         t = time.asctime(time.localtime(ts))
-        self.text.insert(END, "{} {}: {}\n".format(t, kind, msg))
+        self.text.insert(END, "{} [{}]: {}\n".format(t, kind, msg))
 
     def clear(self):
         self.text.delete("1.0", END)
 
 class LogHelper:
-    def __init__(self):
+    def __init__(self, env=None):
         self.logBuf = []
         self.logWindows = []
+        environ.set_logger(env, self)
 
     def __del__(self):
         for win in list(self.logWindows):
@@ -65,7 +67,10 @@ class LogHelper:
         self.log("Info", msg)
 
     def log_error(self, msg):
-        self.log("Error", msg)
+        self.log("Err", msg)
+
+    def log_warning(self, msg):
+        self.log("Warn", msg)
 
     def open_log_window(self, title):
         win = LogWindow(title, self.logWindows)

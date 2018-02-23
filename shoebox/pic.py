@@ -2,6 +2,7 @@
 
 import re
 from collections import namedtuple
+from tkit import environ
 
 pictureExts = [".jpg", ".jpeg", ".gif", ".png", ".tif"]
 
@@ -20,19 +21,19 @@ folderPat = re.compile(r"^([A-Za-z]+\d*)([A-Za-z]*)(\d*(?:\+\d+)*)([- ]*)(.*)")
 filePat = re.compile(r"^([A-Za-z]+\d*)([A-Za-z]*)(\d*(?:\+\d+)*)-([A-Za-z]*)(0*)([1-9]\d*)([A-Za-z]*)([- ]*)(.*)")
 
 # leading plus unnecessary if parent has suffix (and therefore ends with a letter)
-def trim_child(mr):
+def trim_child(mr, env):
     if mr.group(3).startswith("+") and mr.group(2):
-        print("***** Extra plus: "+mr.group())
+        environ.log_warning(env, "Extra plus: {}".format(mr.group()))
         return mr.group(3)[1:]
     else:
         return mr.group(3)
 
-def parse_folder(name):
+def parse_folder(name, env=None):
     mr = folderPat.match(name)
     if mr:
         parts = [
             (mr.group(1) + mr.group(2)).upper(), #parent
-            trim_child(mr), #child
+            trim_child(mr, env), #child
             None, #type
             None, #zeros
             # child number for sorting or 0 if no child string
@@ -48,7 +49,7 @@ def parse_folder(name):
             return Parts._make(parts)
     return None
 
-def parse_file(name):
+def parse_file(name, env=None):
     mr = filePat.match(name)
     if mr:
         # find last dot for extension
@@ -58,7 +59,7 @@ def parse_file(name):
             idot = len(mr.group(9))
         parts = [
             (mr.group(1) + mr.group(2)).upper(), #parent
-            trim_child(mr), #child
+            trim_child(mr, env), #child
             mr.group(4).upper(), #type
             mr.group(5), #zeros
             int(mr.group(6)), #num
