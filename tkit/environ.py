@@ -1,7 +1,7 @@
 # tbox.environ
 
 def set_logger(env, logger):
-    if env:
+    if env is not None:
         env['logger'] = logger
 
 def log_info(env, msg):

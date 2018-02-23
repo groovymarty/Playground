@@ -6,9 +6,9 @@ from tkinter import ttk
 from PIL import Image
 import ImageTk
 from shoebox import pic, nailcache
-from shoebox.nails import Nails, read_nails
 from shoebox.nailer import Nailer
 from shoebox.pxfolder import PxFolder
+from shoebox.pxtile import PxTile
 from tkit.loghelper import LogHelper
 
 instances = []
@@ -61,26 +61,23 @@ class Px(LogHelper):
         self.panedWin.add(self.treeFrame)
 
         self.tree.tag_configure('noncanon', background='lavender')
-
         self.treeItems = {}
-        self.photos = []
 
         self.canvasFrame = Frame(self.panedWin)
         self.canvasScroll = Scrollbar(self.canvasFrame)
         self.canvasScroll.pack(side=RIGHT, fill=Y)
-        self.canvas = Canvas(self.canvasFrame, scrollregion=(0, 0, 1000, 1000))
+        self.canvas = Canvas(self.canvasFrame, scrollregion=(0, 0, 1, 1))
         self.canvas.pack(side=RIGHT, fill=BOTH, expand=True)
         self.canvas.configure(yscrollcommand=self.canvasScroll.set)
         self.canvasScroll.configure(command=self.canvas.yview)
         self.panedWin.add(self.canvasFrame)
 
-        self.canvas.create_line(0,0,300,1000)
         self.nailSz = pic.nailSizes[-1]
         self.tileGap = 15
         self.x = 0
         self.y = 0
-        self.photos = []
-        self.canvasWidth = self.canvas.winfo_width()
+        self.tiles = {}
+        self.canvasWidth = 0
         self.canvas.bind('<Configure>', self.on_canvas_resize)
 
         self.lastError = ""
@@ -197,6 +194,9 @@ class Px(LogHelper):
     def on_canvas_resize(self, event):
         if self.canvas.winfo_width() != self.canvasWidth:
             self.canvasWidth = self.canvas.winfo_width()
+        if self.x == 0 and self.y == 0:
+            self.clear_canvas()
+            self.canvas.create_line(0, 0, self.canvasWidth, self.tree.winfo_height())
 
     # delete all items in canvas and reset state variables
     def clear_canvas(self):
@@ -204,10 +204,11 @@ class Px(LogHelper):
         self.canvas.delete('xx')
         self.x = 0
         self.y = 0
-        self.photos = []
+        self.tiles = {}
 
     # add tiles for all pictures in current folder to canvas
     def populate_canvas(self):
+        self.canvas.configure(background="lemonchiffon")
         if self.curFolder is not None:
             self.clear_error()
             self.set_status("Loading...")
@@ -256,8 +257,8 @@ class Px(LogHelper):
             except:
                 self.log_error("Can't create thumbnail for {}".format(ent.name))
         if photo is not None:
-            self.photos.append(photo)
-            self.canvas.create_image(self.x, self.y, image=photo, anchor=NW)
+            oid = self.canvas.create_image(self.x, self.y, image=photo, anchor=NW)
+            self.tiles[oid] = PxTile(photo)
             self.x += self.nailSz + self.tileGap
             if self.x + self.nailSz > self.canvasWidth:
                 self.x = 0
