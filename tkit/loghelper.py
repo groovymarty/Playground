@@ -9,6 +9,7 @@ class LogWindow:
     def __init__(self, title, instances):
         self.instances = instances
         self.top = Toplevel()
+        self.top.geometry("900x500")
         self.top.title(title)
         self.top.bind('<Destroy>', self.on_destroy)
         self.scroll = Scrollbar(self.top)

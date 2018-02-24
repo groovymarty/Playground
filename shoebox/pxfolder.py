@@ -11,9 +11,9 @@ class PxFolder:
         self.children = []
         parts = pic.parse_folder(self.name, env)
         self.id = parts.id if parts else None
-        # this folder is noncanonical if ID can't be parsed from name,
+        # a folder is noncanonical if ID can't be parsed from name,
         # or if it lies in a subtree under a noncanonical parent
-        # root folder (no parent) must be noncanon=false or all folders would be noncanonical!
+        # force root folder (no parent) to be canonical else all folders would be noncanonical!
         self.noncanon = parent and (parent.noncanon or not self.id)
 
     def add_child(self, folder):

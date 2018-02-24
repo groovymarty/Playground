@@ -10,13 +10,14 @@ from shoebox.nailer import Nailer
 from shoebox.pxfolder import PxFolder
 from shoebox.pxtile import PxTile
 from tkit.loghelper import LogHelper
+from tkit.widgethelper import WidgetHelper
 
 instances = []
 nextInstNum = 1
 
 tileGap = 14
 
-class Px(LogHelper):
+class Px(LogHelper, WidgetHelper):
     def __init__(self):
         self.env = {}
         LogHelper.__init__(self, self.env)
@@ -31,8 +32,11 @@ class Px(LogHelper):
         self.topBar.grid(column=0, row=0, sticky=(N,W,E))
         self.refreshButton = ttk.Button(self.topBar, text="Refresh", command=self.do_refresh)
         self.refreshButton.pack(side=LEFT)
+        self.sizeButton = ttk.Button(self.topBar, text="Small", command=self.do_size)
+        self.sizeButton.pack(side=LEFT)
         self.nailerButton = ttk.Button(self.topBar, text="Nailer", command=self.do_nailer)
-        self.nailerButton.pack(side=LEFT)
+        self.nailerButton.pack(side=RIGHT)
+        self.enable_buttons(False)
 
         self.statusBar = Frame(self.top)
         self.statusBar.grid(column=0, row=1, sticky=(N,W,E))
@@ -79,13 +83,13 @@ class Px(LogHelper):
         self.y = 0
         self.tiles = {}
         self.canvasWidth = 0
-        self.canvasBlank = True
         self.canvas.bind('<Configure>', self.on_canvas_resize)
 
         self.lastError = ""
         self.curFolder = None
         self.nails = None
         self.nailsTried = False
+        self.loaded = False
         self.nPictures = 0
         self.rootFolder = PxFolder(None, "", ".", "")
         self.populate_tree(self.rootFolder)
@@ -139,18 +143,13 @@ class Px(LogHelper):
     def clear_error(self):
         self.lastError = ""
 
-    # show info message in status and log it
-    def log_info(self, msg):
-        self.set_status(msg)
-        super().log_info(msg)
-
-    # show error message in status and log it
+    # show error/warning message in status and log it
+    # for info and other log messages just log them
     def log_error(self, msg):
         self.lastError = msg
         self.set_status(msg, True)
         super().log_error(msg)
 
-    # show warning message in status and log it
     def log_warning(self, msg):
         self.lastError = msg
         self.set_status(msg, True)
@@ -160,6 +159,15 @@ class Px(LogHelper):
     def do_refresh(self):
         self.clear_canvas()
         self.populate_canvas()
+
+    # when Small/Large button clicked
+    def do_size(self):
+        i = pic.nailSizes.index(self.nailSz)
+        i = (i + 1) % len(pic.nailSizes)
+        self.nailSz = pic.nailSizes[i]
+        i = (i + 1) % len(pic.nailSizes)
+        self.sizeButton.configure(text=pic.nailSizeNames[i])
+        self.do_refresh()
 
     # when Nailer button clicked
     def do_nailer(self):
@@ -171,6 +179,12 @@ class Px(LogHelper):
     # when Log button clicked
     def do_log(self):
         self.open_log_window("Log - Px {:d}".format(self.instNum))
+
+    # enable/disable buttons
+    def enable_buttons(self, enable=True):
+        self.enable_widget(self.refreshButton, enable)
+        self.enable_widget(self.sizeButton, enable)
+        self.enable_widget(self.nailerButton, enable)
 
     # populate tree
     def populate_tree(self, parent):
@@ -196,7 +210,7 @@ class Px(LogHelper):
     def on_canvas_resize(self, event):
         if self.canvas.winfo_width() != self.canvasWidth:
             self.canvasWidth = self.canvas.winfo_width()
-        if self.canvasBlank:
+        if not self.loaded:
             self.clear_canvas()
             self.canvas.create_line(0, 0, self.canvasWidth, self.tree.winfo_height())
 
@@ -210,9 +224,8 @@ class Px(LogHelper):
 
     # add tiles for all pictures in current folder to canvas
     def populate_canvas(self):
-        self.canvasBlank = False
-        self.canvas.configure(background="black")
-        if self.curFolder is not None:
+        if self.curFolder:
+            self.canvas.configure(background="black")
             self.clear_error()
             self.set_status("Loading...")
             self.nPictures = 0
@@ -220,7 +233,7 @@ class Px(LogHelper):
             self.nailsTried = False
 
             for ent in os.scandir(self.curFolder.path):
-                if ent.is_file():
+                if ent.is_file() and ent.name != "Thumbs.db":
                     if os.path.splitext(ent.name)[1].lower() in pic.pictureExts:
                         self.nPictures += 1
                         self.add_pic_tile(ent)
@@ -234,6 +247,8 @@ class Px(LogHelper):
                 self.y += self.nailSz + tileGap
             self.canvas.configure(scrollregion=(0, 0, 1, self.y))
             self.set_status_default_or_error()
+            self.loaded = True
+            self.enable_buttons()
 
     # add tile for a picture
     def add_pic_tile(self, ent):
@@ -242,7 +257,7 @@ class Px(LogHelper):
         if self.nails is None and not self.nailsTried:
             self.nailsTried = True
             try:
-                self.nails = nailcache.get_nails(self.curFolder.path, self.nailSz)
+                self.nails = nailcache.get_nails(self.curFolder.path, self.nailSz, self.env)
             except FileNotFoundError:
                 self.log_error("No thumbnail file for size {}".format(self.nailSz))
             except RuntimeError as e:
@@ -276,7 +291,6 @@ class Px(LogHelper):
     # add tile for a file
     def add_file_tile(self, ent):
         rectSz = 128
-        print(ent.name)
         oid = self.canvas.create_rectangle(self.x, self.y, self.x+rectSz, self.y+rectSz, fill="gray")
         self.canvas.create_line(self.x, self.y, self.x+rectSz, self.y+rectSz)
         self.tiles[oid] = PxTile(None)

@@ -7,6 +7,7 @@ from tkit import environ
 pictureExts = [".jpg", ".jpeg", ".gif", ".png", ".tif"]
 
 nailSizes = [128, 244]
+nailSizeNames = ["Small", "Large"]
 
 # named tuple returned by parse functions
 #                            |0        |1       |2      |3       |4     |5     |6     |7         |8     |9      |10
