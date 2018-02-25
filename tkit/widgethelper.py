@@ -38,3 +38,9 @@ class WidgetHelper:
         widget.bind('<Return>', func)
         widget.bind('<FocusOut>', func)
         widget.bind('<<ComboboxSelected>>', func)
+
+    @staticmethod
+    def setup_canvas_mousewheel(canvas):
+        def on_mousewheel(event):
+            canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+        canvas.bind('<MouseWheel>', on_mousewheel)

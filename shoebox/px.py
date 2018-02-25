@@ -66,7 +66,7 @@ class Px(LogHelper, WidgetHelper):
         self.treeScroll.configure(command=self.tree.yview)
         self.panedWin.add(self.treeFrame)
 
-        self.tree.tag_configure('noncanon', background='lavender')
+        self.tree.tag_configure('noncanon', background='cyan')
         self.treeItems = {}
 
         self.canvasFrame = Frame(self.panedWin)
@@ -76,11 +76,13 @@ class Px(LogHelper, WidgetHelper):
         self.canvas.pack(side=RIGHT, fill=BOTH, expand=True)
         self.canvas.configure(yscrollcommand=self.canvasScroll.set)
         self.canvasScroll.configure(command=self.canvas.yview)
+        self.setup_canvas_mousewheel(self.canvas)
         self.panedWin.add(self.canvasFrame)
 
         self.nailSz = pic.nailSizes[-1]
         self.x = 0
         self.y = 0
+        self.hmax = 0
         self.tiles = {}
         self.canvasWidth = 0
         self.canvas.bind('<Configure>', self.on_canvas_resize)
@@ -188,6 +190,7 @@ class Px(LogHelper, WidgetHelper):
 
     # populate tree
     def populate_tree(self, parent):
+        # note i'm not sorting, on my system scandir returns them sorted already
         for ent in os.scandir(parent.path):
             if ent.is_dir():
                 iid = self.tree.insert(parent.iid, 'end', text=ent.name)
@@ -218,8 +221,9 @@ class Px(LogHelper, WidgetHelper):
     def clear_canvas(self):
         self.canvas.addtag_all('xx')
         self.canvas.delete('xx')
-        self.x = tileGap / 2;
-        self.y = tileGap / 2;
+        self.x = tileGap / 2
+        self.y = tileGap / 2
+        self.hmax = 0
         self.tiles = {}
 
     # add tiles for all pictures in current folder to canvas
@@ -232,6 +236,7 @@ class Px(LogHelper, WidgetHelper):
             self.nails = None
             self.nailsTried = False
 
+            # note i'm not sorting, on my system scandir returns them sorted already
             for ent in os.scandir(self.curFolder.path):
                 if ent.is_file() and ent.name != "Thumbs.db":
                     if os.path.splitext(ent.name)[1].lower() in pic.pictureExts:
@@ -242,10 +247,13 @@ class Px(LogHelper, WidgetHelper):
                     self.x += self.nailSz + tileGap
                     if self.x + self.nailSz > self.canvasWidth:
                         self.x = tileGap / 2
-                        self.y += self.nailSz + tileGap
+                        self.y += self.hmax + tileGap
+                        self.hmax = 0
             if self.x > tileGap:
-                self.y += self.nailSz + tileGap
+                self.y += self.hmax + tileGap
+                self.hmax = 0
             self.canvas.configure(scrollregion=(0, 0, 1, self.y))
+            self.canvas.yview_moveto(0)
             self.set_status_default_or_error()
             self.loaded = True
             self.enable_buttons()
@@ -287,6 +295,12 @@ class Px(LogHelper, WidgetHelper):
         else:
             oid = self.canvas.create_image(self.x, self.y, image=photo, anchor=NW)
             self.tiles[oid] = PxTile(photo)
+            h = photo.height()
+            txt = self.canvas.create_text(self.x, self.y + h, text=ent.name, fill="white", anchor=NW, width=self.nailSz)
+            bb = self.canvas.bbox(txt)
+            h += bb[3] - bb[1]
+            if h > self.hmax:
+                self.hmax = h
 
     # add tile for a file
     def add_file_tile(self, ent):
@@ -294,3 +308,9 @@ class Px(LogHelper, WidgetHelper):
         oid = self.canvas.create_rectangle(self.x, self.y, self.x+rectSz, self.y+rectSz, fill="gray")
         self.canvas.create_line(self.x, self.y, self.x+rectSz, self.y+rectSz)
         self.tiles[oid] = PxTile(None)
+        h = rectSz
+        txt = self.canvas.create_text(self.x, self.y + h, text=ent.name, fill="cyan", anchor=NW, width=self.nailSz)
+        bb = self.canvas.bbox(txt)
+        h += bb[3] - bb[1]
+        if h > self.hmax:
+            self.hmax = h
