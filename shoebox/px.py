@@ -8,7 +8,7 @@ import ImageTk
 from shoebox import pic, nailcache
 from shoebox.nailer import Nailer
 from shoebox.pxfolder import PxFolder
-from shoebox.pxtile import PxTile
+from shoebox.pxtile import PxTilePic, PxTileFile
 from tkit.loghelper import LogHelper
 from tkit.widgethelper import WidgetHelper
 
@@ -80,9 +80,6 @@ class Px(LogHelper, WidgetHelper):
         self.panedWin.add(self.canvasFrame)
 
         self.nailSz = pic.nailSizes[-1]
-        self.x = 0
-        self.y = 0
-        self.hmax = 0
         self.tiles = {}
         self.canvasWidth = 0
         self.canvas.bind('<Configure>', self.on_canvas_resize)
@@ -217,13 +214,9 @@ class Px(LogHelper, WidgetHelper):
             self.clear_canvas()
             self.canvas.create_line(0, 0, self.canvasWidth, self.tree.winfo_height())
 
-    # delete all items in canvas and reset state variables
+    # delete all items in canvas
     def clear_canvas(self):
-        self.canvas.addtag_all('xx')
-        self.canvas.delete('xx')
-        self.x = tileGap / 2
-        self.y = tileGap / 2
-        self.hmax = 0
+        self.canvas.delete(ALL)
         self.tiles = {}
 
     # add tiles for all pictures in current folder to canvas
@@ -235,31 +228,39 @@ class Px(LogHelper, WidgetHelper):
             self.nPictures = 0
             self.nails = None
             self.nailsTried = False
+            x = tileGap / 2
+            y = tileGap / 2
+            hmax = 0
 
             # note i'm not sorting, on my system scandir returns them sorted already
             for ent in os.scandir(self.curFolder.path):
                 if ent.is_file() and ent.name != "Thumbs.db":
                     if os.path.splitext(ent.name)[1].lower() in pic.pictureExts:
                         self.nPictures += 1
-                        self.add_pic_tile(ent)
+                        tile = self.make_pic_tile(ent)
                     else:
-                        self.add_file_tile(ent)
-                    self.x += self.nailSz + tileGap
-                    if self.x + self.nailSz > self.canvasWidth:
-                        self.x = tileGap / 2
-                        self.y += self.hmax + tileGap
-                        self.hmax = 0
-            if self.x > tileGap:
-                self.y += self.hmax + tileGap
-                self.hmax = 0
-            self.canvas.configure(scrollregion=(0, 0, 1, self.y))
+                        tile = self.make_file_tile(ent)
+
+                    tile.add_to_canvas(self.canvas, x, y, self.nailSz)
+                    self.tiles[tile.items[0]] = tile
+                    if tile.h > hmax:
+                        hmax = tile.h
+
+                    x += self.nailSz + tileGap
+                    if x + self.nailSz > self.canvasWidth:
+                        x = tileGap / 2
+                        y += hmax + tileGap
+                        hmax = 0
+            if x > tileGap:
+                y += hmax + tileGap
+            self.canvas.configure(scrollregion=(0, 0, 1, y))
             self.canvas.yview_moveto(0)
             self.set_status_default_or_error()
             self.loaded = True
             self.enable_buttons()
 
-    # add tile for a picture
-    def add_pic_tile(self, ent):
+    # make tile for a picture
+    def make_pic_tile(self, ent):
         photo = None
         # try to get thumbnails if we haven't already tried
         if self.nails is None and not self.nailsTried:
@@ -291,26 +292,10 @@ class Px(LogHelper, WidgetHelper):
                 self.log_error("Can't create thumbnail for {}".format(ent.name))
         # if still no image, give up and display as a file
         if photo is None:
-            self.add_file_tile(ent)
+            return self.make_file_tile(ent)
         else:
-            oid = self.canvas.create_image(self.x, self.y, image=photo, anchor=NW)
-            self.tiles[oid] = PxTile(photo)
-            h = photo.height()
-            txt = self.canvas.create_text(self.x, self.y + h, text=ent.name, fill="white", anchor=NW, width=self.nailSz)
-            bb = self.canvas.bbox(txt)
-            h += bb[3] - bb[1]
-            if h > self.hmax:
-                self.hmax = h
+            return PxTilePic(ent.name, photo, self.env)
 
-    # add tile for a file
-    def add_file_tile(self, ent):
-        rectSz = 128
-        oid = self.canvas.create_rectangle(self.x, self.y, self.x+rectSz, self.y+rectSz, fill="gray")
-        self.canvas.create_line(self.x, self.y, self.x+rectSz, self.y+rectSz)
-        self.tiles[oid] = PxTile(None)
-        h = rectSz
-        txt = self.canvas.create_text(self.x, self.y + h, text=ent.name, fill="cyan", anchor=NW, width=self.nailSz)
-        bb = self.canvas.bbox(txt)
-        h += bb[3] - bb[1]
-        if h > self.hmax:
-            self.hmax = h
+    # make tile for a file
+    def make_file_tile(self, ent):
+        return PxTileFile(ent.name, self.env)

@@ -71,7 +71,7 @@ def parse_file(name, env=None):
             "file"] #what
         if parts[6] or not parts[7]: #has separator or comment is empty
             parts.append("{0}{1}-{2}{4:d}{5}".format(*parts)) #id
-            return parts
+            return Parts._make(parts)
     return None
 
 # return PIL image rotated according to EXIF orientation value
