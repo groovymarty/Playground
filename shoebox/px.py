@@ -24,10 +24,13 @@ class Px(LogHelper, WidgetHelper):
         global nextInstNum
         self.instNum = nextInstNum
         nextInstNum += 1
+
+        # create top level window
         self.top = Toplevel()
         self.top.title("Px {:d}".format(self.instNum))
         self.top.bind('<Destroy>', self.on_destroy)
 
+        # create top button bar
         self.topBar = Frame(self.top)
         self.topBar.grid(column=0, row=0, sticky=(N,W,E))
         self.refreshButton = ttk.Button(self.topBar, text="Refresh", command=self.do_refresh)
@@ -38,6 +41,7 @@ class Px(LogHelper, WidgetHelper):
         self.nailerButton.pack(side=RIGHT)
         self.enable_buttons(False)
 
+        # create status bar
         self.statusBar = Frame(self.top)
         self.statusBar.grid(column=0, row=1, sticky=(N,W,E))
         self.statusLabel = ttk.Label(self.statusBar, text="")
@@ -45,6 +49,7 @@ class Px(LogHelper, WidgetHelper):
         self.logButton = ttk.Button(self.statusBar, text="Log", command=self.do_log)
         self.logButton.pack(side=RIGHT)
 
+        # created paned window for tree and canvas
         self.panedWin = PanedWindow(self.top, orient=HORIZONTAL, width=800, height=800, sashwidth=5, sashrelief=GROOVE)
         self.panedWin.grid(column=0, row=2, sticky=(N,W,E,S))
         self.top.grid_columnconfigure(0, weight=1)
@@ -53,9 +58,10 @@ class Px(LogHelper, WidgetHelper):
         # turn off border for all Treeviews.. see https://www.codeday.top/2017/10/26/52272.html
         s = ttk.Style()
         s.layout('Treeview', [('Treeview.field', {'border': 0})])
-        # style for error messages
+        # style for error messages (status bar)
         s.configure('Error.TLabel', foreground='red')
 
+        # create tree view for directories
         self.treeFrame = Frame(self.panedWin)
         self.treeScroll = Scrollbar(self.treeFrame)
         self.treeScroll.pack(side=RIGHT, fill=Y)
@@ -66,9 +72,11 @@ class Px(LogHelper, WidgetHelper):
         self.treeScroll.configure(command=self.tree.yview)
         self.panedWin.add(self.treeFrame)
 
+        # tag for noncanonical items
         self.tree.tag_configure('noncanon', background='cyan')
         self.treeItems = {}
 
+        # create canvas for tiles
         self.canvasFrame = Frame(self.panedWin)
         self.canvasScroll = Scrollbar(self.canvasFrame)
         self.canvasScroll.pack(side=RIGHT, fill=Y)
@@ -79,10 +87,15 @@ class Px(LogHelper, WidgetHelper):
         self.setup_canvas_mousewheel(self.canvas)
         self.panedWin.add(self.canvasFrame)
 
+        # canvas stuff
         self.nailSz = pic.nailSizes[-1]
-        self.tiles = {}
+        self.tiles = []
+        self.selectedTiles = []
+        self.lastClickIndex = 0
+        self.canvasItems = {} #canvas id of image to tile object
         self.canvasWidth = 0
         self.canvas.bind('<Configure>', self.on_canvas_resize)
+        self.canvas.bind('<Button>', self.on_canvas_click)
 
         self.lastError = ""
         self.curFolder = None
@@ -214,10 +227,61 @@ class Px(LogHelper, WidgetHelper):
             self.clear_canvas()
             self.canvas.create_line(0, 0, self.canvasWidth, self.tree.winfo_height())
 
+    # when user clicks in canvas
+    def on_canvas_click(self, event):
+        items = self.canvas.find_withtag(CURRENT)
+        if len(items) and items[0] in self.canvasItems:
+            tile = self.canvasItems[items[0]]
+            index = self.tiles.index(tile)
+            if event.state & 1: #shift
+                # extend selection from last clicked tile (not inclusive) to clicked time (inclusive)
+                if index < self.lastClickIndex:
+                    for i in range(index, self.lastClickIndex):
+                        self.select_tile(self.tiles[i])
+                else:
+                    for i in range(self.lastClickIndex+1, index+1):
+                        self.select_tile(self.tiles[i])
+            elif event.state & 4: #control
+                # toggle selection of clicked tile
+                if not tile.selected:
+                    self.select_tile(tile)
+                else:
+                    self.unselect_tile(tile)
+            else:
+                # plain click, clear all selections and select the clicked tile
+                self.unselect_all()
+                self.select_tile(tile)
+            # remember index of last tile clicked (for shift-click extension)
+            self.lastClickIndex = index
+        else:
+            # clicking outside any tile clears all selections
+            self.unselect_all()
+
+    # select a tile
+    def select_tile(self, tile):
+        if not tile.selected:
+            tile.draw_selected(self.canvas)
+            self.selectedTiles.append(tile)
+
+    # unselect a tile
+    def unselect_tile(self, tile):
+        if tile.selected:
+            tile.erase_selected(self.canvas)
+            self.selectedTiles.remove(tile)
+
+    # unselect all tiles
+    def unselect_all(self):
+        for tile in self.selectedTiles:
+            tile.erase_selected(self.canvas)
+        self.selectedTiles = []
+
     # delete all items in canvas
     def clear_canvas(self):
         self.canvas.delete(ALL)
-        self.tiles = {}
+        self.canvasItems = {}
+        self.tiles = []
+        self.selectedTiles = []
+        self.lastClickIndex = 0
 
     # add tiles for all pictures in current folder to canvas
     def populate_canvas(self):
@@ -242,18 +306,23 @@ class Px(LogHelper, WidgetHelper):
                         tile = self.make_file_tile(ent)
 
                     tile.add_to_canvas(self.canvas, x, y, self.nailSz)
-                    self.tiles[tile.items[0]] = tile
+                    self.add_tile(tile)
                     if tile.h > hmax:
                         hmax = tile.h
 
+                    # bump start position for next tile,
+                    # possibly bump to next row
                     x += self.nailSz + tileGap
                     if x + self.nailSz > self.canvasWidth:
                         x = tileGap / 2
                         y += hmax + tileGap
                         hmax = 0
+            # bump to next row if partial row
             if x > tileGap:
                 y += hmax + tileGap
+            # set scroll region to final height
             self.canvas.configure(scrollregion=(0, 0, 1, y))
+            # scroll to top
             self.canvas.yview_moveto(0)
             self.set_status_default_or_error()
             self.loaded = True
@@ -299,3 +368,8 @@ class Px(LogHelper, WidgetHelper):
     # make tile for a file
     def make_file_tile(self, ent):
         return PxTileFile(ent.name, self.env)
+
+    # add a tile
+    def add_tile(self, tile):
+        self.tiles.append(tile)
+        self.canvasItems[tile.items[0]] = tile
