@@ -9,6 +9,10 @@ pictureExts = [".jpg", ".jpeg", ".gif", ".png", ".tif"]
 nailSizes = [128, 244]
 nailSizeNames = ["Small", "Large"]
 
+# error bits
+DUP = 0x01  #duplicate
+OOP = 0x02  #out of place
+
 # named tuple returned by parse functions
 #                            |0        |1       |2      |3       |4     |5     |6     |7         |8     |9      |10
 Parts = namedtuple('Parts', ['parent', 'child', 'type', 'zeros', 'num', 'ver', 'sep', 'comment', 'ext', 'what', 'id'])
@@ -73,6 +77,16 @@ def parse_file(name, env=None):
             parts.append("{0}{1}-{2}{4:d}{5}".format(*parts)) #id
             return Parts._make(parts)
     return None
+
+# given parse results, generate ID of parent folder or "" if parent is root
+def make_parent_id(parts):
+    if parts.child:
+        if "+" in parts.child:
+            return parts.parent + parts.child[0:parts.child.rfind("+")]
+        else:
+            return parts.parent
+    else:
+        return ""
 
 # return PIL image rotated according to EXIF orientation value
 def fix_image_orientation(im):

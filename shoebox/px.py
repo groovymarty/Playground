@@ -72,8 +72,10 @@ class Px(LogHelper, WidgetHelper):
         self.treeScroll.configure(command=self.tree.yview)
         self.panedWin.add(self.treeFrame)
 
-        # tag for noncanonical items
+        # tree stuff
         self.tree.tag_configure('noncanon', background='cyan')
+        self.tree.tag_configure('error', background='orange')
+        self.tree.tag_configure('childerror', background='tan')
         self.treeItems = {}
 
         # create canvas for tiles
@@ -104,6 +106,7 @@ class Px(LogHelper, WidgetHelper):
         self.loaded = False
         self.nPictures = 0
         self.rootFolder = PxFolder(None, "", ".", "")
+        self.folders = {"": self.rootFolder}
         self.populate_tree(self.rootFolder)
         self.set_status_default_or_error()
         instances.append(self)
@@ -207,9 +210,39 @@ class Px(LogHelper, WidgetHelper):
                 folder = PxFolder(parent, ent.name, ent.path, iid, env=self.env)
                 parent.add_child(folder)
                 self.treeItems[iid] = folder
-                if folder.noncanon:
-                    self.tree.item(iid, tags='noncanon')
+                self.add_folder(folder)
                 self.populate_tree(folder)
+
+    # add a folder, check for errors
+    def add_folder(self, folder):
+        if folder.noncanon:
+            # folder is noncanonical, ID cannot be parsed
+            self.tree.item(folder.iid, tags='noncanon')
+        elif folder.id in self.folders:
+            # duplicate folder ID
+            self.set_folder_error(folder, pic.DUP)
+            self.log_error("Duplicate folder ID: {}".format(folder.path))
+            otherFolder = self.folders[folder.id]
+            if not otherFolder.is_error(pic.DUP):
+                self.set_folder_error(otherFolder, pic.DUP)
+                self.log_error("Duplicate folder ID: {}".format(otherFolder.path))
+        else:
+            # folder ID is good, add to collection
+            self.folders[folder.id] = folder
+            # verify folder ID correctly predicts the folder's place in the tree
+            parentId = pic.make_parent_id(folder.parts)
+            if parentId not in self.folders or folder.parent is not self.folders[parentId]:
+                self.set_folder_error(folder, pic.OOP)
+                self.log_error("Folder out of place: {}".format(folder.path))
+
+    # set folder error
+    def set_folder_error(self, folder, errBit):
+        folder.set_error(errBit)
+        self.tree.item(folder.iid, tags='error')
+        parent = folder.parent
+        while parent and parent.iid and not parent.errors:
+            self.tree.item(parent.iid, tags='childerror')
+            parent = parent.parent
 
     # when user clicks tree item
     def on_tree_select(self, event):
