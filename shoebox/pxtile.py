@@ -15,12 +15,18 @@ class PxTile:
         # additional items follow, such as black slash line in file tile
         # last item is yellow border if selected
         self.items = None
-        self.parts = pic.parse_file(self.name, env)
-        self.id = self.parts.id if self.parts else None
-        # a file is noncanonical if ID can't be parsed from name
-        self.noncanon = not self.id
+        self.parts = None
+        self.id = None
+        self.noncanon = True
+        self.errors = 0
         self.selected = False
         self.h = 0
+
+    def set_error(self, errBit):
+        self.errors |= errBit
+
+    def is_error(self, errBit):
+        return self.errors & errBit
 
     def draw_selected(self, canvas):
         if not self.selected:
@@ -43,12 +49,16 @@ class PxTilePic(PxTile):
     def __init__(self, name, photo, env=None):
         super().__init__(name, env)
         self.photo = photo
+        self.parts = pic.parse_file(self.name, env)
+        self.id = self.parts.id if self.parts else None
+        # noncanonical means ID can't be parsed from name
+        self.noncanon = not self.id
 
     def add_to_canvas(self, canvas, x, y, w):
         img = canvas.create_image(x, y, image=self.photo, anchor=NW)
         self.h = self.photo.height()
-        txt = canvas.create_text(x, y + self.h, text=self.name, anchor=NW, width=w,
-                                 fill="cyan" if self.noncanon else "white")
+        color = "orange" if self.errors else "cyan" if self.noncanon else "white"
+        txt = canvas.create_text(x, y + self.h, text=self.name, anchor=NW, width=w, fill=color)
         bb = canvas.bbox(txt)
         self.h += bb[3] - bb[1]
         self.items = (img, txt)

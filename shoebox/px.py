@@ -76,7 +76,7 @@ class Px(LogHelper, WidgetHelper):
         self.tree.tag_configure('noncanon', background='cyan')
         self.tree.tag_configure('error', background='orange')
         self.tree.tag_configure('childerror', background='tan')
-        self.treeItems = {}
+        self.treeItems = {} #tree iid to file object
 
         # create canvas for tiles
         self.canvasFrame = Frame(self.panedWin)
@@ -91,7 +91,8 @@ class Px(LogHelper, WidgetHelper):
 
         # canvas stuff
         self.nailSz = pic.nailSizes[-1]
-        self.tiles = []
+        self.tiles = {} #groovy id to tile object (note only canonical names have ids)
+        self.tilesOrder = [] #array of tiles in display order (all tiles whether canononical or not)
         self.selectedTiles = []
         self.lastClickIndex = 0
         self.canvasItems = {} #canvas id of image to tile object
@@ -106,7 +107,7 @@ class Px(LogHelper, WidgetHelper):
         self.loaded = False
         self.nPictures = 0
         self.rootFolder = PxFolder(None, "", ".", "")
-        self.folders = {"": self.rootFolder}
+        self.folders = {"": self.rootFolder} #folder id to folder object
         self.populate_tree(self.rootFolder)
         self.set_status_default_or_error()
         instances.append(self)
@@ -230,7 +231,7 @@ class Px(LogHelper, WidgetHelper):
             # folder ID is good, add to collection
             self.folders[folder.id] = folder
             # verify folder ID correctly predicts the folder's place in the tree
-            parentId = pic.make_parent_id(folder.parts)
+            parentId = pic.get_parent_id(folder.parts)
             if parentId not in self.folders or folder.parent is not self.folders[parentId]:
                 self.set_folder_error(folder, pic.OOP)
                 self.log_error("Folder out of place: {}".format(folder.path))
@@ -265,15 +266,15 @@ class Px(LogHelper, WidgetHelper):
         items = self.canvas.find_withtag(CURRENT)
         if len(items) and items[0] in self.canvasItems:
             tile = self.canvasItems[items[0]]
-            index = self.tiles.index(tile)
+            index = self.tilesOrder.index(tile)
             if event.state & 1: #shift
                 # extend selection from last clicked tile (not inclusive) to clicked time (inclusive)
                 if index < self.lastClickIndex:
                     for i in range(index, self.lastClickIndex):
-                        self.select_tile(self.tiles[i])
+                        self.select_tile(self.tilesOrder[i])
                 else:
                     for i in range(self.lastClickIndex+1, index+1):
-                        self.select_tile(self.tiles[i])
+                        self.select_tile(self.tilesOrder[i])
             elif event.state & 4: #control
                 # toggle selection of clicked tile
                 if not tile.selected:
@@ -312,7 +313,8 @@ class Px(LogHelper, WidgetHelper):
     def clear_canvas(self):
         self.canvas.delete(ALL)
         self.canvasItems = {}
-        self.tiles = []
+        self.tiles = {}
+        self.tilesOrder = []
         self.selectedTiles = []
         self.lastClickIndex = 0
 
@@ -338,8 +340,9 @@ class Px(LogHelper, WidgetHelper):
                     else:
                         tile = self.make_file_tile(ent)
 
-                    tile.add_to_canvas(self.canvas, x, y, self.nailSz)
                     self.add_tile(tile)
+                    tile.add_to_canvas(self.canvas, x, y, self.nailSz)
+                    self.canvasItems[tile.items[0]] = tile
                     if tile.h > hmax:
                         hmax = tile.h
 
@@ -404,5 +407,21 @@ class Px(LogHelper, WidgetHelper):
 
     # add a tile
     def add_tile(self, tile):
-        self.tiles.append(tile)
-        self.canvasItems[tile.items[0]] = tile
+        self.tilesOrder.append(tile)
+        if tile.id:
+            if tile.id in self.tiles:
+                # duplicate groovy ID
+                tile.set_error(pic.DUP)
+                self.log_error("Duplicate ID: {}".format(tile.name))
+                otherTile = self.tiles[tile.id]
+                if not otherTile.is_error(pic.DUP):
+                    otherTile.set_error(pic.DUP)
+                    self.log_error("Duplicate ID: {}".format(otherTile.name))
+            else:
+                # groovy ID is good, add to collection
+                self.tiles[tile.id] = tile
+                # verify ID correctly predicts the folder where item can be found
+                folderId = pic.get_folder_id(tile.parts)
+                if folderId not in self.folders or self.curFolder is not self.folders[folderId]:
+                    tile.set_error(pic.OOP)
+                    self.log_error("Picture out of place: {}".format(tile.name))

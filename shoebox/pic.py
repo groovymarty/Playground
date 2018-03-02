@@ -78,8 +78,12 @@ def parse_file(name, env=None):
             return Parts._make(parts)
     return None
 
-# given parse results, generate ID of parent folder or "" if parent is root
-def make_parent_id(parts):
+# given parse results, return folder ID
+def get_folder_id(parts):
+    return parts.parent + parts.child
+
+# given parse results, return ID of parent folder or "" if parent is root
+def get_parent_id(parts):
     if parts.child:
         if "+" in parts.child:
             return parts.parent + parts.child[0:parts.child.rfind("+")]
