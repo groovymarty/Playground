@@ -35,8 +35,10 @@ class Px(LogHelper, WidgetHelper):
         self.topBar.grid(column=0, row=0, sticky=(N,W,E))
         self.refreshButton = ttk.Button(self.topBar, text="Refresh", command=self.do_refresh)
         self.refreshButton.pack(side=LEFT)
-        self.sizeButton = ttk.Button(self.topBar, text="Small", command=self.do_size)
+        self.sizeButton = ttk.Button(self.topBar, text="Small", command=self.toggle_nail_size)
         self.sizeButton.pack(side=LEFT)
+        self.selectButton = ttk.Button(self.topBar, text="Select All", command=self.toggle_select_all)
+        self.selectButton.pack(side=LEFT)
         self.nailerButton = ttk.Button(self.topBar, text="Nailer", command=self.do_nailer)
         self.nailerButton.pack(side=RIGHT)
         self.enable_buttons(False)
@@ -93,8 +95,8 @@ class Px(LogHelper, WidgetHelper):
         self.nailSz = pic.nailSizes[-1]
         self.tiles = {} #groovy id to tile object (note only canonical names have ids)
         self.tilesOrder = [] #array of tiles in display order (all tiles whether canononical or not)
-        self.selectedTiles = []
-        self.lastClickIndex = 0
+        self.tilesByName = {} #name to tile object
+        self.lastTileClicked = None
         self.canvasItems = {} #canvas id of image to tile object
         self.canvasWidth = 0
         self.canvas.bind('<Configure>', self.on_canvas_resize)
@@ -173,17 +175,35 @@ class Px(LogHelper, WidgetHelper):
 
     # when Refresh button clicked
     def do_refresh(self):
+        selections = self.save_selections()
         self.clear_canvas()
         self.populate_canvas()
+        self.apply_selections(selections)
 
     # when Small/Large button clicked
-    def do_size(self):
+    def toggle_nail_size(self):
         i = pic.nailSizes.index(self.nailSz)
         i = (i + 1) % len(pic.nailSizes)
         self.nailSz = pic.nailSizes[i]
         i = (i + 1) % len(pic.nailSizes)
         self.sizeButton.configure(text=pic.nailSizeNames[i])
         self.do_refresh()
+
+    # when Select All/None button clicked
+    def toggle_select_all(self):
+        if any(tile.selected for tile in self.tilesOrder):
+            self.select_all(False)
+            self.lastTileClicked = None
+        else:
+            self.select_all()
+        self.update_select_button()
+
+    # update Select All/None button
+    def update_select_button(self):
+        if any(tile.selected for tile in self.tilesOrder):
+            self.selectButton.configure(text="Select None")
+        else:
+            self.selectButton.configure(text="Select All")
 
     # when Nailer button clicked
     def do_nailer(self):
@@ -200,6 +220,7 @@ class Px(LogHelper, WidgetHelper):
     def enable_buttons(self, enable=True):
         self.enable_widget(self.refreshButton, enable)
         self.enable_widget(self.sizeButton, enable)
+        self.enable_widget(self.selectButton, enable)
         self.enable_widget(self.nailerButton, enable)
 
     # populate tree
@@ -268,12 +289,16 @@ class Px(LogHelper, WidgetHelper):
             tile = self.canvasItems[items[0]]
             index = self.tilesOrder.index(tile)
             if event.state & 1: #shift
-                # extend selection from last clicked tile (not inclusive) to clicked time (inclusive)
-                if index < self.lastClickIndex:
-                    for i in range(index, self.lastClickIndex):
+                # extend selection from last tile clicked (not inclusive) to clicked tile (inclusive)
+                try:
+                    lastClickIndex = self.tilesOrder.index(self.lastTileClicked)
+                except ValueError:
+                    lastClickIndex = 0
+                if index < lastClickIndex:
+                    for i in range(index, lastClickIndex):
                         self.select_tile(self.tilesOrder[i])
                 else:
-                    for i in range(self.lastClickIndex+1, index+1):
+                    for i in range(lastClickIndex+1, index+1):
                         self.select_tile(self.tilesOrder[i])
             elif event.state & 4: #control
                 # toggle selection of clicked tile
@@ -282,32 +307,44 @@ class Px(LogHelper, WidgetHelper):
                 else:
                     self.unselect_tile(tile)
             else:
-                # plain click, clear all selections and select the clicked tile
-                self.unselect_all()
+                # plain click, select the clicked tile
                 self.select_tile(tile)
-            # remember index of last tile clicked (for shift-click extension)
-            self.lastClickIndex = index
-        else:
-            # clicking outside any tile clears all selections
-            self.unselect_all()
+            # remember last tile clicked (for shift-click extension)
+            self.lastTileClicked = tile
+            self.update_select_button()
 
     # select a tile
     def select_tile(self, tile):
         if not tile.selected:
             tile.draw_selected(self.canvas)
-            self.selectedTiles.append(tile)
 
     # unselect a tile
     def unselect_tile(self, tile):
         if tile.selected:
             tile.erase_selected(self.canvas)
-            self.selectedTiles.remove(tile)
 
-    # unselect all tiles
-    def unselect_all(self):
-        for tile in self.selectedTiles:
-            tile.erase_selected(self.canvas)
-        self.selectedTiles = []
+    # select/unselect all
+    def select_all(self, select=True):
+        if select:
+            for tile in self.tilesOrder:
+                self.select_tile(tile)
+        else:
+            for tile in self.tilesOrder:
+                self.unselect_tile(tile)
+
+    # return current selections
+    def save_selections(self):
+        selections = {}
+        for tile in self.tilesOrder:
+            if tile.selected:
+                selections[tile.name] = True
+        return selections
+
+    # apply selections
+    def apply_selections(self, selections):
+        for name, val in selections.items():
+            if name in self.tilesByName:
+                self.select_tile(self.tilesByName[name])
 
     # delete all items in canvas
     def clear_canvas(self):
@@ -315,7 +352,7 @@ class Px(LogHelper, WidgetHelper):
         self.canvasItems = {}
         self.tiles = {}
         self.tilesOrder = []
-        self.selectedTiles = []
+        self.tilesByName = {}
         self.lastClickIndex = 0
 
     # add tiles for all pictures in current folder to canvas
@@ -408,6 +445,7 @@ class Px(LogHelper, WidgetHelper):
     # add a tile
     def add_tile(self, tile):
         self.tilesOrder.append(tile)
+        self.tilesByName[tile.name] = tile
         if tile.id:
             if tile.id in self.tiles:
                 # duplicate groovy ID
