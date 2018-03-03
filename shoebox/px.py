@@ -454,6 +454,7 @@ class Px(LogHelper, WidgetHelper):
                 otherTile = self.tiles[tile.id]
                 if not otherTile.is_error(pic.DUP):
                     otherTile.set_error(pic.DUP)
+                    otherTile.redraw_text(self.canvas, self.nailSz)
                     self.log_error("Duplicate ID: {}".format(otherTile.name))
             else:
                 # groovy ID is good, add to collection

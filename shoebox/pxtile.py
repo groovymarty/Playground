@@ -20,7 +20,9 @@ class PxTile:
         self.noncanon = True
         self.errors = 0
         self.selected = False
-        self.h = 0
+        self.h0 = 0 #height of item[0]
+        self.h = 0 #total height of tile
+        self.text = name
 
     def set_error(self, errBit):
         self.errors |= errBit
@@ -45,6 +47,29 @@ class PxTile:
             self.items = self.items[0:-1]
             canvas.delete(r)
 
+    def pick_text_color(self):
+        return "orange" if self.errors else "cyan" if self.noncanon else "white"
+
+    def set_text(self, text):
+        self.text = text
+
+    def redraw_text(self, canvas, w):
+        hOld = self.h
+        if len(self.items) >= 2:
+            # get coordinates of tile
+            x, y = canvas.coords(self.items[0])
+            # delete old text
+            canvas.delete(self.items[1])
+            # create new text
+            txt = canvas.create_text(x, y + self.h0, text=self.text, anchor=NW, width=w, fill=self.pick_text_color())
+            # update tile height
+            bb = canvas.bbox(txt)
+            self.h = self.h0 + bb[3] - bb[1]
+            # update items tuple
+            self.items = (self.items[0], txt) + self.items[2:]
+        # return change in height
+        return self.h - hOld
+
 class PxTilePic(PxTile):
     def __init__(self, name, photo, env=None):
         super().__init__(name, env)
@@ -56,22 +81,22 @@ class PxTilePic(PxTile):
 
     def add_to_canvas(self, canvas, x, y, w):
         img = canvas.create_image(x, y, image=self.photo, anchor=NW)
-        self.h = self.photo.height()
-        color = "orange" if self.errors else "cyan" if self.noncanon else "white"
-        txt = canvas.create_text(x, y + self.h, text=self.name, anchor=NW, width=w, fill=color)
+        self.h0 = self.photo.height()
+        txt = canvas.create_text(x, y + self.h0, text=self.text, anchor=NW, width=w, fill=self.pick_text_color())
         bb = canvas.bbox(txt)
-        self.h += bb[3] - bb[1]
+        self.h = self.h0 + bb[3] - bb[1]
         self.items = (img, txt)
 
 class PxTileFile(PxTile):
     def __init__(self, name, env=None):
         super().__init__(name, env)
+        self.noncanon = True #always noncanonical
 
     def add_to_canvas(self, canvas, x, y, w):
         rect = canvas.create_rectangle(x, y, x+fileBoxSz, y+fileBoxSz, fill="gray")
         line = canvas.create_line(x, y, x+fileBoxSz, y+fileBoxSz)
-        self.h = fileBoxSz
-        txt = canvas.create_text(x, y + self.h, text=self.name, anchor=NW, width=w, fill="cyan")
+        self.h0 = fileBoxSz
+        txt = canvas.create_text(x, y + self.h0, text=self.name, anchor=NW, width=w, fill=self.pick_text_color())
         bb = canvas.bbox(txt)
-        self.h += bb[3] - bb[1]
+        self.h = self.h0 + bb[3] - bb[1]
         self.items = (rect, txt, line)
