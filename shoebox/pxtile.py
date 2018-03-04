@@ -6,6 +6,15 @@ from shoebox import pic
 
 fileBoxSz = 128
 
+selectColors = {
+    1:  "yellow",
+    2:  "fuchsia",
+    3:  "lime",
+    4:  "red",
+    5:  "cyan",
+    6:  "dodgerblue"
+}
+
 class PxTile:
     def __init__(self, name, env=None):
         self.name = name
@@ -30,13 +39,13 @@ class PxTile:
     def is_error(self, errBit):
         return self.errors & errBit
 
-    def draw_selected(self, canvas):
+    def draw_selected(self, canvas, color):
         if not self.selected:
-            self.selected = True
+            self.selected = color
             bb = canvas.bbox(self.items[0])
             # this makes a 3px yellow border plus 1px gap around image and text
             r = canvas.create_rectangle(bb[0]-3, bb[1]-3, bb[2]+2, bb[1]+self.h+2,
-                                        outline="yellow", width=3)
+                                        outline=selectColors[color], width=3)
             canvas.tag_lower(r)
             self.items += (r,)
 

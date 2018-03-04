@@ -8,7 +8,7 @@ import ImageTk
 from shoebox import pic, nailcache
 from shoebox.nailer import Nailer
 from shoebox.pxfolder import PxFolder
-from shoebox.pxtile import PxTilePic, PxTileFile
+from shoebox.pxtile import PxTilePic, PxTileFile, selectColors
 from tkit.loghelper import LogHelper
 from tkit.widgethelper import WidgetHelper
 
@@ -97,6 +97,7 @@ class Px(LogHelper, WidgetHelper):
         self.tilesOrder = [] #array of tiles in display order (all tiles whether canononical or not)
         self.tilesByName = {} #name to tile object
         self.lastTileClicked = None
+        self.curSelectColor = 1
         self.canvasItems = {} #canvas id of image to tile object
         self.canvasWidth = 0
         self.canvas.bind('<Configure>', self.on_canvas_resize)
@@ -195,7 +196,7 @@ class Px(LogHelper, WidgetHelper):
             self.select_all(False)
             self.lastTileClicked = None
         else:
-            self.select_all()
+            self.select_all(self.curSelectColor)
         self.update_select_button()
 
     # update Select All/None button
@@ -296,55 +297,56 @@ class Px(LogHelper, WidgetHelper):
                     lastClickIndex = 0
                 if index < lastClickIndex:
                     for i in range(index, lastClickIndex):
-                        self.select_tile(self.tilesOrder[i])
+                        self.select_tile(self.tilesOrder[i], self.curSelectColor)
                 else:
                     for i in range(lastClickIndex+1, index+1):
-                        self.select_tile(self.tilesOrder[i])
+                        self.select_tile(self.tilesOrder[i], self.curSelectColor)
             elif event.state & 4: #control
                 # toggle selection of clicked tile
                 if not tile.selected:
-                    self.select_tile(tile)
+                    self.select_tile(tile, self.curSelectColor)
                 else:
-                    self.unselect_tile(tile)
+                    # take selection color from clicked tile before unselecting it
+                    self.curSelectColor = tile.selected
+                    self.select_tile(tile, False)
+            elif event.state & 0x20000: #alt
+                # bump color and select the clicked tile
+                self.curSelectColor += 1
+                if self.curSelectColor not in selectColors:
+                    self.curSelectColor = 1
+                self.select_tile(tile, self.curSelectColor)
             else:
                 # plain click, select the clicked tile
-                self.select_tile(tile)
+                self.select_tile(tile, self.curSelectColor)
             # remember last tile clicked (for shift-click extension)
             self.lastTileClicked = tile
             self.update_select_button()
 
     # select a tile
-    def select_tile(self, tile):
-        if not tile.selected:
-            tile.draw_selected(self.canvas)
-
-    # unselect a tile
-    def unselect_tile(self, tile):
-        if tile.selected:
+    def select_tile(self, tile, color):
+        if not color or (tile.selected and tile.selected != color):
             tile.erase_selected(self.canvas)
+        if color and not tile.selected:
+            tile.draw_selected(self.canvas, color)
 
     # select/unselect all
-    def select_all(self, select=True):
-        if select:
-            for tile in self.tilesOrder:
-                self.select_tile(tile)
-        else:
-            for tile in self.tilesOrder:
-                self.unselect_tile(tile)
+    def select_all(self, color):
+        for tile in self.tilesOrder:
+            self.select_tile(tile, color)
 
     # return current selections
     def save_selections(self):
         selections = {}
         for tile in self.tilesOrder:
             if tile.selected:
-                selections[tile.name] = True
+                selections[tile.name] = tile.selected
         return selections
 
     # apply selections
     def apply_selections(self, selections):
-        for name, val in selections.items():
+        for name, color in selections.items():
             if name in self.tilesByName:
-                self.select_tile(self.tilesByName[name])
+                self.select_tile(self.tilesByName[name], color)
 
     # delete all items in canvas
     def clear_canvas(self):
@@ -354,6 +356,7 @@ class Px(LogHelper, WidgetHelper):
         self.tilesOrder = []
         self.tilesByName = {}
         self.lastClickIndex = 0
+        self.curSelectColor = 1
 
     # add tiles for all pictures in current folder to canvas
     def populate_canvas(self):
