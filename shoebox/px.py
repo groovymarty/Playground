@@ -37,7 +37,8 @@ class Px(LogHelper, WidgetHelper):
         self.refreshButton.pack(side=LEFT)
         self.sizeButton = ttk.Button(self.topBar, text="Small", command=self.toggle_nail_size)
         self.sizeButton.pack(side=LEFT)
-        self.selectButton = ttk.Button(self.topBar, text="Select All", command=self.toggle_select_all)
+        self.selectButton = ttk.Button(self.topBar, text="Select All", style="Select.TButton",
+                                       command=self.toggle_select_all)
         self.selectButton.pack(side=LEFT)
         self.nailerButton = ttk.Button(self.topBar, text="Nailer", command=self.do_nailer)
         self.nailerButton.pack(side=RIGHT)
@@ -62,6 +63,8 @@ class Px(LogHelper, WidgetHelper):
         s.layout('Treeview', [('Treeview.field', {'border': 0})])
         # style for error messages (status bar)
         s.configure('Error.TLabel', foreground='red')
+        # style to show current selection color
+        s.configure('Select.TButton', background=selectColors[1])
 
         # create tree view for directories
         self.treeFrame = Frame(self.panedWin)
@@ -100,6 +103,7 @@ class Px(LogHelper, WidgetHelper):
         self.curSelectColor = 1
         self.canvasItems = {} #canvas id of image to tile object
         self.canvasWidth = 0
+        self.hTotal = 0
         self.canvas.bind('<Configure>', self.on_canvas_resize)
         self.canvas.bind('<Button>', self.on_canvas_click)
 
@@ -178,7 +182,7 @@ class Px(LogHelper, WidgetHelper):
     def do_refresh(self):
         selections = self.save_selections()
         self.clear_canvas()
-        self.populate_canvas()
+        self.populate_canvas(os.scandir(self.curFolder.path))
         self.apply_selections(selections)
 
     # when Small/Large button clicked
@@ -205,6 +209,9 @@ class Px(LogHelper, WidgetHelper):
             self.selectButton.configure(text="Select None")
         else:
             self.selectButton.configure(text="Select All")
+        s = ttk.Style()
+        s.configure('Select.TButton', background=selectColors[self.curSelectColor])
+
 
     # when Nailer button clicked
     def do_nailer(self):
@@ -273,7 +280,7 @@ class Px(LogHelper, WidgetHelper):
         if sel and sel[0] in self.treeItems:
             self.curFolder = self.treeItems[sel[0]]
             self.clear_canvas()
-            self.populate_canvas()
+            self.populate_canvas(os.scandir(self.curFolder.path))
 
     # when user resizes the window
     def on_canvas_resize(self, event):
@@ -306,18 +313,24 @@ class Px(LogHelper, WidgetHelper):
                 if not tile.selected:
                     self.select_tile(tile, self.curSelectColor)
                 else:
-                    # take selection color from clicked tile before unselecting it
+                    # absorb color of clicked tile before unselecting it
                     self.curSelectColor = tile.selected
                     self.select_tile(tile, False)
             elif event.state & 0x20000: #alt
-                # bump color and select the clicked tile
-                self.curSelectColor += 1
-                if self.curSelectColor not in selectColors:
-                    self.curSelectColor = 1
+                # possibly bump color (first alt-click sets current color, next one bumps color)
+                if tile.selected == self.curSelectColor:
+                    self.curSelectColor += 1
+                    if self.curSelectColor not in selectColors:
+                        self.curSelectColor = 1
                 self.select_tile(tile, self.curSelectColor)
             else:
-                # plain click, select the clicked tile
-                self.select_tile(tile, self.curSelectColor)
+                # plain click
+                if not tile.selected:
+                    self.select_tile(tile, self.curSelectColor)
+                else:
+                    # already selected, absorb color
+                    self.curSelectColor = tile.selected
+
             # remember last tile clicked (for shift-click extension)
             self.lastTileClicked = tile
             self.update_select_button()
@@ -357,52 +370,54 @@ class Px(LogHelper, WidgetHelper):
         self.tilesByName = {}
         self.lastClickIndex = 0
         self.curSelectColor = 1
+        self.nPictures = 0
+        self.hTotal = tileGap / 2
 
-    # add tiles for all pictures in current folder to canvas
-    def populate_canvas(self):
-        if self.curFolder:
-            self.canvas.configure(background="black")
-            self.clear_error()
-            self.set_status("Loading...")
-            self.nPictures = 0
-            self.nails = None
-            self.nailsTried = False
-            x = tileGap / 2
-            y = tileGap / 2
-            hmax = 0
+    # add specified pictures to canvas
+    # argument is return value from scandir() or equivalent
+    def populate_canvas(self, entries):
+        self.canvas.configure(background="black")
+        self.clear_error()
+        self.set_status("Loading...")
+        self.nails = None
+        self.nailsTried = False
+        x = tileGap / 2
+        y = self.hTotal
+        hmax = 0
 
-            # note i'm not sorting, on my system scandir returns them sorted already
-            for ent in os.scandir(self.curFolder.path):
-                if ent.is_file() and ent.name != "Thumbs.db":
-                    if os.path.splitext(ent.name)[1].lower() in pic.pictureExts:
-                        self.nPictures += 1
-                        tile = self.make_pic_tile(ent)
-                    else:
-                        tile = self.make_file_tile(ent)
+        # note i'm not sorting, on my system scandir returns them sorted already
+        for ent in entries:
+            if ent.is_file() and ent.name != "Thumbs.db":
+                if os.path.splitext(ent.name)[1].lower() in pic.pictureExts:
+                    self.nPictures += 1
+                    tile = self.make_pic_tile(ent)
+                else:
+                    tile = self.make_file_tile(ent)
 
-                    self.add_tile(tile)
-                    tile.add_to_canvas(self.canvas, x, y, self.nailSz)
-                    self.canvasItems[tile.items[0]] = tile
-                    if tile.h > hmax:
-                        hmax = tile.h
+                self.add_tile(tile)
+                tile.add_to_canvas(self.canvas, x, y, self.nailSz)
+                self.canvasItems[tile.items[0]] = tile
+                if tile.h > hmax:
+                    hmax = tile.h
 
-                    # bump start position for next tile,
-                    # possibly bump to next row
-                    x += self.nailSz + tileGap
-                    if x + self.nailSz > self.canvasWidth:
-                        x = tileGap / 2
-                        y += hmax + tileGap
-                        hmax = 0
-            # bump to next row if partial row
-            if x > tileGap:
-                y += hmax + tileGap
-            # set scroll region to final height
-            self.canvas.configure(scrollregion=(0, 0, 1, y))
-            # scroll to top
-            self.canvas.yview_moveto(0)
-            self.set_status_default_or_error()
-            self.loaded = True
-            self.enable_buttons()
+                # bump start position for next tile,
+                # possibly bump to next row
+                x += self.nailSz + tileGap
+                if x + self.nailSz > self.canvasWidth:
+                    x = tileGap / 2
+                    y += hmax + tileGap
+                    hmax = 0
+        # bump to next row if partial row
+        if x > tileGap:
+            y += hmax + tileGap
+        # set scroll region to final height
+        self.canvas.configure(scrollregion=(0, 0, 1, y))
+        self.hTotal = y
+        # scroll to top
+        self.canvas.yview_moveto(0)
+        self.set_status_default_or_error()
+        self.loaded = True
+        self.enable_buttons()
 
     # make tile for a picture
     def make_pic_tile(self, ent):
@@ -411,7 +426,8 @@ class Px(LogHelper, WidgetHelper):
         if self.nails is None and not self.nailsTried:
             self.nailsTried = True
             try:
-                self.nails = nailcache.get_nails(self.curFolder.path, self.nailSz, self.env)
+                folderPath = os.path.split(ent.path)[0]
+                self.nails = nailcache.get_nails(folderPath, self.nailSz, self.env)
             except FileNotFoundError:
                 self.log_error("No thumbnail file for size {}".format(self.nailSz))
             except RuntimeError as e:
