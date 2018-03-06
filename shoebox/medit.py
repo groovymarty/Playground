@@ -36,6 +36,5 @@ class Medit:
             self.top = None
 
     # Medit destructor
-    # it's likely destroy() has already been called, but call again just to be sure
     def __del__(self):
-        self.destroy()
+        self.destroy() #probably already called

@@ -33,7 +33,7 @@ class LogWindow:
             self.top = None
 
     def __del__(self):
-        self.destroy()
+        self.destroy() #probably already called
 
     def add_entry(self, ent):
         (ts, kind, msg) = ent
@@ -50,8 +50,7 @@ class LogHelper:
         environ.set_logger(env, self)
 
     def __del__(self):
-        for win in list(self.logWindows):
-            win.destroy()
+        self.close_log_windows()
 
     def clear_log(self):
         self.logBuf.clear()
@@ -77,3 +76,7 @@ class LogHelper:
         win = LogWindow(title, self.logWindows)
         for ent in self.logBuf:
             win.add_entry(ent)
+
+    def close_log_windows(self):
+        for win in list(self.logWindows):
+            win.destroy()

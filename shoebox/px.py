@@ -5,7 +5,7 @@ from tkinter import *
 from tkinter import ttk
 from PIL import Image
 import ImageTk
-from shoebox import pic, nailcache
+from shoebox import pic, nailcache, dnd
 from shoebox.nailer import Nailer
 from shoebox.pxfolder import PxFolder
 from shoebox.pxtile import PxTilePic, PxTileFile, selectColors
@@ -101,11 +101,16 @@ class Px(LogHelper, WidgetHelper):
         self.tilesByName = {} #name to tile object
         self.lastTileClicked = None
         self.curSelectColor = 1
+        self.dragging = False
+        self.dragStart = None
         self.canvasItems = {} #canvas id of image to tile object
         self.canvasWidth = 0
         self.hTotal = 0
         self.canvas.bind('<Configure>', self.on_canvas_resize)
-        self.canvas.bind('<Button>', self.on_canvas_click)
+        self.canvas.bind('<Button-1>', self.on_canvas_click)
+        self.canvas.bind('<B1-Motion>', self.on_canvas_dnd_motion)
+        self.canvas.bind('<ButtonRelease>', self.on_canvas_dnd_release)
+        dnd.add_target(self.canvas, self)
 
         self.lastError = ""
         self.curFolder = None
@@ -123,7 +128,6 @@ class Px(LogHelper, WidgetHelper):
     # this is the easiest and most common way to destroy Px,
     # and includes the case where the entire shoebox application is shut down
     def on_destroy(self, ev):
-        LogHelper.__del__(self)
         self.top = None
         self.destroy()
 
@@ -132,6 +136,8 @@ class Px(LogHelper, WidgetHelper):
     # so this function removes all known references then closes the top level window
     # note this will result in a second call from the on_destroy event handler; that's ok
     def destroy(self):
+        dnd.remove_target(self.canvas)
+        self.close_log_windows()
         if self in instances:
             instances.remove(self)
         if self.top is not None:
@@ -139,9 +145,9 @@ class Px(LogHelper, WidgetHelper):
             self.top = None
 
     # Px destructor
-    # it's likely destroy() has already been called, but call again just to be sure
     def __del__(self):
-        self.destroy()
+        self.destroy() #probably already called
+        LogHelper.__del__(self)
 
     # set status to specified string
     def set_status(self, msg, error=False):
@@ -211,7 +217,6 @@ class Px(LogHelper, WidgetHelper):
             self.selectButton.configure(text="Select All")
         s = ttk.Style()
         s.configure('Select.TButton', background=selectColors[self.curSelectColor])
-
 
     # when Nailer button clicked
     def do_nailer(self):
@@ -360,6 +365,30 @@ class Px(LogHelper, WidgetHelper):
         for name, color in selections.items():
             if name in self.tilesByName:
                 self.select_tile(self.tilesByName[name], color)
+
+    # on any mouse motion with button down
+    def on_canvas_dnd_motion(self, event):
+        if not self.dragging:
+            if self.dragStart is None:
+                self.dragStart = (event.x, event.y)
+            elif abs(event.x - self.dragStart[0]) > 10 or abs(event.y - self.dragStart[1]) > 10:
+                self.dragging = True
+                self.canvas.configure(cursor="box_spiral")
+
+    # on mouse button release
+    def on_canvas_dnd_release(self, event):
+        if self.dragging:
+            w = self.top.winfo_containing(event.x_root, event.y_root)
+            if w != self.canvas and dnd.try_drop(w, []):
+                print("px {} drop was accepted".format(self.instNum))
+        self.dragging = False
+        self.dragStart = None
+        self.canvas.configure(cursor="")
+
+    # called by dnd, return true if drop accepted
+    def receive_drop(self, items):
+        print("px {} received drop".format(self.instNum))
+        return True
 
     # delete all items in canvas
     def clear_canvas(self):
