@@ -22,3 +22,19 @@ def get_nails(folderPath, sz, env=None):
     nails.touch(touchCount)
     touchCount += 1
     return nails
+
+looseCache = {}
+looseCount = 0
+
+def add_loose_file(path, img):
+    global looseCount
+    looseCache[path] = img
+    looseCount += 1
+
+def get_loose_file(path):
+    return looseCache[path] if path in looseCache else None;
+
+def change_loose_file(oldPath, newPath):
+    if oldPath in looseCache:
+        looseCache[newPath] = looseCache[oldPath]
+        del looseCache[oldPath]

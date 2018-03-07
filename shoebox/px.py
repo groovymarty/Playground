@@ -471,6 +471,14 @@ class Px(LogHelper, WidgetHelper):
                     raise RuntimeError("Can't create image from XPNG for {}".format(ent.name))
             except RuntimeError as e:
                 self.log_error(str(e))
+            except KeyError as e:
+                photo = nailcache.get_loose_file(ent.path)
+                if photo is None:
+                    self.log_error(str(e)) #no thumbnail for this file
+        else:
+            # no log when this fails because we've already said the xpng file is missing
+            photo = nailcache.get_loose_file(ent.path)
+
         # if still no image, try to create thumbnail on the fly
         if photo is None:
             try:
@@ -478,6 +486,8 @@ class Px(LogHelper, WidgetHelper):
                 im = pic.fix_image_orientation(im)
                 im.thumbnail((self.nailSz, self.nailSz))
                 photo = ImageTk.PhotoImage(im)
+                # add to loose file cache
+                nailcache.add_loose_file(ent.path, photo)
             except:
                 self.log_error("Can't create thumbnail for {}".format(ent.name))
         # if still no image, give up and display as a file

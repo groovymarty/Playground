@@ -70,7 +70,7 @@ class Nails:
             else:
                 raise RuntimeError("Bad XPNG offset={:d}, length={:d} for {}".format(offset, length, name))
         else:
-            raise RuntimeError("No thumbnail for {}".format(name))
+            raise KeyError("No thumbnail for {}".format(name))
 
     def touch(self, value):
         self.lastTouch = value
