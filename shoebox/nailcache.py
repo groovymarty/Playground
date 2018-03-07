@@ -26,15 +26,17 @@ def get_nails(folderPath, sz, env=None):
 looseCache = {}
 looseCount = 0
 
-def add_loose_file(path, img):
+def add_loose_file(path, sz, img):
     global looseCount
-    looseCache[path] = img
+    looseCache[(path, sz)] = img
     looseCount += 1
 
-def get_loose_file(path):
-    return looseCache[path] if path in looseCache else None;
+def get_loose_file(path, sz):
+    key = (path, sz)
+    return looseCache[key] if key in looseCache else None;
 
-def change_loose_file(oldPath, newPath):
-    if oldPath in looseCache:
-        looseCache[newPath] = looseCache[oldPath]
-        del looseCache[oldPath]
+def change_loose_file(oldPath, newPath, sz):
+    oldKey = (oldPath, sz)
+    if oldKey in looseCache:
+        looseCache[(newPath, sz)] = looseCache[oldKey]
+        del looseCache[oldKey]
