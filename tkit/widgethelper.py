@@ -1,22 +1,32 @@
 # tkit.widgethelper
 
+from tkinter import *
+
 class WidgetHelper:
     @staticmethod
     def enable_widget(widget, enable=True, recursive=False):
-        if enable:
-            widget.state(['!disabled'])
+        if hasattr(widget, 'state'):
+            # ttk themed widget
+            if enable:
+                widget.state(['!disabled'])
+            else:
+                widget.state(['disabled'])
         else:
-            widget.state(['disabled'])
+            widget.config(state=NORMAL if enable else DISABLED)
         if recursive:
             for child in widget.winfo_children():
                 WidgetHelper.enable_widget(child, enable)
 
     @staticmethod
     def disable_widget(widget, disable=True, recursive=False):
-        if disable:
-            widget.state(['disabled'])
+        if hasattr(widget, 'state'):
+            # ttk themed widget
+            if disable:
+                widget.state(['disabled'])
+            else:
+                widget.state(['!disabled'])
         else:
-            widget.state(['!disabled'])
+            widget.config(state=DISABLED if disable else NORMAL)
         if recursive:
             for child in widget.winfo_children():
                 WidgetHelper.disable_widget(child, disable)

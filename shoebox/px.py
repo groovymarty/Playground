@@ -6,9 +6,11 @@ from tkinter import ttk
 from PIL import Image
 import ImageTk
 from shoebox import pic, nailcache, dnd
+from shoebox.dnd import DndItemEnt
 from shoebox.nailer import Nailer
 from shoebox.pxfolder import PxFolder
 from shoebox.pxtile import PxTilePic, PxTileFile, selectColors
+from tkit.direntry import DirEntryFile
 from tkit.loghelper import LogHelper
 from tkit.widgethelper import WidgetHelper
 
@@ -27,7 +29,9 @@ class Px(LogHelper, WidgetHelper):
 
         # create top level window
         self.top = Toplevel()
-        self.top.title("Px {:d}".format(self.instNum))
+        self.title = "Px {:d}".format(self.instNum)
+        self.styleRoot = "Px{:d}".format(self.instNum)
+        self.top.title(self.title)
         self.top.bind('<Destroy>', self.on_destroy)
 
         # create top button bar
@@ -37,7 +41,7 @@ class Px(LogHelper, WidgetHelper):
         self.refreshButton.pack(side=LEFT)
         self.sizeButton = ttk.Button(self.topBar, text="Small", command=self.toggle_nail_size)
         self.sizeButton.pack(side=LEFT)
-        self.selectButton = ttk.Button(self.topBar, text="Select All", style="Select.TButton",
+        self.selectButton = ttk.Button(self.topBar, text="Select All", style=self.styleRoot+".Select.TButton",
                                        command=self.toggle_select_all)
         self.selectButton.pack(side=LEFT)
         self.nailerButton = ttk.Button(self.topBar, text="Nailer", command=self.do_nailer)
@@ -103,6 +107,8 @@ class Px(LogHelper, WidgetHelper):
         self.curSelectColor = 1
         self.dragging = False
         self.dragStart = None
+        self.dragTiles = None
+        self.dragColor = None
         self.canvasItems = {} #canvas id of image to tile object
         self.canvasWidth = 0
         self.hTotal = 0
@@ -110,7 +116,7 @@ class Px(LogHelper, WidgetHelper):
         self.canvas.bind('<Button-1>', self.on_canvas_click)
         self.canvas.bind('<B1-Motion>', self.on_canvas_dnd_motion)
         self.canvas.bind('<ButtonRelease>', self.on_canvas_dnd_release)
-        dnd.add_target(self.canvas, self)
+        dnd.add_target(self.canvas, self, self.title)
 
         self.lastError = ""
         self.curFolder = None
@@ -202,7 +208,7 @@ class Px(LogHelper, WidgetHelper):
 
     # when Select All/None button clicked
     def toggle_select_all(self):
-        if any(tile.selected for tile in self.tilesOrder):
+        if self.any_selected():
             self.select_all(False)
             self.lastTileClicked = None
         else:
@@ -216,7 +222,9 @@ class Px(LogHelper, WidgetHelper):
         else:
             self.selectButton.configure(text="Select All")
         s = ttk.Style()
-        s.configure('Select.TButton', background=selectColors[self.curSelectColor])
+        s.configure(self.styleRoot+'.Select.TButton', background=selectColors[self.curSelectColor])
+        self.set_status("{:d} items selected {}".format(self.num_selected(self.curSelectColor),
+                                                        selectColors[self.curSelectColor]))
 
     # when Nailer button clicked
     def do_nailer(self):
@@ -339,6 +347,8 @@ class Px(LogHelper, WidgetHelper):
             # remember last tile clicked (for shift-click extension)
             self.lastTileClicked = tile
             self.update_select_button()
+        else:
+            self.set_status_default()
 
     # select a tile
     def select_tile(self, tile, color):
@@ -346,6 +356,14 @@ class Px(LogHelper, WidgetHelper):
             tile.erase_selected(self.canvas)
         if color and not tile.selected:
             tile.draw_selected(self.canvas, color)
+
+    # any tiles selected?
+    def any_selected(self):
+        return any(tile.selected for tile in self.tilesOrder)
+
+    # return number of tiles selected with specified color
+    def num_selected(self, color):
+        return len([tile for tile in self.tilesOrder if tile.selected == color])
 
     # select/unselect all
     def select_all(self, color):
@@ -370,25 +388,57 @@ class Px(LogHelper, WidgetHelper):
     def on_canvas_dnd_motion(self, event):
         if not self.dragging:
             if self.dragStart is None:
-                self.dragStart = (event.x, event.y)
+                # get canvas item under mouse
+                items = self.canvas.find_withtag(CURRENT)
+                if len(items) and items[0] in self.canvasItems:
+                    tile = self.canvasItems[items[0]]
+                    if tile.selected:
+                        # drag all tiles selected with same color
+                        # note you can't drag unselected tiles
+                        self.dragColor = tile.selected
+                        self.dragTiles = [t for t in self.tilesOrder if t.selected == self.dragColor]
+                        self.dragStart = (event.x, event.y)
             elif abs(event.x - self.dragStart[0]) > 10 or abs(event.y - self.dragStart[1]) > 10:
+                # have dragged far enough to call it a real drag
                 self.dragging = True
                 self.canvas.configure(cursor="box_spiral")
+                self.set_status("Dragging {:d} {} items".format(len(self.dragTiles),
+                                                                selectColors[self.dragColor]))
 
     # on mouse button release
     def on_canvas_dnd_release(self, event):
         if self.dragging:
             w = self.top.winfo_containing(event.x_root, event.y_root)
-            if w != self.canvas and dnd.try_drop(w, []):
-                print("px {} drop was accepted".format(self.instNum))
+            if w != self.canvas:
+                items = [DndItemEnt(DirEntryFile(os.path.join(self.curFolder.path, t.name)))
+                         for t in self.dragTiles]
+                accepted = dnd.try_drop(w, items)
+                nAccepted = 0
+                if accepted:
+                    for index, item in enumerate(items):
+                        if accepted is True or index < len(accepted) and accepted[index]:
+                            print("px {} drop {} was accepted".format(self.instNum, item.thing.name))
+                            nAccepted += 1
+                    self.set_status("{:d} of {:d} items accepted by {}".format(nAccepted, len(items),
+                                                                               dnd.get_target_name(w)))
+                else:
+                    self.set_status("No items accepted")
+            else:
+                self.set_status_default()
+
         self.dragging = False
         self.dragStart = None
+        self.dragTiles = None
+        self.dragColor = None
         self.canvas.configure(cursor="")
 
     # called by dnd, return true if drop accepted
     def receive_drop(self, items):
-        print("px {} received drop".format(self.instNum))
-        return True
+        if self.curFolder:
+            print("px {} received drop".format(self.instNum))
+            return True
+        else:
+            return False
 
     # delete all items in canvas
     def clear_canvas(self):
