@@ -79,6 +79,11 @@ class PxTile:
         # return change in height
         return self.h - hOld
 
+    def erase(self, canvas):
+        for item in self.items:
+            canvas.delete(item)
+        self.selected = False
+
 class PxTilePic(PxTile):
     def __init__(self, name, photo, env=None):
         super().__init__(name, env)

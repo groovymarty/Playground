@@ -1,6 +1,6 @@
 # shoebox.px
 
-import os
+import os, shutil
 from tkinter import *
 from tkinter import ttk
 from PIL import Image
@@ -415,9 +415,9 @@ class Px(LogHelper, WidgetHelper):
                 accepted = dnd.try_drop(w, items)
                 nAccepted = 0
                 if accepted:
-                    for index, item in enumerate(items):
+                    for index, tile in enumerate(self.dragTiles):
                         if accepted is True or index < len(accepted) and accepted[index]:
-                            print("px {} drop {} was accepted".format(self.instNum, item.thing.name))
+                            self.remove_tile(tile)
                             nAccepted += 1
                     self.set_status("{:d} of {:d} items accepted by {}".format(nAccepted, len(items),
                                                                                dnd.get_target_name(w)))
@@ -432,11 +432,26 @@ class Px(LogHelper, WidgetHelper):
         self.dragColor = None
         self.canvas.configure(cursor="")
 
-    # called by dnd, return true if drop accepted
+    # called by dnd, return true if drop accepted (or array of true/false)
     def receive_drop(self, items):
         if self.curFolder:
-            print("px {} received drop".format(self.instNum))
-            return True
+            entries = []
+            result = []
+            for item in items:
+                accepted = False
+                if item.kind == dnd.ENT:
+                    ent = item.thing
+                    try:
+                        self.log_info("Moving {} to {}".format(ent.path, self.curFolder.path))
+                        shutil.move(ent.path, self.curFolder.path)
+                        entries.append(ent)
+                        accepted = True
+                    except shutil.Error as e:
+                        self.log_error("Could not accept {}: {}".format(item.thing.path, str(e)))
+                result.append(accepted)
+            if len(entries):
+                self.populate_canvas(entries)
+            return result
         else:
             return False
 
@@ -572,3 +587,22 @@ class Px(LogHelper, WidgetHelper):
                 if folderId not in self.folders or self.curFolder is not self.folders[folderId]:
                     tile.set_error(pic.OOP)
                     self.log_error("Picture out of place: {}".format(tile.name))
+
+    # remove a tile
+    def remove_tile(self, tile):
+        try:
+            if tile.id:
+                del self.tiles[tile.id]
+        except KeyError:
+            self.log_error("Error removing {}, id={} not in tiles".format(tile.name, tile.id))
+        try:
+            self.tilesOrder.remove(tile)
+        except ValueError:
+            self.log_error("Error removing {}, not in tilesOrder".format(tile.name))
+        try:
+            del self.tilesByName[tile.name]
+        except ValueError:
+            self.log_error("Error removing {}, not in tilesByName".format(tile.name))
+        if tile is self.lastTileClicked:
+            self.lastTileClicked = None
+        tile.erase(self.canvas)
