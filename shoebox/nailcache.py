@@ -13,10 +13,10 @@ def get_nails(folderPath, sz, env=None):
     if key in cache:
         nails = cache[key]
     else:
-        cacheCount += 1
-        environ.log_info(env, "Adding '{}' sz={:d} to nail cache, n={}".format(folderPath, sz, cacheCount))
         nails = Nails(read_nails(folderPath, sz))
+        environ.log_info(env, "Adding '{}' sz={:d} to nail cache, n={}".format(folderPath, sz, cacheCount))
         cache[key] = nails
+        cacheCount += 1
 
     # touch for LRU algorithm
     nails.touch(touchCount)
@@ -28,15 +28,19 @@ looseCount = 0
 
 def add_loose_file(path, sz, img):
     global looseCount
-    looseCache[(path, sz)] = img
+    if sz not in looseCache:
+        looseCache[sz] = {}
+    looseCache[sz][path] = img
     looseCount += 1
 
 def get_loose_file(path, sz):
-    key = (path, sz)
-    return looseCache[key] if key in looseCache else None;
+    if sz in looseCache and path in looseCache[sz]:
+        return looseCache[sz][path]
+    else:
+        return None
 
-def change_loose_file(oldPath, newPath, sz):
-    oldKey = (oldPath, sz)
-    if oldKey in looseCache:
-        looseCache[(newPath, sz)] = looseCache[oldKey]
-        del looseCache[oldKey]
+def change_loose_file(oldPath, newPath):
+    for sz in looseCache:
+        if oldPath in looseCache[sz]:
+            looseCache[sz][newPath] = looseCache[sz][oldPath]
+            del looseCache[sz][oldPath]

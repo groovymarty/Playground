@@ -44,6 +44,8 @@ class Px(LogHelper, WidgetHelper):
         self.selectButton = ttk.Button(self.topBar, text="Select All", style=self.styleRoot+".Select.TButton",
                                        command=self.toggle_select_all)
         self.selectButton.pack(side=LEFT)
+        self.numButton = ttk.Button(self.topBar, text="Num", command=self.do_num)
+        self.numButton.pack(side=LEFT)
         self.nailerButton = ttk.Button(self.topBar, text="Nailer", command=self.do_nailer)
         self.nailerButton.pack(side=RIGHT)
         self.enable_buttons(False)
@@ -242,6 +244,7 @@ class Px(LogHelper, WidgetHelper):
         self.enable_widget(self.refreshButton, enable)
         self.enable_widget(self.sizeButton, enable)
         self.enable_widget(self.selectButton, enable)
+        self.enable_widget(self.numButton, enable)
         self.enable_widget(self.nailerButton, enable)
 
     # populate tree
@@ -439,15 +442,17 @@ class Px(LogHelper, WidgetHelper):
             result = []
             for item in items:
                 accepted = False
-                if item.kind == dnd.ENT:
+                if isinstance(item, DndItemEnt):
                     ent = item.thing
                     try:
                         self.log_info("Moving {} to {}".format(ent.path, self.curFolder.path))
                         shutil.move(ent.path, self.curFolder.path)
-                        entries.append(ent)
+                        newPath = os.path.join(self.curFolder.path, ent.name)
+                        nailcache.change_loose_file(ent.path, newPath)
+                        entries.append(DirEntryFile(newPath))
                         accepted = True
                     except shutil.Error as e:
-                        self.log_error("Could not accept {}: {}".format(item.thing.path, str(e)))
+                        self.log_error("Could not accept {}: {}".format(ent.path, str(e)))
                 result.append(accepted)
             if len(entries):
                 self.populate_canvas(entries)
@@ -523,7 +528,7 @@ class Px(LogHelper, WidgetHelper):
                 folderPath = os.path.split(ent.path)[0]
                 self.nails = nailcache.get_nails(folderPath, self.nailSz, self.env)
             except FileNotFoundError:
-                self.log_error("No thumbnail file for size {}".format(self.nailSz))
+                self.log_error("No thumbnail file in {} for size {}".format(self.curFolder.path, self.nailSz))
             except RuntimeError as e:
                 self.log_error(str(e))
         # try to get image from thumbnails
@@ -566,6 +571,7 @@ class Px(LogHelper, WidgetHelper):
         return PxTileFile(ent.name, self.env)
 
     # add a tile
+    # assumes tile is made by above functions so it's already drawn on canvas
     def add_tile(self, tile):
         self.tilesOrder.append(tile)
         self.tilesByName[tile.name] = tile
@@ -588,21 +594,62 @@ class Px(LogHelper, WidgetHelper):
                     tile.set_error(pic.OOP)
                     self.log_error("Picture out of place: {}".format(tile.name))
 
-    # remove a tile
+    # remove a tile, including erasing from canvas
     def remove_tile(self, tile):
-        try:
-            if tile.id:
-                del self.tiles[tile.id]
-        except KeyError:
-            self.log_error("Error removing {}, id={} not in tiles".format(tile.name, tile.id))
         try:
             self.tilesOrder.remove(tile)
         except ValueError:
             self.log_error("Error removing {}, not in tilesOrder".format(tile.name))
-        try:
+        if tile.name in self.tilesByName:
             del self.tilesByName[tile.name]
-        except ValueError:
-            self.log_error("Error removing {}, not in tilesByName".format(tile.name))
+        if tile.id in self.tiles:
+            del self.tiles[tile.id]
         if tile is self.lastTileClicked:
             self.lastTileClicked = None
         tile.erase(self.canvas)
+
+    # rename a tile
+    def rename_tile(self, tile, newName):
+        if tile.name in self.tilesByName:
+            del self.tilesByName[tile.name]
+        self.tilesByName[newName] = tile
+        if tile.id in self.tiles:
+            del self.tiles[tile.id]
+        tile.name = newName
+        if isinstance(tile, PxTilePic):
+            tile.parse_name(self.env)
+        if tile.id:
+            self.tiles[tile.id] = tile
+        tile.text = newName
+        tile.redraw_text(self.canvas, self.nailSz)
+
+    # return highest numbered tile
+    def get_highest_num(self):
+        n = 0
+        for tile in self.tilesOrder:
+            if tile.id and not tile.errors and tile.parts.num > n:
+                n = tile.parts.num
+        return n
+
+    # number tiles that aren't already numbered
+    def do_num(self):
+        if self.curFolder.noncanon:
+            self.log_error("Sorry, current folder is noncanonical")
+        else:
+            folderId = pic.get_folder_id(self.curFolder.parts)
+            n = self.get_highest_num()
+            n = int((n + 10) / 10) * 10
+            nChanged = 0
+            for tile in self.tilesOrder:
+                if isinstance(tile, PxTilePic) and not tile.id:
+                    ext = os.path.splitext(tile.name)[1]
+                    newName = "{}-{:04d}{}".format(folderId, n, ext)
+                    oldPath = os.path.join(self.curFolder.path, tile.name)
+                    newPath = os.path.join(self.curFolder.path, newName)
+                    self.log_info("Renaming {} to {}".format(oldPath, newName))
+                    os.rename(oldPath, newPath)
+                    self.rename_tile(tile, newName)
+                    nailcache.change_loose_file(oldPath, newPath)
+                    nChanged += 1
+                    n += 10
+            self.set_status("{:d} files changed, next number is {:d}".format(nChanged, n))

@@ -59,9 +59,6 @@ class PxTile:
     def pick_text_color(self):
         return "orange" if self.errors else "cyan" if self.noncanon else "white"
 
-    def set_text(self, text):
-        self.text = text
-
     def redraw_text(self, canvas, w):
         hOld = self.h
         if len(self.items) >= 2:
@@ -88,6 +85,9 @@ class PxTilePic(PxTile):
     def __init__(self, name, photo, env=None):
         super().__init__(name, env)
         self.photo = photo
+        self.parse_name(env)
+
+    def parse_name(self, env):
         self.parts = pic.parse_file(self.name, env)
         self.id = self.parts.id if self.parts else None
         # noncanonical means ID can't be parsed from name
@@ -110,7 +110,7 @@ class PxTileFile(PxTile):
         rect = canvas.create_rectangle(x, y, x+fileBoxSz, y+fileBoxSz, fill="gray")
         line = canvas.create_line(x, y, x+fileBoxSz, y+fileBoxSz)
         self.h0 = fileBoxSz
-        txt = canvas.create_text(x, y + self.h0, text=self.name, anchor=NW, width=w, fill=self.pick_text_color())
+        txt = canvas.create_text(x, y + self.h0, text=self.text, anchor=NW, width=w, fill=self.pick_text_color())
         bb = canvas.bbox(txt)
         self.h = self.h0 + bb[3] - bb[1]
         self.items = (rect, txt, line)
