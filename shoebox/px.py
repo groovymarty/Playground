@@ -46,6 +46,8 @@ class Px(LogHelper, WidgetHelper):
         self.selectButton.pack(side=LEFT)
         self.numButton = ttk.Button(self.topBar, text="Num", command=self.do_num)
         self.numButton.pack(side=LEFT)
+        self.unnumButton = ttk.Button(self.topBar, text="Unnum", command=self.do_unnum)
+        self.unnumButton.pack(side=LEFT)
         self.nailerButton = ttk.Button(self.topBar, text="Nailer", command=self.do_nailer)
         self.nailerButton.pack(side=RIGHT)
         self.enable_buttons(False)
@@ -245,6 +247,7 @@ class Px(LogHelper, WidgetHelper):
         self.enable_widget(self.sizeButton, enable)
         self.enable_widget(self.selectButton, enable)
         self.enable_widget(self.numButton, enable)
+        self.enable_widget(self.unnumButton, enable)
         self.enable_widget(self.nailerButton, enable)
 
     # populate tree
@@ -653,3 +656,18 @@ class Px(LogHelper, WidgetHelper):
                     nChanged += 1
                     n += 10
             self.set_status("{:d} files changed, next number is {:d}".format(nChanged, n))
+
+    # unnumber selected tiles
+    def do_unnum(self):
+        nChanged = 0
+        for tile in self.tilesOrder:
+            if tile.id and tile.selected:
+                newName = "_{}".format(tile.name)
+                oldPath = os.path.join(self.curFolder.path, tile.name)
+                newPath = os.path.join(self.curFolder.path, newName)
+                self.log_info("Renaming {} to {}".format(oldPath, newName))
+                os.rename(oldPath, newPath)
+                self.rename_tile(tile, newName)
+                nailcache.change_loose_file(oldPath, newPath)
+                nChanged += 1
+            self.set_status("{:d} files changed".format(nChanged))
