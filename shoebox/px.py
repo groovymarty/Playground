@@ -449,14 +449,11 @@ class Px(LogHelper, WidgetHelper):
                 if isinstance(item, DndItemEnt):
                     ent = item.thing
                     try:
-                        self.log_info("Moving {} to {}".format(ent.path, self.curFolder.path))
-                        shutil.move(ent.path, self.curFolder.path)
-                        newPath = os.path.join(self.curFolder.path, ent.name)
-                        nailcache.change_loose_file(ent.path, newPath)
+                        newPath = self.move_file_to_cur_folder(ent.path)
                         entries.append(DirEntryFile(newPath))
                         accepted = True
-                    except shutil.Error as e:
-                        self.log_error("Could not accept {}: {}".format(ent.path, str(e)))
+                    except RuntimeError as e:
+                        self.log_error(str(e))
                 result.append(accepted)
             if len(entries):
                 self.populate_canvas(entries)
@@ -532,7 +529,7 @@ class Px(LogHelper, WidgetHelper):
                 folderPath = os.path.split(ent.path)[0]
                 self.nails = nailcache.get_nails(folderPath, self.nailSz, self.env)
             except FileNotFoundError:
-                self.log_error("No thumbnail file in {} for size {}".format(self.curFolder.path, self.nailSz))
+                self.log_error("No thumbnail file size {:d} in {}".format(self.nailSz, self.curFolder.path))
             except RuntimeError as e:
                 self.log_error(str(e))
         # try to get image from thumbnails
@@ -556,6 +553,7 @@ class Px(LogHelper, WidgetHelper):
         # if still no image, try to create thumbnail on the fly
         if photo is None:
             try:
+                self.log_info("Making thumbnail size {:d} for {}".format(self.nailSz, ent.name))
                 im = Image.open(ent.path)
                 im = pic.fix_image_orientation(im)
                 im.thumbnail((self.nailSz, self.nailSz))
@@ -563,7 +561,7 @@ class Px(LogHelper, WidgetHelper):
                 # add to loose file cache
                 nailcache.add_loose_file(ent.path, self.nailSz, photo)
             except:
-                self.log_error("Can't create thumbnail for {}".format(ent.name))
+                self.log_error("Can't create thumbnail size {:d} for {}".format(self.nailSz, ent.name))
         # if still no image, give up and display as a file
         if photo is None:
             return self.make_file_tile(ent)
@@ -648,14 +646,13 @@ class Px(LogHelper, WidgetHelper):
                 if isinstance(tile, PxTilePic) and not tile.id:
                     ext = os.path.splitext(tile.name)[1]
                     newName = "{}-{:04d}{}".format(folderId, n, ext)
-                    oldPath = os.path.join(self.curFolder.path, tile.name)
-                    newPath = os.path.join(self.curFolder.path, newName)
-                    self.log_info("Renaming {} to {}".format(oldPath, newName))
-                    os.rename(oldPath, newPath)
-                    self.rename_tile(tile, newName)
-                    nailcache.change_loose_file(oldPath, newPath)
-                    nChanged += 1
-                    n += 10
+                    try:
+                        self.rename_file_in_cur_folder(tile.name, newName)
+                        self.rename_tile(tile, newName)
+                        nChanged += 1
+                        n += 10
+                    except RuntimeError as e:
+                        self.log_error(str(e))
             self.set_status("{:d} files changed, next number is {:d}".format(nChanged, n))
 
     # unnumber selected tiles
@@ -664,11 +661,33 @@ class Px(LogHelper, WidgetHelper):
         for tile in self.tilesOrder:
             if tile.id and tile.selected:
                 newName = "_{}".format(tile.name)
-                oldPath = os.path.join(self.curFolder.path, tile.name)
-                newPath = os.path.join(self.curFolder.path, newName)
-                self.log_info("Renaming {} to {}".format(oldPath, newName))
-                os.rename(oldPath, newPath)
-                self.rename_tile(tile, newName)
-                nailcache.change_loose_file(oldPath, newPath)
-                nChanged += 1
+                try:
+                    self.rename_file_in_cur_folder(tile.name, newName)
+                    self.rename_tile(tile, newName)
+                    nChanged += 1
+                except RuntimeError as e:
+                    self.log_error(str(e))
             self.set_status("{:d} files changed".format(nChanged))
+
+    # rename file in current folder, return new path
+    def rename_file_in_cur_folder(self, oldName, newName):
+        oldPath = os.path.join(self.curFolder.path, oldName)
+        newPath = os.path.join(self.curFolder.path, newName)
+        self.log_info("Renaming {} to {}".format(oldPath, newName))
+        try:
+            shutil.move(oldPath, newPath)
+            nailcache.change_loose_file(oldPath, newPath)
+            return newPath
+        except BaseException as e:
+            raise RuntimeError("Rename failed for {}: {}".format(oldPath, str(e)))
+
+    # move file to current folder, return new path
+    def move_file_to_cur_folder(self, oldPath):
+        newPath = os.path.join(self.curFolder.path, os.path.basename(oldPath))
+        self.log_info("Moving {} to {}".format(oldPath, self.curFolder.path))
+        try:
+            shutil.move(oldPath, newPath)
+            nailcache.change_loose_file(oldPath, newPath)
+            return newPath
+        except BaseException as e:
+            raise RuntimeError("Move failed for {}: {}".format(oldPath, str(e)))
