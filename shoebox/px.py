@@ -29,9 +29,9 @@ class Px(LogHelper, WidgetHelper):
 
         # create top level window
         self.top = Toplevel()
-        self.title = "Px {:d}".format(self.instNum)
+        self.pxName = "Px {:d}".format(self.instNum)
         self.styleRoot = "Px{:d}".format(self.instNum)
-        self.top.title(self.title)
+        self.top.title(self.pxName)
         self.top.bind('<Destroy>', self.on_destroy)
 
         # create top button bar
@@ -120,7 +120,7 @@ class Px(LogHelper, WidgetHelper):
         self.canvas.bind('<Button-1>', self.on_canvas_click)
         self.canvas.bind('<B1-Motion>', self.on_canvas_dnd_motion)
         self.canvas.bind('<ButtonRelease>', self.on_canvas_dnd_release)
-        dnd.add_target(self.canvas, self, self.title)
+        dnd.add_target(self.canvas, self, self.pxName)
 
         self.lastError = ""
         self.curFolder = None
@@ -298,6 +298,7 @@ class Px(LogHelper, WidgetHelper):
         sel = self.tree.selection()
         if sel and sel[0] in self.treeItems:
             self.curFolder = self.treeItems[sel[0]]
+            self.top.title("{} - {}".format(self.pxName, self.curFolder.path[2:]))
             self.clear_canvas()
             self.populate_canvas(os.scandir(self.curFolder.path))
 
