@@ -660,41 +660,93 @@ class Px(LogHelper, WidgetHelper):
                 n = tile.parts.num
         return n
 
-    # number tiles that aren't already numbered
+    # number selected tiles that aren't already numbered
     def do_num(self):
         if self.curFolder.noncanon:
             self.log_error("Sorry, current folder is noncanonical")
         else:
+            self.clear_error()
             folderId = pic.get_folder_id(self.curFolder.parts)
             n = self.get_highest_num()
             n = int((n + 10) / 10) * 10
+            nSelected = 0
             nChanged = 0
+            groups = [] #tuples: (lastNumSeen, nextNumSeen, stickRight, tilesToNumber)
+            lastNumSeen = 0
+            tilesToNumber = []
+            # find subranges of tiles to be numbered
             for tile in self.tilesOrder:
-                if isinstance(tile, PxTilePic) and not tile.id:
+                if tile.selected == self.curSelectColor:
+                    nSelected += 1
+                    if not tile.id and isinstance(tile, PxTilePic):
+                        # found unnumbered picture tile, add to current group
+                        tilesToNumber.append(tile)
+                if tile.id and not tile.errors:
+                    # found numbered tile, end current group
+                    if len(tilesToNumber):
+                        # stick right if next numbered tile is selected, else stick left
+                        groups.append((lastNumSeen, tile.parts.num, tile.selected, tilesToNumber))
+                        tilesToNumber = []
+                    # keep track of last number seen
+                    lastNumSeen = tile.parts.num
+            # end group in progress, if any
+            if len(tilesToNumber):
+                groups.append((lastNumSeen, 9999999, False, tilesToNumber))
+            # process each subrange
+            for lastNumSeen, nextNumSeen, stickRight, tilesToNumber in groups:
+                nNeeded = len(tilesToNumber)
+                nAvail = nextNumSeen - lastNumSeen - 1
+                nTaken = min(nNeeded, nAvail)
+                if stickRight:
+                    num = nextNumSeen - nTaken
+                else:
+                    num = lastNumSeen + 1
+                # to do, when to step by 10, when to start at next multiple of 10..?
+                for tile in tilesToNumber[:nTaken]:
                     ext = os.path.splitext(tile.name)[1]
-                    newName = "{}-{:04d}{}".format(folderId, n, ext)
+                    # to do.. keep comment...
+                    # to do.. when to do 3 digits?
+                    newName = "{}-{:04d}{}".format(folderId, num, ext)
                     try:
                         self.rename_file_in_cur_folder(tile.name, newName)
                         self.rename_tile(tile, newName)
                         nChanged += 1
-                        n += 10
+                        # to do.. step..?
+                        num += 1
                     except RuntimeError as e:
                         self.log_error(str(e))
-            self.set_status("{:d} files changed, next number is {:d}".format(nChanged, n))
+
+                nShort = nNeeded - nTaken
+                if nShort:
+                    self.log_error("{:d} files after {:d} could not be numbered".format(nShort, num-1))
+
+            if not self.lastError:
+                if nSelected:
+                    self.set_status("{:d} files changed".format(nChanged))
+                else:
+                    self.set_status("No files selected")
 
     # unnumber selected tiles
     def do_unnum(self):
+        self.clear_error()
+        nSelected = 0
         nChanged = 0
         for tile in self.tilesOrder:
-            if tile.id and tile.selected:
-                newName = "_{}".format(tile.name)
-                try:
-                    self.rename_file_in_cur_folder(tile.name, newName)
-                    self.rename_tile(tile, newName)
-                    nChanged += 1
-                except RuntimeError as e:
-                    self.log_error(str(e))
-            self.set_status("{:d} files changed".format(nChanged))
+            if tile.selected == self.curSelectColor:
+                nSelected += 1
+                if tile.id:
+                    newName = "_{}".format(tile.name)
+                    try:
+                        self.rename_file_in_cur_folder(tile.name, newName)
+                        self.rename_tile(tile, newName)
+                        nChanged += 1
+                    except RuntimeError as e:
+                        self.log_error(str(e))
+        if not self.lastError:
+            if nSelected:
+                self.set_status("{:d} files changed".format(nChanged))
+            else:
+                self.set_status("No files selected")
 
     # rename file in current folder, return new path
     def rename_file_in_cur_folder(self, oldName, newName):
