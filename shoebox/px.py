@@ -573,10 +573,16 @@ class Px(LogHelper, WidgetHelper):
         return PxTileFile(ent.name, self.env)
 
     # add a tile
-    # assumes tile is made by above functions so it's already drawn on canvas
+    # since tile may not be on canvas, does not redraw text in case of error
     def add_tile(self, tile):
         self.tilesOrder.append(tile)
         self.tilesByName[tile.name] = tile
+        if tile.id:
+            self.add_tile_id(tile)
+
+    # add tile ID to collection, check for DUP and OOP errors
+    # since tile may not be on canvas, does not redraw text in case of error
+    def add_tile_id(self, tile):
         if tile.id:
             if tile.id in self.tiles:
                 # duplicate groovy ID
@@ -585,6 +591,7 @@ class Px(LogHelper, WidgetHelper):
                 otherTile = self.tiles[tile.id]
                 if not otherTile.is_error(pic.DUP):
                     otherTile.set_error(pic.DUP)
+                    # ok to assume other tile is on canvas
                     otherTile.redraw_text(self.canvas, self.nailSz)
                     self.log_error("Duplicate ID: {}".format(otherTile.name))
             else:
@@ -604,25 +611,45 @@ class Px(LogHelper, WidgetHelper):
             self.log_error("Error removing {}, not in tilesOrder".format(tile.name))
         if tile.name in self.tilesByName:
             del self.tilesByName[tile.name]
-        if tile.id in self.tiles:
-            del self.tiles[tile.id]
+        if tile.id:
+            self.remove_tile_id(tile)
         if tile is self.lastTileClicked:
             self.lastTileClicked = None
         tile.erase(self.canvas)
+
+    # remove tile ID from collection, recheck DUP errors
+    def remove_tile_id(self, tile):
+        if tile.id:
+            # remove from collection
+            if tile.id in self.tiles and self.tiles[tile.id] is tile:
+                del self.tiles[tile.id]
+            # find all other tiles with same ID
+            otherTiles = [t for t in self.tilesOrder if t is not tile and t.id == tile.id]
+            if len(otherTiles):
+                otherTile = otherTiles[0]
+                # if exactly one found, clear DUP error
+                if len(otherTiles) == 1:
+                    otherTile.clear_error(pic.DUP)
+                    # ok to assume other tile is on canvas
+                    otherTile.redraw_text(self.canvas, self.nailSz)
+                # if collection is vacant for this ID, add one of them
+                if tile.id not in self.tiles:
+                    self.tiles[tile.id] = otherTile
 
     # rename a tile
     def rename_tile(self, tile, newName):
         if tile.name in self.tilesByName:
             del self.tilesByName[tile.name]
         self.tilesByName[newName] = tile
-        if tile.id in self.tiles:
-            del self.tiles[tile.id]
+        if tile.id:
+            self.remove_tile_id(tile)
         tile.name = newName
+        tile.text = newName
+        tile.errors = 0
         if isinstance(tile, PxTilePic):
             tile.parse_name(self.env)
         if tile.id:
-            self.tiles[tile.id] = tile
-        tile.text = newName
+            self.add_tile_id(tile)
         tile.redraw_text(self.canvas, self.nailSz)
 
     # return highest numbered tile

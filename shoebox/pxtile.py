@@ -36,6 +36,9 @@ class PxTile:
     def set_error(self, errBit):
         self.errors |= errBit
 
+    def clear_error(self, errBit):
+        self.errors &= ~errBit
+
     def is_error(self, errBit):
         return self.errors & errBit
 
