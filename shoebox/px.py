@@ -128,6 +128,7 @@ class Px(LogHelper, WidgetHelper):
         self.nailsTried = False
         self.loaded = False
         self.nPictures = 0
+        self.numDigits = 0
         self.rootFolder = PxFolder(None, "", ".", "")
         self.folders = {"": self.rootFolder} #folder id to folder object
         self.populate_tree(self.rootFolder)
@@ -183,7 +184,7 @@ class Px(LogHelper, WidgetHelper):
         self.lastError = ""
 
     # show error/warning message in status and log it
-    # for info and other log messages just log them
+    # for info optionally show in status and log it
     def log_error(self, msg):
         self.lastError = msg
         self.set_status(msg, True)
@@ -193,6 +194,11 @@ class Px(LogHelper, WidgetHelper):
         self.lastError = msg
         self.set_status(msg, True)
         super().log_warning(msg)
+
+    def log_info(self, msg, showInStatus=False):
+        if showInStatus:
+            self.set_status(msg)
+        super().log_info(msg)
 
     # when Refresh button clicked
     def do_refresh(self):
@@ -491,6 +497,10 @@ class Px(LogHelper, WidgetHelper):
                 if os.path.splitext(ent.name)[1].lower() in pic.pictureExts:
                     self.nPictures += 1
                     tile = self.make_pic_tile(ent)
+                    # update number of digits, lock in 4 once that number is seen
+                    if tile.id and self.numDigits != 4:
+                        nd = pic.get_num_digits(tile.parts)
+                        self.numDigits = 4 if nd >= 4 else max(nd, self.numDigits)
                 else:
                     tile = self.make_file_tile(ent)
 
@@ -553,7 +563,7 @@ class Px(LogHelper, WidgetHelper):
         # if still no image, try to create thumbnail on the fly
         if photo is None:
             try:
-                self.log_info("Making thumbnail size {:d} for {}".format(self.nailSz, ent.name))
+                self.log_info("Making thumbnail size {:d} for {}".format(self.nailSz, ent.name), True)
                 im = Image.open(ent.path)
                 im = pic.fix_image_orientation(im)
                 im.thumbnail((self.nailSz, self.nailSz))
@@ -666,65 +676,96 @@ class Px(LogHelper, WidgetHelper):
             self.log_error("Sorry, current folder is noncanonical")
         else:
             self.clear_error()
-            folderId = pic.get_folder_id(self.curFolder.parts)
-            n = self.get_highest_num()
-            n = int((n + 10) / 10) * 10
             nSelected = 0
             nChanged = 0
-            groups = [] #tuples: (lastNumSeen, nextNumSeen, stickRight, tilesToNumber)
             lastNumSeen = 0
-            tilesToNumber = []
+            tilesInGroup = []
             # find subranges of tiles to be numbered
             for tile in self.tilesOrder:
                 if tile.selected == self.curSelectColor:
                     nSelected += 1
                     if not tile.id and isinstance(tile, PxTilePic):
                         # found unnumbered picture tile, add to current group
-                        tilesToNumber.append(tile)
+                        tilesInGroup.append(tile)
                 if tile.id and not tile.errors:
                     # found numbered tile, end current group
-                    if len(tilesToNumber):
+                    if len(tilesInGroup):
                         # stick right if next numbered tile is selected, else stick left
-                        groups.append((lastNumSeen, tile.parts.num, tile.selected, tilesToNumber))
-                        tilesToNumber = []
+                        nChanged += self.number_group_of_tiles(tilesInGroup,
+                                                               lastNumSeen, tile.parts.num, tile.selected)
+                        tilesInGroup = []
                     # keep track of last number seen
                     lastNumSeen = tile.parts.num
-            # end group in progress, if any
-            if len(tilesToNumber):
-                groups.append((lastNumSeen, 9999999, False, tilesToNumber))
-            # process each subrange
-            for lastNumSeen, nextNumSeen, stickRight, tilesToNumber in groups:
-                nNeeded = len(tilesToNumber)
-                nAvail = nextNumSeen - lastNumSeen - 1
-                nTaken = min(nNeeded, nAvail)
-                if stickRight:
-                    num = nextNumSeen - nTaken
-                else:
-                    num = lastNumSeen + 1
-                # to do, when to step by 10, when to start at next multiple of 10..?
-                for tile in tilesToNumber[:nTaken]:
-                    ext = os.path.splitext(tile.name)[1]
-                    # to do.. keep comment...
-                    # to do.. when to do 3 digits?
-                    newName = "{}-{:04d}{}".format(folderId, num, ext)
-                    try:
-                        self.rename_file_in_cur_folder(tile.name, newName)
-                        self.rename_tile(tile, newName)
-                        nChanged += 1
-                        # to do.. step..?
-                        num += 1
-                    except RuntimeError as e:
-                        self.log_error(str(e))
-
-                nShort = nNeeded - nTaken
-                if nShort:
-                    self.log_error("{:d} files after {:d} could not be numbered".format(nShort, num-1))
-
+            # do the last group, if any
+            if len(tilesInGroup):
+                nChanged += self.number_group_of_tiles(tilesInGroup, lastNumSeen, pic.MAXNUM, False)
             if not self.lastError:
                 if nSelected:
                     self.set_status("{:d} files changed".format(nChanged))
                 else:
                     self.set_status("No files selected")
+
+    # number a group of unnumbered tiles consecutively
+    # lastNumSeen is last numbered tile before group (or zero)
+    # nextNumSeen is next numbered tile after group (or MAXNUM)
+    # stickRight says what to do if there are more numbers available than we need
+    # if true, number the group based on nextNumSeen (so numbering break is before group)
+    # otherwise number the group based on lastNumSeen (so numbering break is after group)
+    # return number of tiles changed
+    def number_group_of_tiles(self, tilesInGroup, lastNumSeen, nextNumSeen, stickRight):
+        folderId = pic.get_folder_id(self.curFolder.parts)
+        nChanged = 0
+        nNeeded = len(tilesInGroup)
+        nAvail = nextNumSeen - lastNumSeen - 1
+        nCanDo = min(nNeeded, nAvail)
+        nCantDo = nNeeded - nCanDo
+
+        # number by tens if possible, otherwise by ones
+        lastNumSeen10 = int(lastNumSeen / 10) * 10
+        if lastNumSeen10 + (nCanDo * 10) < nextNumSeen:
+            step = 10
+            firstAvailNum = lastNumSeen10 + step
+            endAvailNum = int(nextNumSeen / 10) * 10
+        else:
+            step = 1
+            firstAvailNum = lastNumSeen + step
+            endAvailNum = nextNumSeen
+
+        # pick first number according to stickiness
+        if stickRight:
+            firstNum = endAvailNum - (nCanDo * 10)
+            tilesToDo = tilesInGroup[nCantDo:]
+            errMsgNum = nextNumSeen
+            errMsgSide = "before"
+        else:
+            firstNum = firstAvailNum
+            tilesToDo = tilesInGroup[:nCanDo]
+            errMsgNum = lastNumSeen
+            errMsgSide = "after"
+
+        num = firstNum
+        for tile in tilesToDo:
+            junk, comment, ext = pic.parse_noncanon(tile.name)
+            lumps = [folderId]
+            if self.numDigits < 4:
+                lumps.append("{:03d}".format(num))
+            else:
+                lumps.append("{:04d}".format(num))
+            if comment:
+                lumps.append(comment)
+            newName = "-".join(lumps) + ext
+            try:
+                self.rename_file_in_cur_folder(tile.name, newName)
+                self.rename_tile(tile, newName)
+                nChanged += 1
+                errMsgNum = num
+                num += step
+            except RuntimeError as e:
+                self.log_error(str(e))
+
+        if nCantDo:
+            self.log_error("{:d} files {} {:d} could not be numbered".format(nCantDo, errMsgSide, errMsgNum))
+        return nChanged
 
     # unnumber selected tiles
     def do_unnum(self):

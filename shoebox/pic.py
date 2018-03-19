@@ -1,6 +1,6 @@
 # shoebox.pic
 
-import re
+import re, os
 from collections import namedtuple
 from tkit import environ
 
@@ -12,6 +12,9 @@ nailSizeNames = ["Small", "Large"]
 # error bits
 DUP = 0x01  #duplicate
 OOP = 0x02  #out of place
+
+# max picture number, for sorting
+MAXNUM = 9999999
 
 # named tuple returned by parse functions
 #                            |0        |1       |2      |3       |4     |5     |6     |7         |8     |9      |10
@@ -91,6 +94,16 @@ def get_parent_id(parts):
             return parts.parent
     else:
         return ""
+
+# given parse results for a file, return number of digits in which picture number was written
+def get_num_digits(parts):
+    return len(parts.zeros) + len(str(parts.num))
+
+# parse a noncanonical name, return tuple (junk, comment, ext)
+def parse_noncanon(name):
+    basename, ext = os.path.splitext(name)
+    lumps = basename.split("-")
+    return "-".join(lumps[:2]), "-".join(lumps[2:]), ext
 
 # return PIL image rotated according to EXIF orientation value
 def fix_image_orientation(im):
