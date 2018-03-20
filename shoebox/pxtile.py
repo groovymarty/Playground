@@ -66,7 +66,7 @@ class PxTile:
         hOld = self.h
         if len(self.items) >= 2:
             # get coordinates of tile
-            x, y = canvas.coords(self.items[0])
+            x, y = canvas.coords(self.items[0])[:2]
             # delete old text
             canvas.delete(self.items[1])
             # create new text

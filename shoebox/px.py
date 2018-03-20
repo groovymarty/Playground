@@ -487,9 +487,28 @@ class Px(LogHelper, WidgetHelper):
         self.set_status("Loading...")
         self.nails = None
         self.nailsTried = False
-        x = tileGap / 2
-        y = self.hTotal
-        hmax = 0
+
+        # bump start position for next tile,
+        # possibly bump to next row
+        def bump_position():
+            nonlocal x, y, hmax
+            x += self.nailSz + tileGap
+            if x + self.nailSz > self.canvasWidth:
+                x = tileGap / 2
+                y += hmax + tileGap
+                hmax = 0
+
+        # where to start?
+        if len(self.tilesOrder):
+            # get cooordinates of last tile and bump
+            x, y = self.canvas.coords(self.tilesOrder[-1].items[0])[:2]
+            hmax = self.hTotal - y
+            bump_position()
+        else:
+            # empty canvas
+            x = tileGap / 2
+            y = tileGap / 2
+            hmax = 0
 
         # note i'm not sorting, on my system scandir returns them sorted already
         for ent in entries:
@@ -509,17 +528,11 @@ class Px(LogHelper, WidgetHelper):
                 self.canvasItems[tile.items[0]] = tile
                 if tile.h > hmax:
                     hmax = tile.h
-
-                # bump start position for next tile,
-                # possibly bump to next row
-                x += self.nailSz + tileGap
-                if x + self.nailSz > self.canvasWidth:
-                    x = tileGap / 2
-                    y += hmax + tileGap
-                    hmax = 0
+                bump_position()
         # bump to next row if partial row
         if x > tileGap:
-            y += hmax + tileGap
+            x = self.canvasWidth
+            bump_position()
         # set scroll region to final height
         self.canvas.configure(scrollregion=(0, 0, 1, y))
         self.hTotal = y
