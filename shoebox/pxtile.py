@@ -107,7 +107,6 @@ class PxTilePic(PxTile):
 class PxTileFile(PxTile):
     def __init__(self, name, env=None):
         super().__init__(name, env)
-        self.noncanon = True #always noncanonical
 
     def add_to_canvas(self, canvas, x, y, w):
         rect = canvas.create_rectangle(x, y, x+fileBoxSz, y+fileBoxSz, fill="gray")
@@ -117,3 +116,13 @@ class PxTileFile(PxTile):
         bb = canvas.bbox(txt)
         self.h = self.h0 + bb[3] - bb[1]
         self.items = (rect, txt, line)
+
+class PxTileHole(PxTile):
+    def __init__(self, env=None):
+        super().__init__("(hole)", env)
+
+    def add_to_canvas(self, canvas, bbox):
+        rect = canvas.create_rectangle(*bbox, outline="gray", width=1, dash=[2,2])
+        self.h0 = bbox[3] - bbox[1]
+        self.h = self.h0
+        self.items = [rect]

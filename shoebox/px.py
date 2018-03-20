@@ -9,7 +9,7 @@ from shoebox import pic, nailcache, dnd
 from shoebox.dnd import DndItemEnt
 from shoebox.nailer import Nailer
 from shoebox.pxfolder import PxFolder
-from shoebox.pxtile import PxTilePic, PxTileFile, selectColors
+from shoebox.pxtile import PxTilePic, PxTileFile, PxTileHole, selectColors
 from tkit.direntry import DirEntryFile
 from tkit.loghelper import LogHelper
 from tkit.widgethelper import WidgetHelper
@@ -626,19 +626,23 @@ class Px(LogHelper, WidgetHelper):
                     tile.set_error(pic.OOP)
                     self.log_error("Picture out of place: {}".format(tile.name))
 
-    # remove a tile, including erasing from canvas
+    # remove a tile, erase from canvas and replace with hole
     def remove_tile(self, tile):
-        try:
-            self.tilesOrder.remove(tile)
-        except ValueError:
-            self.log_error("Error removing {}, not in tilesOrder".format(tile.name))
         if tile.name in self.tilesByName:
             del self.tilesByName[tile.name]
         if tile.id:
             self.remove_tile_id(tile)
         if tile is self.lastTileClicked:
             self.lastTileClicked = None
+        bbox = self.canvas.bbox(tile.items[0])
         tile.erase(self.canvas)
+        try:
+            i = self.tilesOrder.index(tile)
+            hole = PxTileHole(self.env)
+            self.tilesOrder[i] = hole
+            hole.add_to_canvas(self.canvas, bbox)
+        except ValueError:
+            self.log_error("Error removing {}, not in tilesOrder".format(tile.name))
 
     # remove tile ID from collection, recheck DUP errors
     def remove_tile_id(self, tile):
