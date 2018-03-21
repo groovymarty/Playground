@@ -351,7 +351,10 @@ class Px(LogHelper, WidgetHelper):
                 self.select_tile(tile, self.curSelectColor)
             else:
                 # plain click
-                if not tile.selected:
+                if isinstance(tile, PxTileHole):
+                    # clicking a hole reflows from there to end
+                    self.reflow(tile)
+                elif not tile.selected:
                     self.select_tile(tile, self.curSelectColor)
                 else:
                     # already selected, absorb color
@@ -516,10 +519,6 @@ class Px(LogHelper, WidgetHelper):
             if ent.is_file() and ent.name != "Thumbs.db":
                 if os.path.splitext(ent.name)[1].lower() in pic.pictureExts:
                     tile = self.make_pic_tile(ent)
-                    # update number of digits, lock in 4 once that number is seen
-                    if tile.id and self.numDigits != 4:
-                        nd = pic.get_num_digits(tile.parts)
-                        self.numDigits = 4 if nd >= 4 else max(nd, self.numDigits)
                 else:
                     tile = self.make_file_tile(ent)
 
@@ -529,6 +528,7 @@ class Px(LogHelper, WidgetHelper):
                 if tile.h > hmax:
                     hmax = tile.h
                 bump_position()
+
         # bump to next row if partial row
         if x > tileGap:
             x = self.canvasWidth
@@ -541,6 +541,56 @@ class Px(LogHelper, WidgetHelper):
         self.set_status_default_or_error()
         self.loaded = True
         self.enable_buttons()
+
+    # reflow starting at specified tile, removing holes
+    # similarity to populate_canvas noted, but trying to factor the similar parts would be too complicated
+    def reflow(self, startTile):
+        try:
+            i = self.tilesOrder.index(startTile)
+        except ValueError:
+            self.log_error("Error reflowing from {}, not in tilesOrder".format(startTile.name))
+            return
+
+        # get cooordinates of start tile
+        x, y = self.canvas.coords(startTile.items[0])[:2]
+        hmax = startTile.h
+        # also look at earlier tiles in same row to find hmax
+        for tile in reversed(self.tilesOrder[:i]):
+            tiley = self.canvas.coords(tile.items[0])[1]
+            if tiley < y:
+                # prior row, done looking
+                break
+            elif tile.h > hmax:
+                hmax = tile.h
+
+        # bump start position for next tile,
+        # possibly bump to next row
+        def bump_position():
+            nonlocal x, y, hmax
+            x += self.nailSz + tileGap
+            if x + self.nailSz > self.canvasWidth:
+                x = tileGap / 2
+                y += hmax + tileGap
+                hmax = 0
+
+        # note slice makes a copy which is good because the loop might mutate tilesOrder by deleting holes
+        for tile in self.tilesOrder[i:]:
+            if isinstance(tile, PxTileHole):
+                self.remove_tile(tile, False)
+            else:
+                oldx, oldy = self.canvas.coords(tile.items[0])[:2]
+                tile.move(self.canvas, x - oldx, y - oldy)
+                if tile.h > hmax:
+                    hmax = tile.h
+                bump_position()
+
+        # bump to next row if partial row
+        if x > tileGap:
+            x = self.canvasWidth
+            bump_position()
+        # set scroll region to final height
+        self.canvas.configure(scrollregion=(0, 0, 1, y))
+        self.hTotal = y
 
     # make tile for a picture
     def make_pic_tile(self, ent):
@@ -604,6 +654,10 @@ class Px(LogHelper, WidgetHelper):
             self.add_tile_id(tile)
         if isinstance(tile, PxTilePic):
             self.nPictures += 1
+            # update number of digits, lock in 4 once that number is seen
+            if tile.id and self.numDigits != 4:
+                nd = pic.get_num_digits(tile.parts)
+                self.numDigits = 4 if nd >= 4 else max(nd, self.numDigits)
 
     # add tile ID to collection, check for DUP and OOP errors
     # since tile may not be on canvas, does not redraw text in case of error
@@ -628,8 +682,8 @@ class Px(LogHelper, WidgetHelper):
                     tile.set_error(pic.OOP)
                     self.log_error("Picture out of place: {}".format(tile.name))
 
-    # remove a tile, erase from canvas and replace with hole
-    def remove_tile(self, tile):
+    # remove a tile, erase from canvas and optionally replace with hole
+    def remove_tile(self, tile, makeHole=True):
         if tile.name in self.tilesByName:
             del self.tilesByName[tile.name]
         if tile.id:
@@ -644,7 +698,7 @@ class Px(LogHelper, WidgetHelper):
             # save bounding box for hole
             bbox = self.canvas.bbox(tile.items[0])
             tile.erase(self.canvas)
-            hole = PxTileHole(self.env)
+            hole = PxTileHole(self.env) if makeHole else None
         else:
             hole = None
         try:
@@ -655,7 +709,7 @@ class Px(LogHelper, WidgetHelper):
                 hole.add_to_canvas(self.canvas, bbox)
                 self.canvasItems[hole.items[0]] = hole
             else:
-                # tile was never put in canvas, so delete from order array
+                # no hole so delete from order array
                 del self.tilesOrder[i]
         except ValueError:
             self.log_error("Error removing {}, not in tilesOrder".format(tile.name))

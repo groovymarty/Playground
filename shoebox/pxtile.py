@@ -84,6 +84,10 @@ class PxTile:
             canvas.delete(item)
         self.selected = False
 
+    def move(self, canvas, dx, dy):
+        for item in self.items:
+            canvas.move(item, dx, dy)
+
 class PxTilePic(PxTile):
     def __init__(self, name, photo, env=None):
         super().__init__(name, env)
