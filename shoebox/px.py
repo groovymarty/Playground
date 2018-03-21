@@ -365,10 +365,11 @@ class Px(LogHelper, WidgetHelper):
 
     # select a tile
     def select_tile(self, tile, color):
-        if not color or (tile.selected and tile.selected != color):
-            tile.erase_selected(self.canvas)
-        if color and not tile.selected:
-            tile.draw_selected(self.canvas, color)
+        if not isinstance(tile, PxTileHole):
+            if not color or (tile.selected and tile.selected != color):
+                tile.erase_selected(self.canvas)
+            if color and not tile.selected:
+                tile.draw_selected(self.canvas, color)
 
     # any tiles selected?
     def any_selected(self):
@@ -514,7 +515,6 @@ class Px(LogHelper, WidgetHelper):
         for ent in entries:
             if ent.is_file() and ent.name != "Thumbs.db":
                 if os.path.splitext(ent.name)[1].lower() in pic.pictureExts:
-                    self.nPictures += 1
                     tile = self.make_pic_tile(ent)
                     # update number of digits, lock in 4 once that number is seen
                     if tile.id and self.numDigits != 4:
@@ -602,6 +602,8 @@ class Px(LogHelper, WidgetHelper):
         self.tilesByName[tile.name] = tile
         if tile.id:
             self.add_tile_id(tile)
+        if isinstance(tile, PxTilePic):
+            self.nPictures += 1
 
     # add tile ID to collection, check for DUP and OOP errors
     # since tile may not be on canvas, does not redraw text in case of error
@@ -634,13 +636,27 @@ class Px(LogHelper, WidgetHelper):
             self.remove_tile_id(tile)
         if tile is self.lastTileClicked:
             self.lastTileClicked = None
-        bbox = self.canvas.bbox(tile.items[0])
-        tile.erase(self.canvas)
+        if isinstance(tile, PxTilePic):
+            self.nPictures -= 1
+        if len(tile.items):
+            if tile.items[0] in self.canvasItems:
+                del self.canvasItems[tile.items[0]]
+            # save bounding box for hole
+            bbox = self.canvas.bbox(tile.items[0])
+            tile.erase(self.canvas)
+            hole = PxTileHole(self.env)
+        else:
+            hole = None
         try:
             i = self.tilesOrder.index(tile)
-            hole = PxTileHole(self.env)
-            self.tilesOrder[i] = hole
-            hole.add_to_canvas(self.canvas, bbox)
+            if hole:
+                # put hole in same place in order array
+                self.tilesOrder[i] = hole
+                hole.add_to_canvas(self.canvas, bbox)
+                self.canvasItems[hole.items[0]] = hole
+            else:
+                # tile was never put in canvas, so delete from order array
+                del self.tilesOrder[i]
         except ValueError:
             self.log_error("Error removing {}, not in tilesOrder".format(tile.name))
 
