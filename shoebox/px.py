@@ -216,19 +216,24 @@ class Px(LogHelper, WidgetHelper):
         self.sizeButton.configure(text=pic.nailSizeNames[i])
         self.do_refresh()
 
-    # when Select All/None button clicked
+    # when Select All/Deselect button clicked
     def toggle_select_all(self):
-        if self.any_selected():
+        if self.any_selected(self.curSelectColor):
+            self.select_all(False, self.curSelectColor)
+            self.lastTileClicked = None
+        elif self.any_selected():
             self.select_all(False)
             self.lastTileClicked = None
         else:
             self.select_all(self.curSelectColor)
         self.update_select_button()
 
-    # update Select All/None button
+    # update Select All/Deselect button
     def update_select_button(self):
-        if any(tile.selected for tile in self.tilesOrder):
-            self.selectButton.configure(text="Select None")
+        if self.any_selected(self.curSelectColor):
+            self.selectButton.configure(text="Deselect")
+        elif self.any_selected():
+            self.selectButton.configure(text="Deselect All")
         else:
             self.selectButton.configure(text="Select All")
         s = ttk.Style()
@@ -323,17 +328,21 @@ class Px(LogHelper, WidgetHelper):
             tile = self.canvasItems[items[0]]
             index = self.tilesOrder.index(tile)
             if event.state & 1: #shift
-                # extend selection from last tile clicked (not inclusive) to clicked tile (inclusive)
-                try:
-                    lastClickIndex = self.tilesOrder.index(self.lastTileClicked)
-                except ValueError:
-                    lastClickIndex = 0
-                if index < lastClickIndex:
-                    for i in range(index, lastClickIndex):
-                        self.select_tile(self.tilesOrder[i], self.curSelectColor)
+                if isinstance(tile, PxTileHole):
+                    # shift-clicking a hole deletes holes from there to end
+                    self.reflow(tile, True)
                 else:
-                    for i in range(lastClickIndex+1, index+1):
-                        self.select_tile(self.tilesOrder[i], self.curSelectColor)
+                    # extend selection from last tile clicked (not inclusive) to clicked tile (inclusive)
+                    try:
+                        lastClickIndex = self.tilesOrder.index(self.lastTileClicked)
+                    except ValueError:
+                        lastClickIndex = 0
+                    if index < lastClickIndex:
+                        for i in range(index, lastClickIndex):
+                            self.select_tile(self.tilesOrder[i], self.curSelectColor)
+                    else:
+                        for i in range(lastClickIndex+1, index+1):
+                            self.select_tile(self.tilesOrder[i], self.curSelectColor)
             elif event.state & 4: #control
                 # toggle selection of clicked tile
                 if not tile.selected:
@@ -352,8 +361,8 @@ class Px(LogHelper, WidgetHelper):
             else:
                 # plain click
                 if isinstance(tile, PxTileHole):
-                    # clicking a hole reflows from there to end
-                    self.reflow(tile)
+                    # clicking a hole deletes that hole and following adjacent holes
+                    self.reflow(tile, "leading")
                 elif not tile.selected:
                     self.select_tile(tile, self.curSelectColor)
                 else:
@@ -365,6 +374,33 @@ class Px(LogHelper, WidgetHelper):
             self.update_select_button()
         else:
             self.set_status_default()
+            if not len(items):
+                # clicked outside or between items, insert hole before next item
+                ex = self.canvas.canvasx(event.x)
+                ey = self.canvas.canvasy(event.y)
+                hole = None
+                for index, tile in enumerate(self.tilesOrder):
+                    x, y = self.canvas.coords(tile.items[0])[:2]
+                    if (ex < x and ey >= y and ey < y + tile.h) or ey < y:
+                        # add hole at index
+                        hole = PxTileHole(self.env)
+                        self.add_tile(hole, index)
+                        hole.add_to_canvas(self.canvas, (x, y))
+                        self.add_canvas_item(hole)
+                        self.reflow(hole)
+                        break
+                if hole is None:
+                    # no next item, must have clicked after last item
+                    # add hole at end of canvas
+                    hole = PxTileHole(self.env)
+                    self.add_tile(hole)
+                    # coordinates don't matter because we're about to reflow
+                    # unless hole is the only tile, so set coords for that case
+                    hole.add_to_canvas(self.canvas, (tileGap/2, tileGap/2))
+                    self.add_canvas_item(hole)
+                    if len(self.tilesOrder) > 1:
+                        # reflow starting at hole's predecessor
+                        self.reflow(self.tilesOrder[-2])
 
     # select a tile
     def select_tile(self, tile, color):
@@ -375,17 +411,21 @@ class Px(LogHelper, WidgetHelper):
                 tile.draw_selected(self.canvas, color)
 
     # any tiles selected?
-    def any_selected(self):
-        return any(tile.selected for tile in self.tilesOrder)
+    def any_selected(self, color=None):
+        if color:
+            return any(tile.selected == color for tile in self.tilesOrder)
+        else:
+            return any(tile.selected for tile in self.tilesOrder)
 
     # return number of tiles selected with specified color
     def num_selected(self, color):
         return len([tile for tile in self.tilesOrder if tile.selected == color])
 
     # select/unselect all
-    def select_all(self, color):
+    def select_all(self, color, filterColor=None):
         for tile in self.tilesOrder:
-            self.select_tile(tile, color)
+            if not filterColor or tile.selected == filterColor:
+                self.select_tile(tile, color)
 
     # return current selections
     def save_selections(self):
@@ -524,7 +564,7 @@ class Px(LogHelper, WidgetHelper):
 
                 self.add_tile(tile)
                 tile.add_to_canvas(self.canvas, x, y, self.nailSz)
-                self.canvasItems[tile.items[0]] = tile
+                self.add_canvas_item(tile)
                 if tile.h > hmax:
                     hmax = tile.h
                 bump_position()
@@ -542,9 +582,11 @@ class Px(LogHelper, WidgetHelper):
         self.loaded = True
         self.enable_buttons()
 
-    # reflow starting at specified tile, removing holes
+    # reflow starting at specified tile, optionally removing holes
     # similarity to populate_canvas noted, but trying to factor the similar parts would be too complicated
-    def reflow(self, startTile):
+    # if removeHoles is "leading", removes holes from start tile to first non-hole
+    # otherwise if removeHoles is truthy, remove all holes
+    def reflow(self, startTile, removeHoles=False):
         try:
             i = self.tilesOrder.index(startTile)
         except ValueError:
@@ -575,9 +617,11 @@ class Px(LogHelper, WidgetHelper):
 
         # note slice makes a copy which is good because the loop might mutate tilesOrder by deleting holes
         for tile in self.tilesOrder[i:]:
-            if isinstance(tile, PxTileHole):
+            if removeHoles and isinstance(tile, PxTileHole):
                 self.remove_tile(tile, False)
             else:
+                if removeHoles == "leading":
+                  removeHoles = False
                 oldx, oldy = self.canvas.coords(tile.items[0])[:2]
                 tile.move(self.canvas, x - oldx, y - oldy)
                 if tile.h > hmax:
@@ -647,8 +691,10 @@ class Px(LogHelper, WidgetHelper):
 
     # add a tile
     # since tile may not be on canvas, does not redraw text in case of error
-    def add_tile(self, tile):
-        self.tilesOrder.append(tile)
+    def add_tile(self, tile, index=-1):
+        if index < 0:
+            index = len(self.tilesOrder)
+        self.tilesOrder.insert(index, tile)
         self.tilesByName[tile.name] = tile
         if tile.id:
             self.add_tile_id(tile)
@@ -682,6 +728,10 @@ class Px(LogHelper, WidgetHelper):
                     tile.set_error(pic.OOP)
                     self.log_error("Picture out of place: {}".format(tile.name))
 
+    # add tile to canvas items for click and drop target
+    def add_canvas_item(self, tile):
+        self.canvasItems[tile.items[0]] = tile
+
     # remove a tile, erase from canvas and optionally replace with hole
     def remove_tile(self, tile, makeHole=True):
         if tile.name in self.tilesByName:
@@ -707,7 +757,7 @@ class Px(LogHelper, WidgetHelper):
                 # put hole in same place in order array
                 self.tilesOrder[i] = hole
                 hole.add_to_canvas(self.canvas, bbox)
-                self.canvasItems[hole.items[0]] = hole
+                self.add_canvas_item(hole)
             else:
                 # no hole so delete from order array
                 del self.tilesOrder[i]

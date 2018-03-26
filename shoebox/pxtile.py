@@ -126,6 +126,9 @@ class PxTileHole(PxTile):
         super().__init__("(hole)", env)
 
     def add_to_canvas(self, canvas, bbox):
+        # if only start coordinates given, use file box size
+        if len(bbox) == 2:
+            bbox += bbox[0] + fileBoxSz, bbox[1] + fileBoxSz
         rect = canvas.create_rectangle(*bbox, fill="black", outline="gray", width=1, dash=[2,2])
         self.h0 = bbox[3] - bbox[1]
         self.h = self.h0
