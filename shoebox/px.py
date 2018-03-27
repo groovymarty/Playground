@@ -227,6 +227,7 @@ class Px(LogHelper, WidgetHelper):
         else:
             self.select_all(self.curSelectColor)
         self.update_select_button()
+        self.update_select_status()
 
     # update Select All/Deselect button
     def update_select_button(self):
@@ -238,6 +239,9 @@ class Px(LogHelper, WidgetHelper):
             self.selectButton.configure(text="Select All")
         s = ttk.Style()
         s.configure(self.styleRoot+'.Select.TButton', background=selectColors[self.curSelectColor])
+
+    # update status to say what's selected
+    def update_select_status(self):
         self.set_status("{:d} items selected {}".format(self.num_selected(self.curSelectColor),
                                                         selectColors[self.curSelectColor]))
 
@@ -372,6 +376,10 @@ class Px(LogHelper, WidgetHelper):
             # remember last tile clicked (for shift-click extension)
             self.lastTileClicked = tile
             self.update_select_button()
+            if self.any_selected(self.curSelectColor):
+                self.update_select_status()
+            else:
+                self.set_status_default()
         else:
             self.set_status_default()
             if not len(items):
@@ -379,13 +387,17 @@ class Px(LogHelper, WidgetHelper):
                 # if clicked after last item, add hole at end of canvas
                 ex = self.canvas.canvasx(event.x)
                 ey = self.canvas.canvasy(event.y)
-                index = -1
-                for i, tile in enumerate(self.tilesOrder):
+                insertAtEnd = True
+                for index, tile in enumerate(self.tilesOrder):
                     x, y = self.canvas.coords(tile.items[0])[:2]
-                    if (ex < x and ey >= y and ey < y + tile.h) or ey < y:
-                        index = i
-                        break;
-                self.insert_holes(index, 1)
+                    if (ex < x and ey >= y and ey < y + tile.h):
+                        self.insert_holes(index, 1)
+                        insertAtEnd = False
+                        break
+                    elif ey < y:
+                        insertAtEnd = False
+                if insertAtEnd:
+                    self.insert_holes(-1, 1)
 
     # select a tile
     def select_tile(self, tile, color):
@@ -454,15 +466,16 @@ class Px(LogHelper, WidgetHelper):
             if w != self.canvas:
                 items = [DndItemEnt(DirEntryFile(os.path.join(self.curFolder.path, t.name)))
                          for t in self.dragTiles]
-                accepted = dnd.try_drop(w, items)
+                accepted = dnd.try_drop(w, items, event)
                 nAccepted = 0
                 if accepted:
                     for index, tile in enumerate(self.dragTiles):
                         if accepted is True or index < len(accepted) and accepted[index]:
-                            self.remove_tile(tile)
+                            self.remove_tile(tile, True)
                             nAccepted += 1
                     self.set_status("{:d} of {:d} items accepted by {}".format(nAccepted, len(items),
                                                                                dnd.get_target_name(w)))
+                    self.update_select_button()
                 else:
                     self.set_status("No items accepted")
             else:
@@ -475,26 +488,43 @@ class Px(LogHelper, WidgetHelper):
         self.canvas.configure(cursor="")
 
     # called by dnd, return true if drop accepted (or array of true/false)
-    def receive_drop(self, items):
-        if self.curFolder:
-            entries = []
-            result = []
-            for item in items:
-                accepted = False
-                if isinstance(item, DndItemEnt):
-                    ent = item.thing
-                    try:
-                        newPath = self.move_file_to_cur_folder(ent.path)
-                        entries.append(DirEntryFile(newPath))
-                        accepted = True
-                    except RuntimeError as e:
-                        self.log_error(str(e))
-                result.append(accepted)
-            if len(entries):
-                self.populate_canvas(entries)
-            return result
-        else:
+    def receive_drop(self, items, event):
+        if not self.curFolder:
             return False
+        entries = []
+        result = []
+        for item in items:
+            accepted = False
+            if isinstance(item, DndItemEnt):
+                ent = item.thing
+                try:
+                    newPath = self.move_file_to_cur_folder(ent.path)
+                    entries.append(DirEntryFile(newPath))
+                    accepted = True
+                except RuntimeError as e:
+                    self.log_error(str(e))
+            result.append(accepted)
+
+        if len(entries):
+            targ = self.get_target_tile(event)
+            if isinstance(targ, PxTileHole):
+                self.fill_holes(targ, entries)
+            else:
+                # not dropped onto a hole, add to end
+                self.populate_canvas(entries)
+        return result
+
+    # return target tile for mouse event or None
+    def get_target_tile(self, event):
+        ex = event.x_root - self.canvas.winfo_rootx()
+        ey = event.y_root - self.canvas.winfo_rooty()
+        cx = self.canvas.canvasx(ex)
+        cy = self.canvas.canvasy(ey)
+        hits = self.canvas.find_overlapping(cx, cy, cx + 1, cy + 1)
+        if len(hits) and hits[0] in self.canvasItems:
+            return self.canvasItems[hits[0]]
+        else:
+            return None
 
     # delete all items in canvas
     def clear_canvas(self):
@@ -542,11 +572,7 @@ class Px(LogHelper, WidgetHelper):
         # note i'm not sorting, on my system scandir returns them sorted already
         for ent in entries:
             if ent.is_file() and ent.name != "Thumbs.db":
-                if os.path.splitext(ent.name)[1].lower() in pic.pictureExts:
-                    tile = self.make_pic_tile(ent)
-                else:
-                    tile = self.make_file_tile(ent)
-
+                tile = self.make_tile(ent)
                 self.add_tile(tile)
                 tile.add_to_canvas(self.canvas, x, y, self.nailSz)
                 self.add_canvas_item(tile)
@@ -598,7 +624,7 @@ class Px(LogHelper, WidgetHelper):
         # note slice makes a copy which is good because the loop might mutate tilesOrder by deleting holes
         for tile in self.tilesOrder[index:]:
             if removeHoles and isinstance(tile, PxTileHole):
-                self.remove_tile(tile, False)
+                self.remove_tile(tile)
             else:
                 if removeHoles == 'leading':
                   removeHoles = False
@@ -615,6 +641,13 @@ class Px(LogHelper, WidgetHelper):
         # set scroll region to final height
         self.canvas.configure(scrollregion=(0, 0, 1, y))
         self.hTotal = y
+
+    # make tile based on file extension
+    def make_tile(self, ent):
+        if os.path.splitext(ent.name)[1].lower() in pic.pictureExts:
+            return self.make_pic_tile(ent)
+        else:
+            return self.make_file_tile(ent)
 
     # make tile for a picture
     def make_pic_tile(self, ent):
@@ -713,7 +746,7 @@ class Px(LogHelper, WidgetHelper):
         self.canvasItems[tile.items[0]] = tile
 
     # remove a tile, erase from canvas and optionally replace with hole
-    def remove_tile(self, tile, makeHole=True):
+    def remove_tile(self, tile, makeHole=False):
         if tile.name in self.tilesByName:
             del self.tilesByName[tile.name]
         if tile.id:
@@ -801,6 +834,33 @@ class Px(LogHelper, WidgetHelper):
                 self.add_canvas_item(hole)
             # reflow starting at hole's predecessor
             self.reflow(max(0, len(self.tilesOrder) - n - 1))
+
+    # fill hole(s) with specified files
+    def fill_holes(self, hole, entries):
+        self.clear_error()
+        self.set_status("Loading...")
+        startIndex = self.tilesOrder.index(hole)
+        # make sure there are enough holes
+        nHoles = 0
+        for tile in self.tilesOrder[startIndex:]:
+            if isinstance(tile, PxTileHole):
+                nHoles += 1
+            else:
+                break
+        if nHoles < len(entries):
+            self.insert_holes(startIndex, len(entries) - nHoles)
+        index = startIndex
+        for ent in entries:
+            hole = self.tilesOrder[index]
+            x, y = self.canvas.coords(hole.items[0])[:2]
+            self.remove_tile(hole)
+            tile = self.make_tile(ent)
+            self.add_tile(tile, index)
+            tile.add_to_canvas(self.canvas, x, y, self.nailSz)
+            self.add_canvas_item(tile)
+            index += 1
+        self.reflow(startIndex)
+        self.set_status_default_or_error()
 
     # return highest numbered tile
     def get_highest_num(self):

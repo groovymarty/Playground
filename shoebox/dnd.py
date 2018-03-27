@@ -12,14 +12,14 @@ def remove_target(w):
 def get_target_name(w):
     return targets[w][1] if w in targets else ""
 
-def try_drop(w, items):
+def try_drop(w, items, event):
     if w in targets:
         target, name = targets[w]
         # return True to accept all items
         # return False to reject all items
         # or return array of True/False to accept items individually
         # if array is shorter than items, remaining items are rejected
-        return target.receive_drop(items)
+        return target.receive_drop(items, event)
     else:
         return False
 
