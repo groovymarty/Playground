@@ -330,7 +330,7 @@ class Px(LogHelper, WidgetHelper):
             if event.state & 1: #shift
                 if isinstance(tile, PxTileHole):
                     # shift-clicking a hole deletes holes from there to end
-                    self.reflow(tile, True)
+                    self.reflow(index, True)
                 else:
                     # extend selection from last tile clicked (not inclusive) to clicked tile (inclusive)
                     try:
@@ -362,7 +362,7 @@ class Px(LogHelper, WidgetHelper):
                 # plain click
                 if isinstance(tile, PxTileHole):
                     # clicking a hole deletes that hole and following adjacent holes
-                    self.reflow(tile, "leading")
+                    self.reflow(index, 'leading')
                 elif not tile.selected:
                     self.select_tile(tile, self.curSelectColor)
                 else:
@@ -376,31 +376,16 @@ class Px(LogHelper, WidgetHelper):
             self.set_status_default()
             if not len(items):
                 # clicked outside or between items, insert hole before next item
+                # if clicked after last item, add hole at end of canvas
                 ex = self.canvas.canvasx(event.x)
                 ey = self.canvas.canvasy(event.y)
-                hole = None
-                for index, tile in enumerate(self.tilesOrder):
+                index = -1
+                for i, tile in enumerate(self.tilesOrder):
                     x, y = self.canvas.coords(tile.items[0])[:2]
                     if (ex < x and ey >= y and ey < y + tile.h) or ey < y:
-                        # add hole at index
-                        hole = PxTileHole(self.env)
-                        self.add_tile(hole, index)
-                        hole.add_to_canvas(self.canvas, (x, y))
-                        self.add_canvas_item(hole)
-                        self.reflow(hole)
-                        break
-                if hole is None:
-                    # no next item, must have clicked after last item
-                    # add hole at end of canvas
-                    hole = PxTileHole(self.env)
-                    self.add_tile(hole)
-                    # coordinates don't matter because we're about to reflow
-                    # unless hole is the only tile, so set coords for that case
-                    hole.add_to_canvas(self.canvas, (tileGap/2, tileGap/2))
-                    self.add_canvas_item(hole)
-                    if len(self.tilesOrder) > 1:
-                        # reflow starting at hole's predecessor
-                        self.reflow(self.tilesOrder[-2])
+                        index = i
+                        break;
+                self.insert_holes(index, 1)
 
     # select a tile
     def select_tile(self, tile, color):
@@ -582,22 +567,17 @@ class Px(LogHelper, WidgetHelper):
         self.loaded = True
         self.enable_buttons()
 
-    # reflow starting at specified tile, optionally removing holes
+    # reflow starting at specified index, optionally removing holes
     # similarity to populate_canvas noted, but trying to factor the similar parts would be too complicated
-    # if removeHoles is "leading", removes holes from start tile to first non-hole
+    # if removeHoles is 'leading', removes holes from start tile to first non-hole
     # otherwise if removeHoles is truthy, remove all holes
-    def reflow(self, startTile, removeHoles=False):
-        try:
-            i = self.tilesOrder.index(startTile)
-        except ValueError:
-            self.log_error("Error reflowing from {}, not in tilesOrder".format(startTile.name))
-            return
-
+    def reflow(self, index, removeHoles=False):
         # get cooordinates of start tile
+        startTile = self.tilesOrder[index]
         x, y = self.canvas.coords(startTile.items[0])[:2]
         hmax = startTile.h
         # also look at earlier tiles in same row to find hmax
-        for tile in reversed(self.tilesOrder[:i]):
+        for tile in reversed(self.tilesOrder[:index]):
             tiley = self.canvas.coords(tile.items[0])[1]
             if tiley < y:
                 # prior row, done looking
@@ -616,11 +596,11 @@ class Px(LogHelper, WidgetHelper):
                 hmax = 0
 
         # note slice makes a copy which is good because the loop might mutate tilesOrder by deleting holes
-        for tile in self.tilesOrder[i:]:
+        for tile in self.tilesOrder[index:]:
             if removeHoles and isinstance(tile, PxTileHole):
                 self.remove_tile(tile, False)
             else:
-                if removeHoles == "leading":
+                if removeHoles == 'leading':
                   removeHoles = False
                 oldx, oldy = self.canvas.coords(tile.items[0])[:2]
                 tile.move(self.canvas, x - oldx, y - oldy)
@@ -798,6 +778,29 @@ class Px(LogHelper, WidgetHelper):
         if tile.id:
             self.add_tile_id(tile)
         tile.redraw_text(self.canvas, self.nailSz)
+
+    # insert hole(s) at index
+    def insert_holes(self, index=-1, n=1):
+        if index >= 0:
+            # insert holes(s) before specified tile
+            x, y = self.canvas.coords(self.tilesOrder[index].items[0])[:2]
+            for i in range(0, n):
+                hole = PxTileHole(self.env)
+                self.add_tile(hole, index)
+                hole.add_to_canvas(self.canvas, (x, y))
+                self.add_canvas_item(hole)
+            self.reflow(index)
+        else:
+            # add hole(s) at end of canvas
+            for i in range(0, n):
+                hole = PxTileHole(self.env)
+                self.add_tile(hole)
+                # coordinates don't matter because we're about to reflow
+                # unless canvas was empty, so set coords for that case
+                hole.add_to_canvas(self.canvas, (tileGap / 2, tileGap / 2))
+                self.add_canvas_item(hole)
+            # reflow starting at hole's predecessor
+            self.reflow(max(0, len(self.tilesOrder) - n - 1))
 
     # return highest numbered tile
     def get_highest_num(self):
