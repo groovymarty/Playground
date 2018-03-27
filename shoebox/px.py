@@ -508,7 +508,7 @@ class Px(LogHelper, WidgetHelper):
         if len(entries):
             targ = self.get_target_tile(event)
             if isinstance(targ, PxTileHole):
-                self.fill_holes(targ, entries)
+                self.populate_holes(self.tilesOrder.index(targ), entries)
             else:
                 # not dropped onto a hole, add to end
                 self.populate_canvas(entries)
@@ -592,6 +592,33 @@ class Px(LogHelper, WidgetHelper):
         self.set_status_default_or_error()
         self.loaded = True
         self.enable_buttons()
+
+    # fill hole(s) with specified files
+    # similarity to populate_canvas noted, but trying to factor the similar parts would be too complicated
+    def populate_holes(self, startIndex, entries):
+        self.clear_error()
+        self.set_status("Loading...")
+        # make sure there are enough holes
+        nHoles = 0
+        for tile in self.tilesOrder[startIndex:]:
+            if isinstance(tile, PxTileHole):
+                nHoles += 1
+            else:
+                break
+        if nHoles < len(entries):
+            self.insert_holes(startIndex, len(entries) - nHoles)
+        index = startIndex
+        for ent in entries:
+            hole = self.tilesOrder[index]
+            x, y = self.canvas.coords(hole.items[0])[:2]
+            self.remove_tile(hole)
+            tile = self.make_tile(ent)
+            self.add_tile(tile, index)
+            tile.add_to_canvas(self.canvas, x, y, self.nailSz)
+            self.add_canvas_item(tile)
+            index += 1
+        self.reflow(startIndex)
+        self.set_status_default_or_error()
 
     # reflow starting at specified index, optionally removing holes
     # similarity to populate_canvas noted, but trying to factor the similar parts would be too complicated
@@ -834,33 +861,6 @@ class Px(LogHelper, WidgetHelper):
                 self.add_canvas_item(hole)
             # reflow starting at hole's predecessor
             self.reflow(max(0, len(self.tilesOrder) - n - 1))
-
-    # fill hole(s) with specified files
-    def fill_holes(self, hole, entries):
-        self.clear_error()
-        self.set_status("Loading...")
-        startIndex = self.tilesOrder.index(hole)
-        # make sure there are enough holes
-        nHoles = 0
-        for tile in self.tilesOrder[startIndex:]:
-            if isinstance(tile, PxTileHole):
-                nHoles += 1
-            else:
-                break
-        if nHoles < len(entries):
-            self.insert_holes(startIndex, len(entries) - nHoles)
-        index = startIndex
-        for ent in entries:
-            hole = self.tilesOrder[index]
-            x, y = self.canvas.coords(hole.items[0])[:2]
-            self.remove_tile(hole)
-            tile = self.make_tile(ent)
-            self.add_tile(tile, index)
-            tile.add_to_canvas(self.canvas, x, y, self.nailSz)
-            self.add_canvas_item(tile)
-            index += 1
-        self.reflow(startIndex)
-        self.set_status_default_or_error()
 
     # return highest numbered tile
     def get_highest_num(self):
