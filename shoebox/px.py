@@ -381,23 +381,29 @@ class Px(LogHelper, WidgetHelper):
             else:
                 self.set_status_default()
         else:
-            self.set_status_default()
             if not len(items):
                 # clicked outside or between items, insert hole before next item
                 # if clicked after last item, add hole at end of canvas
                 ex = self.canvas.canvasx(event.x)
                 ey = self.canvas.canvasy(event.y)
+                holeAdded = False
                 insertAtEnd = True
                 for index, tile in enumerate(self.tilesOrder):
                     x, y = self.canvas.coords(tile.items[0])[:2]
                     if (ex < x and ey >= y and ey < y + tile.h):
                         self.insert_holes(index, 1)
+                        holeAdded = True
                         insertAtEnd = False
                         break
                     elif ey < y:
                         insertAtEnd = False
                 if insertAtEnd:
                     self.insert_holes(-1, 1)
+                    holeAdded = True
+                if holeAdded:
+                    self.set_status("Hole added")
+                else:
+                    self.set_status_default()
 
     # select a tile
     def select_tile(self, tile, color):
@@ -464,6 +470,7 @@ class Px(LogHelper, WidgetHelper):
         if self.dragging:
             w = self.top.winfo_containing(event.x_root, event.y_root)
             if w != self.canvas:
+                # dnd to a different window
                 items = [DndItemEnt(DirEntryFile(os.path.join(self.curFolder.path, t.name)))
                          for t in self.dragTiles]
                 accepted = dnd.try_drop(w, items, event)
@@ -479,7 +486,30 @@ class Px(LogHelper, WidgetHelper):
                 else:
                     self.set_status("No items accepted")
             else:
-                self.set_status_default()
+                # dnd within same window
+                targ = self.get_target_tile(event)
+                if isinstance(targ, PxTileHole):
+                    toIndex = self.tilesOrder.index(targ)
+                    minIndex = toIndex
+                    # make sure there are enough holes
+                    nHoles = self.count_holes(toIndex)
+                    if nHoles < len(self.dragTiles):
+                        self.insert_holes(toIndex, len(self.dragTiles) - nHoles)
+                    # swap dragged tiles and holes
+                    for tile in self.dragTiles:
+                        fromIndex = self.tilesOrder.index(tile)
+                        minIndex = min(minIndex, fromIndex)
+                        hole = self.tilesOrder[toIndex]
+                        self.tilesOrder[fromIndex] = hole
+                        self.tilesOrder[toIndex] = tile
+                        toIndex += 1
+                    # reflow the affected tiles
+                    # must go back one because tiles we moved have invalid coordinates
+                    # ok if start index goes to -1, will reflow all tiles
+                    self.reflow(minIndex-1)
+                    self.set_status("{:d} items moved".format(len(self.dragTiles)))
+                else:
+                    self.set_status_default()
 
         self.dragging = False
         self.dragStart = None
@@ -599,12 +629,7 @@ class Px(LogHelper, WidgetHelper):
         self.clear_error()
         self.set_status("Loading...")
         # make sure there are enough holes
-        nHoles = 0
-        for tile in self.tilesOrder[startIndex:]:
-            if isinstance(tile, PxTileHole):
-                nHoles += 1
-            else:
-                break
+        nHoles = self.count_holes(startIndex)
         if nHoles < len(entries):
             self.insert_holes(startIndex, len(entries) - nHoles)
         index = startIndex
@@ -624,19 +649,28 @@ class Px(LogHelper, WidgetHelper):
     # similarity to populate_canvas noted, but trying to factor the similar parts would be too complicated
     # if removeHoles is 'leading', removes holes from start tile to first non-hole
     # otherwise if removeHoles is truthy, remove all holes
-    def reflow(self, index, removeHoles=False):
-        # get cooordinates of start tile
-        startTile = self.tilesOrder[index]
-        x, y = self.canvas.coords(startTile.items[0])[:2]
-        hmax = startTile.h
-        # also look at earlier tiles in same row to find hmax
-        for tile in reversed(self.tilesOrder[:index]):
-            tiley = self.canvas.coords(tile.items[0])[1]
-            if tiley < y:
-                # prior row, done looking
-                break
-            elif tile.h > hmax:
-                hmax = tile.h
+    # assumes starting tile has valid coordinates; from then on coordinates don't matter
+    # if index < 0 reflow entire canvas; all coordinates will be recomputed
+    def reflow(self, index=-1, removeHoles=False):
+        # get coordinates of start tile
+        if index >= 0 and index < len(self.tilesOrder):
+            startTile = self.tilesOrder[index]
+            x, y = self.canvas.coords(startTile.items[0])[:2]
+            hmax = startTile.h
+            # also look at earlier tiles in same row to find hmax
+            for tile in reversed(self.tilesOrder[:index]):
+                tiley = self.canvas.coords(tile.items[0])[1]
+                if tiley < y:
+                    # prior row, done looking
+                    break
+                elif tile.h > hmax:
+                    hmax = tile.h
+        else:
+            # reflow entire canvas
+            index = 0
+            x = tileGap / 2
+            y = tileGap / 2
+            hmax = 0
 
         # bump start position for next tile,
         # possibly bump to next row
@@ -839,6 +873,16 @@ class Px(LogHelper, WidgetHelper):
             self.add_tile_id(tile)
         tile.redraw_text(self.canvas, self.nailSz)
 
+    # count holes
+    def count_holes(self, index):
+        nHoles = 0
+        for tile in self.tilesOrder[index:]:
+            if isinstance(tile, PxTileHole):
+                nHoles += 1
+            else:
+                break
+        return nHoles
+
     # insert hole(s) at index
     def insert_holes(self, index=-1, n=1):
         if index >= 0:
@@ -856,11 +900,11 @@ class Px(LogHelper, WidgetHelper):
                 hole = PxTileHole(self.env)
                 self.add_tile(hole)
                 # coordinates don't matter because we're about to reflow
-                # unless canvas was empty, so set coords for that case
-                hole.add_to_canvas(self.canvas, (tileGap / 2, tileGap / 2))
+                hole.add_to_canvas(self.canvas, (0, 0))
                 self.add_canvas_item(hole)
-            # reflow starting at hole's predecessor
-            self.reflow(max(0, len(self.tilesOrder) - n - 1))
+            # reflow starting at predecessor of added holes
+            # ok if start index goes to -1, will reflow all tiles
+            self.reflow(len(self.tilesOrder) - n - 1)
 
     # return highest numbered tile
     def get_highest_num(self):
