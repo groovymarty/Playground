@@ -12,6 +12,7 @@ nailSizeNames = ["Small", "Large"]
 # error bits
 DUP = 0x01  #duplicate
 OOP = 0x02  #out of place
+OOO = 0x04  #out of order
 
 # max picture number, for sorting
 MAXNUM = 9999999

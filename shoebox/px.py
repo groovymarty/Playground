@@ -315,6 +315,7 @@ class Px(LogHelper, WidgetHelper):
             self.curFolder = self.treeItems[sel[0]]
             self.top.title("{} - {}".format(self.pxName, self.curFolder.path[2:]))
             self.clear_canvas()
+            self.update_select_button()
             self.populate_canvas(os.scandir(self.curFolder.path))
 
     # when user resizes the window
@@ -508,6 +509,9 @@ class Px(LogHelper, WidgetHelper):
                     # ok if start index goes to -1, will reflow all tiles
                     self.reflow(minIndex-1)
                     self.set_status("{:d} items moved".format(len(self.dragTiles)))
+                    # deselect after drag and drop
+                    self.select_all(None, self.curSelectColor)
+                    self.update_select_button()
                 else:
                     self.set_status_default()
 
@@ -576,6 +580,7 @@ class Px(LogHelper, WidgetHelper):
         self.set_status("Loading...")
         self.nails = None
         self.nailsTried = False
+        prevLen = len(self.tilesOrder)
 
         # bump start position for next tile,
         # possibly bump to next row
@@ -622,6 +627,8 @@ class Px(LogHelper, WidgetHelper):
         self.set_status_default_or_error()
         self.loaded = True
         self.enable_buttons()
+        # check tiles just added for OOO errors
+        self.check_out_of_order(self.expand_range_by_one_correct_num((prevLen, len(self.tilesOrder))))
 
     # fill hole(s) with specified files
     # similarity to populate_canvas noted, but trying to factor the similar parts would be too complicated
@@ -991,7 +998,7 @@ class Px(LogHelper, WidgetHelper):
         for tile in tilesToDo:
             junk, comment, ext = pic.parse_noncanon(tile.name)
             lumps = [folderId]
-            if self.numDigits < 4:
+            if self.numDigits == 3:
                 lumps.append("{:03d}".format(num))
             else:
                 lumps.append("{:04d}".format(num))
@@ -1032,6 +1039,59 @@ class Px(LogHelper, WidgetHelper):
                 self.set_status("{:d} files changed".format(nChanged))
             else:
                 self.set_status("No files selected")
+
+    # expand range to include one more correctly numbered tile at beginning and end
+    def expand_range_by_one_correct_num(self, startEnd):
+        startIndex, endIndex = startEnd
+        if startIndex > 0:
+            try:
+                startIndex = next(i for i, t in enumerate(reversed(self.tilesOrder[:startIndex-1]))
+                                        if t.id and not t.errors)
+            except StopIteration:
+                pass
+        if endIndex < len(self.tilesOrder):
+            try:
+                endIndex = next(i for i, t in enumerate(self.tilesOrder[endIndex])
+                                      if t.id and not t.errors)
+            except StopIteration:
+                pass
+        return startIndex, endIndex
+
+    # check range of tiles for OOO error
+    # assume first and last tiles are in correct order, unless they conflict with each other
+    # in which case first tile is deemed correct
+    def check_out_of_order(self, startEnd):
+        startIndex, endIndex = startEnd
+        # clear all OOO error bits
+        for tile in self.tilesOrder[startIndex:endIndex]:
+            tile.clear_error(pic.OOO)
+            tile.redraw_text(self.canvas, self.nailSz) #TODO
+            #TODO look for changes and update at end, in case already marked OOO and still OOO
+            #TODO also log error when OOO found, change detection good for this too
+        # get tiles to consider -- only tiles with numbers and no other errors
+        tiles = [t for t in self.tilesOrder[startIndex:endIndex]
+                       if t.id and not t.errors]
+        # we must reduce size of tiles array in each pass of each loop or it will hang
+        while len(tiles) > 2:
+            # pass over correct tiles at start of range
+            while len(tiles) > 2 and tiles[0].parts.num < tiles[1].parts.num and \
+                                     tiles[1].parts.num < tiles[-1].parts.num:
+                del tiles[0]
+            # pass over correct tiles at end of range
+            while len(tiles) > 2 and tiles[0].parts.num < tiles[-2].parts.num and \
+                                     tiles[-2].parts.num < tiles[-1].parts.num:
+                del tiles[-1]
+            # assume first is correct, so second must be out of order
+            # note it could be out of order with respect to last, such as 1 10 2
+            if len(tiles) > 2:
+                tiles[1].set_error(pic.OOO)
+                tiles[1].redraw_text(self.canvas, self.nailSz) #TODO
+                del tiles[1]
+        # we're down to 2 or fewer tiles
+        if len(tiles) == 2 and tiles[1].parts.num < tiles[0].parts.num:
+            # assume first one is correct
+            tiles[1].set_error(pic.OOO)
+            tiles[1].redraw_text(self.canvas, self.nailSz) #TODO
 
     # rename file in current folder, return new path
     def rename_file_in_cur_folder(self, oldName, newName):
