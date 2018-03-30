@@ -477,13 +477,15 @@ class Px(LogHelper, WidgetHelper):
                 accepted = dnd.try_drop(w, items, event)
                 nAccepted = 0
                 if accepted:
-                    for index, tile in enumerate(self.dragTiles):
-                        if accepted is True or index < len(accepted) and accepted[index]:
+                    for i, tile in enumerate(self.dragTiles):
+                        if accepted is True or i < len(accepted) and accepted[i]:
                             self.remove_tile(tile, True)
                             nAccepted += 1
                     self.set_status("{:d} of {:d} items accepted by {}".format(nAccepted, len(items),
                                                                                dnd.get_target_name(w)))
                     self.update_select_button()
+                    if nAccepted:
+                        self.sweep_out_of_order()
                 else:
                     self.set_status("No items accepted")
             else:
@@ -491,6 +493,7 @@ class Px(LogHelper, WidgetHelper):
                 targ = self.get_target_tile(event)
                 if isinstance(targ, PxTileHole):
                     toIndex = self.tilesOrder.index(targ)
+                    toIndexStart = toIndex
                     minIndex = toIndex
                     # make sure there are enough holes
                     nHoles = self.count_holes(toIndex)
@@ -512,6 +515,9 @@ class Px(LogHelper, WidgetHelper):
                     # deselect after drag and drop
                     self.select_all(None, self.curSelectColor)
                     self.update_select_button()
+                    # check tiles just moved for OOO errors
+                    self.check_out_of_order(toIndexStart, toIndex)
+                    self.sweep_out_of_order()
                 else:
                     self.set_status_default()
 
@@ -628,13 +634,14 @@ class Px(LogHelper, WidgetHelper):
         self.loaded = True
         self.enable_buttons()
         # check tiles just added for OOO errors
-        self.check_out_of_order(self.expand_range_by_one_numbered((prevLen, len(self.tilesOrder))))
+        self.check_out_of_order(prevLen, len(self.tilesOrder))
 
     # fill hole(s) with specified files
     # similarity to populate_canvas noted, but trying to factor the similar parts would be too complicated
     def populate_holes(self, startIndex, entries):
         self.clear_error()
         self.set_status("Loading...")
+        prevLen = len(self.tilesOrder)
         # make sure there are enough holes
         nHoles = self.count_holes(startIndex)
         if nHoles < len(entries):
@@ -651,6 +658,8 @@ class Px(LogHelper, WidgetHelper):
             index += 1
         self.reflow(startIndex)
         self.set_status_default_or_error()
+        # check tiles just added for OOO errors
+        self.check_out_of_order(prevLen, len(self.tilesOrder))
 
     # reflow starting at specified index, optionally removing holes
     # similarity to populate_canvas noted, but trying to factor the similar parts would be too complicated
@@ -1040,23 +1049,6 @@ class Px(LogHelper, WidgetHelper):
             else:
                 self.set_status("No files selected")
 
-    # expand range to include one more numbered tile at beginning and end
-    def expand_range_by_one_numbered(self, startEnd):
-        startIndex, endIndex = startEnd
-        if startIndex > 0:
-            try:
-                startIndex = next(i for i, t in enumerate(reversed(self.tilesOrder[:startIndex-1]))
-                                        if t.is_numbered())
-            except StopIteration:
-                pass
-        if endIndex < len(self.tilesOrder):
-            try:
-                endIndex = next(i for i, t in enumerate(self.tilesOrder[endIndex])
-                                      if t.is_numbered())
-            except StopIteration:
-                pass
-        return startIndex, endIndex
-
     # set out-of-order error for specified tile and redraw text
     def set_tile_out_of_order(self, tile):
         if not tile.is_error(pic.OOO):
@@ -1071,22 +1063,27 @@ class Px(LogHelper, WidgetHelper):
             tile.redraw_text(self.canvas, self.nailSz)
 
     # check range of tiles for OOO error
-    # assume first and last tiles are in correct order, unless they conflict with each other
-    # in which case first tile is deemed correct
-    def check_out_of_order(self, startEnd):
-        startIndex, endIndex = startEnd
+    def check_out_of_order(self, startIndex, endIndex):
+        # anchor the range to existing numbered tiles by expanding it by one at each end
+        while startIndex > 0:
+            startIndex -= 1
+            if self.tilesOrder[startIndex].is_numbered():
+                break
+        while endIndex < len(self.tilesOrder):
+            endIndex += 1
+            if self.tilesOrder[endIndex-1].is_numbered():
+                break
         # find first numbered tile at start of range
         # it is deemed correct by definition
-        # note we clear OOO for all unnumbered tiles we encounter along the way
         while startIndex < endIndex:
             startTile = self.tilesOrder[startIndex]
             startIndex += 1
-            self.clear_tile_out_of_order(startTile)
             if startTile.is_numbered():
+                self.clear_tile_out_of_order(startTile)
                 startNum = startTile.parts.num
                 break
-        # find last correctly numbered tile at end of range
-        # by correctly numbered we mean greater than startNum
+        # find last numbered tile at end of range that's greater than startNum
+        # it is deemed correct also (other numbered tiles we pass on the way are OOO)
         while startIndex < endIndex:
             endTile = self.tilesOrder[endIndex-1]
             endIndex -= 1
@@ -1097,9 +1094,6 @@ class Px(LogHelper, WidgetHelper):
                     break
                 else:
                     self.set_tile_out_of_order(endTile)
-            else:
-                # not numbered, clear OOO error
-                self.clear_tile_out_of_order(endTile)
         # now test the remaining tiles
         # they must ascend from startNum but cannot exceed endNum
         lastNum = startNum
@@ -1110,8 +1104,29 @@ class Px(LogHelper, WidgetHelper):
                     lastNum = tile.parts.num
                 else:
                     self.set_tile_out_of_order(tile)
+
+    # sweep all tiles and clear OOO errors that are no longer true
+    # do this when tiles have been moved or removed, possibly fixing OOO errors
+    # rely on above function to set OOO errors in the local context of moved or added tiles
+    # this function also clears any stray OOO errors on unnumbered tiles
+    def sweep_out_of_order(self):
+        startNum = 0
+        tilesToCheck = []
+        def check_these(tiles, endNum):
+            for tile in tiles:
+                if tile.parts.num > startNum and tile.parts.num < endNum:
+                    self.clear_tile_out_of_order(tile)
+
+        for tile in self.tilesOrder:
+            if tile.is_numbered():
+                if tile.is_error(pic.OOO):
+                    tilesToCheck.append(tile)
+                else:
+                    if len(tilesToCheck):
+                        check_these(tilesToCheck, tile.parts.num)
+                        tilesToCheck = []
+                    startNum = tile.parts.num
             else:
-                # not numbered, clear OOO error
                 self.clear_tile_out_of_order(tile)
 
     # rename file in current folder, return new path
