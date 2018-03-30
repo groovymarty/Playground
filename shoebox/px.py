@@ -628,7 +628,7 @@ class Px(LogHelper, WidgetHelper):
         self.loaded = True
         self.enable_buttons()
         # check tiles just added for OOO errors
-        self.check_out_of_order(self.expand_range_by_one_correct_num((prevLen, len(self.tilesOrder))))
+        self.check_out_of_order(self.expand_range_by_one_numbered((prevLen, len(self.tilesOrder))))
 
     # fill hole(s) with specified files
     # similarity to populate_canvas noted, but trying to factor the similar parts would be too complicated
@@ -1040,58 +1040,79 @@ class Px(LogHelper, WidgetHelper):
             else:
                 self.set_status("No files selected")
 
-    # expand range to include one more correctly numbered tile at beginning and end
-    def expand_range_by_one_correct_num(self, startEnd):
+    # expand range to include one more numbered tile at beginning and end
+    def expand_range_by_one_numbered(self, startEnd):
         startIndex, endIndex = startEnd
         if startIndex > 0:
             try:
                 startIndex = next(i for i, t in enumerate(reversed(self.tilesOrder[:startIndex-1]))
-                                        if t.id and not t.errors)
+                                        if t.is_numbered())
             except StopIteration:
                 pass
         if endIndex < len(self.tilesOrder):
             try:
                 endIndex = next(i for i, t in enumerate(self.tilesOrder[endIndex])
-                                      if t.id and not t.errors)
+                                      if t.is_numbered())
             except StopIteration:
                 pass
         return startIndex, endIndex
+
+    # set out-of-order error for specified tile and redraw text
+    def set_tile_out_of_order(self, tile):
+        if not tile.is_error(pic.OOO):
+            tile.set_error(pic.OOO)
+            tile.redraw_text(self.canvas, self.nailSz)
+            self.log_error("Out of order: {}".format(tile.name))
+
+    # clear out-of-order bit for specified tile and redraw text
+    def clear_tile_out_of_order(self, tile):
+        if tile.is_error(pic.OOO):
+            tile.clear_error(pic.OOO)
+            tile.redraw_text(self.canvas, self.nailSz)
 
     # check range of tiles for OOO error
     # assume first and last tiles are in correct order, unless they conflict with each other
     # in which case first tile is deemed correct
     def check_out_of_order(self, startEnd):
         startIndex, endIndex = startEnd
-        # clear all OOO error bits
+        # find first numbered tile at start of range
+        # it is deemed correct by definition
+        # note we clear OOO for all unnumbered tiles we encounter along the way
+        while startIndex < endIndex:
+            startTile = self.tilesOrder[startIndex]
+            startIndex += 1
+            self.clear_tile_out_of_order(startTile)
+            if startTile.is_numbered():
+                startNum = startTile.parts.num
+                break
+        # find last correctly numbered tile at end of range
+        # by correctly numbered we mean greater than startNum
+        while startIndex < endIndex:
+            endTile = self.tilesOrder[endIndex-1]
+            endIndex -= 1
+            if endTile.is_numbered():
+                if endTile.parts.num > startNum:
+                    self.clear_tile_out_of_order(endTile)
+                    endNum = endTile.parts.num
+                    break
+                else:
+                    self.set_tile_out_of_order(endTile)
+            else:
+                # not numbered, clear OOO error
+                self.clear_tile_out_of_order(endTile)
+        # now test the remaining tiles
+        # they must ascend from startNum but cannot exceed endNum
+        lastNum = startNum
         for tile in self.tilesOrder[startIndex:endIndex]:
-            tile.clear_error(pic.OOO)
-            tile.redraw_text(self.canvas, self.nailSz) #TODO
-            #TODO look for changes and update at end, in case already marked OOO and still OOO
-            #TODO also log error when OOO found, change detection good for this too
-        # get tiles to consider -- only tiles with numbers and no other errors
-        tiles = [t for t in self.tilesOrder[startIndex:endIndex]
-                       if t.id and not t.errors]
-        # we must reduce size of tiles array in each pass of each loop or it will hang
-        while len(tiles) > 2:
-            # pass over correct tiles at start of range
-            while len(tiles) > 2 and tiles[0].parts.num < tiles[1].parts.num and \
-                                     tiles[1].parts.num < tiles[-1].parts.num:
-                del tiles[0]
-            # pass over correct tiles at end of range
-            while len(tiles) > 2 and tiles[0].parts.num < tiles[-2].parts.num and \
-                                     tiles[-2].parts.num < tiles[-1].parts.num:
-                del tiles[-1]
-            # assume first is correct, so second must be out of order
-            # note it could be out of order with respect to last, such as 1 10 2
-            if len(tiles) > 2:
-                tiles[1].set_error(pic.OOO)
-                tiles[1].redraw_text(self.canvas, self.nailSz) #TODO
-                del tiles[1]
-        # we're down to 2 or fewer tiles
-        if len(tiles) == 2 and tiles[1].parts.num < tiles[0].parts.num:
-            # assume first one is correct
-            tiles[1].set_error(pic.OOO)
-            tiles[1].redraw_text(self.canvas, self.nailSz) #TODO
+            if tile.is_numbered():
+                if tile.parts.num > lastNum and tile.parts.num < endNum:
+                    self.clear_tile_out_of_order(tile)
+                    lastNum = tile.parts.num
+                else:
+                    self.set_tile_out_of_order(tile)
+            else:
+                # not numbered, clear OOO error
+                self.clear_tile_out_of_order(tile)
 
     # rename file in current folder, return new path
     def rename_file_in_cur_folder(self, oldName, newName):
