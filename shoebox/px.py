@@ -48,6 +48,8 @@ class Px(LogHelper, WidgetHelper):
         self.numButton.pack(side=LEFT)
         self.unnumButton = ttk.Button(self.topBar, text="Unnum", command=self.do_unnum)
         self.unnumButton.pack(side=LEFT)
+        self.sortButton = ttk.Button(self.topBar, text="Sort", command=self.do_sort)
+        self.sortButton.pack(side=LEFT)
         self.nailerButton = ttk.Button(self.topBar, text="Nailer", command=self.do_nailer)
         self.nailerButton.pack(side=RIGHT)
         self.enable_buttons(False)
@@ -263,6 +265,7 @@ class Px(LogHelper, WidgetHelper):
         self.enable_widget(self.selectButton, enable)
         self.enable_widget(self.numButton, enable)
         self.enable_widget(self.unnumButton, enable)
+        self.enable_widget(self.sortButton, enable)
         self.enable_widget(self.nailerButton, enable)
 
     # populate tree
@@ -1049,6 +1052,22 @@ class Px(LogHelper, WidgetHelper):
             else:
                 self.set_status("No files selected")
 
+    # sort tiles by number
+    def do_sort(self):
+        self.clear_error()
+        # pull out the numbered tiles into a separate array
+        a = [t for t in self.tilesOrder if t.is_numbered()]
+        # sort them by number
+        a.sort(key=lambda t: t.parts.num)
+        # weave in the sorted tiles with the unnumbered ones in their original order
+        it = iter(a)
+        self.tilesOrder = [next(it) if t.is_numbered() else t for t in self.tilesOrder]
+        # repaint canvas with the new order
+        self.reflow()
+        # clear OOO error flags
+        self.sweep_out_of_order()
+        self.set_status_default()
+
     # set out-of-order error for specified tile and redraw text
     def set_tile_out_of_order(self, tile):
         if not tile.is_error(pic.OOO):
@@ -1128,6 +1147,8 @@ class Px(LogHelper, WidgetHelper):
                     startNum = tile.parts.num
             else:
                 self.clear_tile_out_of_order(tile)
+        if len(tilesToCheck):
+            check_these(tilesToCheck, pic.MAXNUM)
 
     # rename file in current folder, return new path
     def rename_file_in_cur_folder(self, oldName, newName):
