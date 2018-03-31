@@ -9,19 +9,25 @@ touchCount = 0
 
 def get_nails(folderPath, sz, env=None):
     global cacheCount, touchCount
-    key = (folderPath, sz)
-    if key in cache:
-        nails = cache[key]
+    if sz not in cache:
+        cache[sz] = {}
+    if folderPath in cache[sz]:
+        nails = cache[sz][folderPath]
     else:
         nails = Nails(read_nails(folderPath, sz))
         environ.log_info(env, "Adding '{}' sz={:d} to nail cache, n={}".format(folderPath, sz, cacheCount))
-        cache[key] = nails
+        cache[sz][folderPath] = nails
         cacheCount += 1
 
     # touch for LRU algorithm
     nails.touch(touchCount)
     touchCount += 1
     return nails
+
+def invalidate_nails(folderPath, env=None):
+    for sz in cache:
+        if folderPath in cache[sz]:
+            del cache[sz][folderPath]
 
 looseCache = {}
 looseCount = 0

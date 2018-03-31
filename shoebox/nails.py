@@ -56,6 +56,13 @@ def read_nails(folderPath, sz):
         pngBytes = f.read()
     return (indx, pngBytes)
 
+def delete_nails(folderPath, sz):
+    path = os.path.join(folderPath, build_file_name(sz))
+    try:
+        os.remove(path)
+    except FileNotFoundError:
+        pass
+
 class Nails:
     def __init__(self, indxAndBytes):
         (self.indx, self.buf) = indxAndBytes

@@ -5,7 +5,7 @@ from tkinter import *
 from tkinter import ttk
 from PIL import Image
 import ImageTk
-from shoebox import pic, nailcache, dnd
+from shoebox import pic, nails, nailcache, dnd
 from shoebox.dnd import DndItemEnt
 from shoebox.nailer import Nailer
 from shoebox.pxfolder import PxFolder
@@ -580,6 +580,8 @@ class Px(LogHelper, WidgetHelper):
         self.curSelectColor = 1
         self.nPictures = 0
         self.hTotal = tileGap / 2
+        self.nails = None
+        self.nailsTried = False
 
     # add specified pictures to canvas
     # argument is return value from scandir() or equivalent
@@ -587,8 +589,6 @@ class Px(LogHelper, WidgetHelper):
         self.canvas.configure(background="black")
         self.clear_error()
         self.set_status("Loading...")
-        self.nails = None
-        self.nailsTried = False
         prevLen = len(self.tilesOrder)
 
         # bump start position for next tile,
@@ -1083,6 +1083,7 @@ class Px(LogHelper, WidgetHelper):
 
     # check range of tiles for OOO error
     def check_out_of_order(self, startIndex, endIndex):
+        startNum = 0
         # anchor the range to existing numbered tiles by expanding it by one at each end
         while startIndex > 0:
             startIndex -= 1
@@ -1115,12 +1116,12 @@ class Px(LogHelper, WidgetHelper):
                     self.set_tile_out_of_order(endTile)
         # now test the remaining tiles
         # they must ascend from startNum but cannot exceed endNum
-        lastNum = startNum
+        priorNum = startNum
         for tile in self.tilesOrder[startIndex:endIndex]:
             if tile.is_numbered():
-                if tile.parts.num > lastNum and tile.parts.num < endNum:
+                if tile.parts.num > priorNum and tile.parts.num < endNum:
                     self.clear_tile_out_of_order(tile)
-                    lastNum = tile.parts.num
+                    priorNum = tile.parts.num
                 else:
                     self.set_tile_out_of_order(tile)
 
@@ -1158,6 +1159,15 @@ class Px(LogHelper, WidgetHelper):
         try:
             shutil.move(oldPath, newPath)
             nailcache.change_loose_file(oldPath, newPath)
+            # TEMP heavy-handed way for now
+            self.nails = None
+            self.nailsTried = True
+            nailcache.invalidate_nails(self.curFolder.path)
+            for sz in pic.nailSizes:
+                nails.delete_nails(self.curFolder.path, sz)
+                name = nails.build_file_name(sz)
+                if name in self.tilesByName:
+                    self.remove_tile(self.tilesByName[name], True)
             return newPath
         except BaseException as e:
             raise RuntimeError("Rename failed for {}: {}".format(oldPath, str(e)))
