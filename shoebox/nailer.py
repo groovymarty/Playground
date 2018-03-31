@@ -6,10 +6,18 @@ from tkinter import ttk, filedialog
 from tkit.widgetgarden import WidgetGarden
 from shoebox import pic, nails
 from PIL import Image
+from datetime import datetime
 
 instances = []
 nextInstNum = 1
 delayMs = 15
+
+def printdelta(tstart, what):
+    tnow = datetime.now()
+    delta = tnow - tstart
+    if (delta.seconds or delta.microseconds > 10000):
+        print("{:02d}.{:06d} {}".format(delta.seconds, delta.microseconds, what))
+    return tnow
 
 class Nailer:
     def __init__(self, path):
@@ -23,7 +31,7 @@ class Nailer:
         instances.append(self)
 
         self.garden = WidgetGarden()
-        self.garden.labelText = {'path': "Starting Path:", 'recursive': "Recursive"}
+        self.garden.labelText = {'path': "Starting Path:", 'recursive': "Recursive", 'fast': "Fast"}
         self.garden.begin_layout(self.top, 3)
         self.top.grid_columnconfigure(1, weight=1)
         self.garden.make_entry('path')
@@ -32,6 +40,9 @@ class Nailer:
         self.garden.next_row()
         self.garden.next_col()
         self.garden.make_checkbutton('recursive')
+        self.garden.next_row()
+        self.garden.next_col()
+        self.garden.make_checkbutton('fast')
         self.garden.next_row()
         self.garden.next_col()
         self.startButton = ttk.Button(self.garden.curParent, text="Start", command=self.do_start)
@@ -62,6 +73,8 @@ class Nailer:
         self.garden.write_var('path', self.absPath)
         self.recursive = True
         self.garden.write_var('recursive', self.recursive)
+        self.fast = False
+        self.garden.write_var('fast', self.fast)
         self.foldersToScan = None
         self.curScan = None
         self.curEnt = None
@@ -72,6 +85,7 @@ class Nailer:
         self.bufs = []
         self.nFolders = 0
         self.nPictures = 0
+        self.tstart = None
 
     # called when my top-level window is closed
     # this is the easiest and most common way to destroy Nailer,
@@ -103,11 +117,16 @@ class Nailer:
             self.absPath = newDir
             self.garden.write_var('path', self.absPath)
 
+    # return delay in milliseconds
+    def get_delay_ms(self):
+        return 0 if self.fast else delayMs
+
     # when start button is clicked
     def do_start(self):
         self.disable_widgets()
         self.absPath = self.garden.read_var('path')
         self.recursive = self.garden.read_var('recursive')
+        self.fast = self.garden.read_var('fast')
         self.foldersToScan = [self.absPath]
         self.curFolder = None
         self.curScan = None
@@ -118,7 +137,8 @@ class Nailer:
         self.nFolders = 0
         self.nPictures = 0
         self.update_totals()
-        self.top.after(delayMs, self.do_next)
+        self.tstart = datetime.now()
+        self.top.after(self.get_delay_ms(), self.do_next)
 
     # when stop button clicked
     def do_stop(self):
@@ -171,7 +191,7 @@ class Nailer:
                     self.curImage = None
                     break
         # that's all for now, come back soon
-        self.top.after(delayMs, self.do_next)
+        self.top.after(self.get_delay_ms(), self.do_next)
 
     # update totals
     def update_totals(self):
@@ -187,27 +207,39 @@ class Nailer:
 
     # process one picture, one size
     def do_picture(self):
+        #tstart = datetime.now()
         (indx, buf) = self.bufs[self.curSzIndx]
         sz = pic.nailSizes[self.curSzIndx]
         # open and read picture file (this is expensive because pic files are a couple GB or larger)
         if self.curImage is None:
             im = Image.open(self.curEnt.path)
+            #tstart = printdelta(tstart, "open and read")
+
             # thumbnails don't contain EXIF information so correct the image orientation now
             self.curImage = pic.fix_image_orientation(im)
+            #tstart = printdelta(tstart, "fix orientation")
+
         # make a copy (except last time) because thumbnail() modifies the image
         if self.curSzIndx < len(pic.nailSizes)-1:
             imCopy = self.curImage.copy()
+            #tstart = printdelta(tstart, "make copy")
         else:
             imCopy = self.curImage
 
         # make thumbnail of desired size
         imCopy.thumbnail((sz, sz))
+        #tstart = printdelta(tstart, "make thumbnail")
+
         # write to PNG file in memory
         f = io.BytesIO()
         imCopy.save(f, "png")
+        #tstart = printdelta(tstart, "save to mem io")
+
         # append to byte array and compute offset, length
         offset = len(buf)
         buf.extend(f.getvalue())
+        #tstart = printdelta(tstart, "copy to buf")
+
         length = len(buf) - offset
         f.close()
         # add to index
@@ -225,7 +257,12 @@ class Nailer:
         self.curScan = None
         self.curImage = None
         self.foldersToScan = None
-        self.curFolderLabel.configure(text="Stopped" if self.quit else "Complete")
+        delta = datetime.now() - self.tstart
+        msg = "{} {:d}.{:d} sec".format(
+            "Stopped" if self.quit else "Complete",
+            delta.seconds,
+            round(delta.microseconds/1000))
+        self.curFolderLabel.configure(text=msg)
         self.curPictureLabel.configure(text="")
         self.disable_widgets(False)
 
