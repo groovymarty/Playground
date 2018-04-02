@@ -1,5 +1,6 @@
 # shoebox.nailcache
 
+import os
 from shoebox.nails import Nails, read_nails
 from tkit import environ
 
@@ -50,3 +51,10 @@ def change_loose_file(oldPath, newPath):
         if oldPath in looseCache[sz]:
             looseCache[sz][newPath] = looseCache[sz][oldPath]
             del looseCache[sz][oldPath]
+
+def explode_nails(folderPath):
+    for sz in cache:
+        if folderPath in cache[sz]:
+            nails = cache[sz][folderPath]
+            for name, data in nails.get_all():
+                add_loose_file(os.path.join(folderPath, name), sz, data)

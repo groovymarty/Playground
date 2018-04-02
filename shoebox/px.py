@@ -1158,16 +1158,9 @@ class Px(LogHelper, WidgetHelper):
         self.log_info("Renaming {} to {}".format(oldPath, newName))
         try:
             shutil.move(oldPath, newPath)
+            # once we start renaming files the nail cache can no longer be trusted
+            self.nuke_nails()
             nailcache.change_loose_file(oldPath, newPath)
-            # TEMP heavy-handed way for now
-            self.nails = None
-            self.nailsTried = True
-            nailcache.invalidate_nails(self.curFolder.path)
-            for sz in pic.nailSizes:
-                nails.delete_nails(self.curFolder.path, sz)
-                name = nails.build_file_name(sz)
-                if name in self.tilesByName:
-                    self.remove_tile(self.tilesByName[name], True)
             return newPath
         except BaseException as e:
             raise RuntimeError("Rename failed for {}: {}".format(oldPath, str(e)))
@@ -1182,3 +1175,21 @@ class Px(LogHelper, WidgetHelper):
             return newPath
         except BaseException as e:
             raise RuntimeError("Move failed for {}: {}".format(oldPath, str(e)))
+
+    # blow away the nails file for this folder
+    # put the images in the loose file cache so we can keep using them,
+    # and the nailer can use them to build a new nails file
+    def nuke_nails(self):
+        # explode any nails files we have in cache for this folder to the loose file cache
+        nailcache.explode_nails(self.curFolder.path)
+        # delete them from the cache
+        nailcache.invalidate_nails(self.curFolder.path)
+        self.nails = None
+        self.nailsTried = True
+        # delete the actual files
+        for sz in pic.nailSizes:
+            nails.delete_nails(self.curFolder.path, sz)
+            # turn file tile into a hole
+            name = nails.build_file_name(sz)
+            if name in self.tilesByName:
+                self.remove_tile(self.tilesByName[name], True)

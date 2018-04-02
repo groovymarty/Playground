@@ -79,5 +79,9 @@ class Nails:
         else:
             raise KeyError("No thumbnail for {}".format(name))
 
+    # generates tuples (name, data)
+    def get_all(self):
+        return ((name, self.get_by_name(name)) for name in self.indx)
+
     def touch(self, value):
         self.lastTouch = value
