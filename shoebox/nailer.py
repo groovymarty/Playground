@@ -4,7 +4,7 @@ import os, io
 from tkinter import *
 from tkinter import ttk, filedialog
 from tkit.widgetgarden import WidgetGarden
-from shoebox import pic, nails
+from shoebox import pic, nails, nailcache
 from PIL import Image
 from datetime import datetime
 
@@ -25,7 +25,7 @@ class Nailer:
         self.instNum = nextInstNum
         nextInstNum += 1
         self.top = Toplevel()
-        self.top.geometry("800x160")
+        self.top.geometry("800x180")
         self.top.title("Nailer {:d}".format(self.instNum))
         self.top.bind('<Destroy>', self.on_destroy)
         instances.append(self)
@@ -210,25 +210,29 @@ class Nailer:
         #tstart = datetime.now()
         (indx, buf) = self.bufs[self.curSzIndx]
         sz = pic.nailSizes[self.curSzIndx]
-        # open and read picture file (this is expensive because pic files are a couple GB or larger)
-        if self.curImage is None:
-            im = Image.open(self.curEnt.path)
-            #tstart = printdelta(tstart, "open and read")
 
-            # thumbnails don't contain EXIF information so correct the image orientation now
-            self.curImage = pic.fix_image_orientation(im)
-            #tstart = printdelta(tstart, "fix orientation")
+        # first check loose file cache
+        imCopy = nailcache.get_loose_file(self.curEnt.path, sz)
+        if not imCopy:
+            # open and read picture file (this is expensive because pic files are a couple GB or larger)
+            if self.curImage is None:
+                im = Image.open(self.curEnt.path)
+                #tstart = printdelta(tstart, "open and read")
 
-        # make a copy (except last time) because thumbnail() modifies the image
-        if self.curSzIndx < len(pic.nailSizes)-1:
-            imCopy = self.curImage.copy()
-            #tstart = printdelta(tstart, "make copy")
-        else:
-            imCopy = self.curImage
+                # thumbnails don't contain EXIF information so correct the image orientation now
+                self.curImage = pic.fix_image_orientation(im)
+                #tstart = printdelta(tstart, "fix orientation")
 
-        # make thumbnail of desired size
-        imCopy.thumbnail((sz, sz))
-        #tstart = printdelta(tstart, "make thumbnail")
+            # make a copy (except last time) because thumbnail() modifies the image
+            if self.curSzIndx < len(pic.nailSizes)-1:
+                imCopy = self.curImage.copy()
+                #tstart = printdelta(tstart, "make copy")
+            else:
+                imCopy = self.curImage
+
+            # make thumbnail of desired size
+            imCopy.thumbnail((sz, sz))
+            #tstart = printdelta(tstart, "make thumbnail")
 
         # write to PNG file in memory
         f = io.BytesIO()

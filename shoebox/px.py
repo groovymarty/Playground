@@ -1046,6 +1046,7 @@ class Px(LogHelper, WidgetHelper):
                         nChanged += 1
                     except RuntimeError as e:
                         self.log_error(str(e))
+        self.sweep_out_of_order()
         if not self.lastError:
             if nSelected:
                 self.set_status("{:d} files changed".format(nChanged))
