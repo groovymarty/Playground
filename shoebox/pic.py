@@ -119,3 +119,7 @@ def fix_image_orientation(im):
             elif orientation == 8:  # 8 = Left/Bottom
                 return im.rotate(90, expand=True)
     return im
+
+# duck test for PIL image, seems they are not all derived from same base class
+def is_pil_image(im):
+    return hasattr(im, 'thumbnail') and hasattr(im, 'rotate')

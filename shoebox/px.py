@@ -753,12 +753,18 @@ class Px(LogHelper, WidgetHelper):
             except RuntimeError as e:
                 self.log_error(str(e))
             except KeyError as e:
-                photo = nailcache.get_loose_file(ent.path, self.nailSz)
+                # see if we can get image from loose file cache
+                # note it might be PIL image or PNG data bytes, we must handle either case
+                imgOrData = nailcache.get_loose_file(ent.path, self.nailSz)
+                if imgOrData:
+                    photo = self.make_tk_photo_image(imgOrData, ent.name)
                 if photo is None:
                     self.log_error(str(e)) #no thumbnail for this file
         else:
             # no log when this fails because we've already said the xpng file is missing
-            photo = nailcache.get_loose_file(ent.path, self.nailSz)
+            imgOrData = nailcache.get_loose_file(ent.path, self.nailSz)
+            if imgOrData:
+                photo = self.make_tk_photo_image(imgOrData, ent.name)
 
         # if still no image, try to create thumbnail on the fly
         if photo is None:
@@ -768,8 +774,8 @@ class Px(LogHelper, WidgetHelper):
                 im = pic.fix_image_orientation(im)
                 im.thumbnail((self.nailSz, self.nailSz))
                 photo = ImageTk.PhotoImage(im)
-                # add to loose file cache
-                nailcache.add_loose_file(ent.path, self.nailSz, photo)
+                # add PIL image to loose file cache
+                nailcache.add_loose_file(ent.path, self.nailSz, im)
             except:
                 self.log_error("Can't create thumbnail size {:d} for {}".format(self.nailSz, ent.name))
         # if still no image, give up and display as a file
@@ -777,6 +783,19 @@ class Px(LogHelper, WidgetHelper):
             return self.make_file_tile(ent)
         else:
             return PxTilePic(ent.name, photo, self.env)
+
+    # make Tkinter photo image from PIL image or PNG data bytes
+    def make_tk_photo_image(self, imgOrData, name):
+        try:
+            if pic.is_pil_image(imgOrData):
+                # make from PIL image
+                return ImageTk.PhotoImage(imgOrData)
+            else:
+                # make from PNG data bytes
+                return PhotoImage(format="png", data=imgOrData)
+        except:
+            self.log_error("Can't create Tk photo image for {}".format(name))
+            return None
 
     # make tile for a file
     def make_file_tile(self, ent):

@@ -39,12 +39,13 @@ def clear_nails(folderPath, env=None):
 looseCache = {}
 looseCount = 0
 
-def add_loose_file(path, sz, img):
+# loose file cache can take PIL image or PNG data bytes
+def add_loose_file(path, sz, imgOrData):
     global looseCount
     path = os.path.abspath(path)
     if sz not in looseCache:
         looseCache[sz] = {}
-    looseCache[sz][path] = img
+    looseCache[sz][path] = imgOrData
     looseCount += 1
 
 def get_loose_file(path, sz):
@@ -78,4 +79,5 @@ def explode_nails(folderPath):
         if folderPath in cache[sz]:
             nails = cache[sz][folderPath]
             for name, data in nails.get_all():
+                # note here we are storing PNG data bytes in loose file cache
                 add_loose_file(os.path.join(folderPath, name), sz, data)

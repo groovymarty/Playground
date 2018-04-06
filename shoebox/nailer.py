@@ -214,7 +214,6 @@ class Nailer:
 
     # process one picture, one size
     def do_picture(self):
-        #tstart = datetime.now()
         (indx, buf) = self.bufs[self.curSzIndx]
         sz = pic.nailSizes[self.curSzIndx]
 
@@ -222,37 +221,36 @@ class Nailer:
         imCopy = nailcache.get_loose_file(self.curEnt.path, sz)
         if imCopy:
             # found it, clear from cache
+            # note this could be image or PNG data, assume image for now
             nailcache.clear_loose_file(self.curEnt.path, sz)
         else:
             # open and read picture file (this is expensive because pic files are a couple GB or larger)
             if self.curImage is None:
                 im = Image.open(self.curEnt.path)
-                #tstart = printdelta(tstart, "open and read")
 
                 # thumbnails don't contain EXIF information so correct the image orientation now
                 self.curImage = pic.fix_image_orientation(im)
-                #tstart = printdelta(tstart, "fix orientation")
 
             # make a copy (except last time) because thumbnail() modifies the image
             if self.curSzIndx < len(pic.nailSizes)-1:
                 imCopy = self.curImage.copy()
-                #tstart = printdelta(tstart, "make copy")
             else:
                 imCopy = self.curImage
 
             # make thumbnail of desired size
             imCopy.thumbnail((sz, sz))
-            #tstart = printdelta(tstart, "make thumbnail")
 
-        # write to PNG file in memory
-        f = io.BytesIO()
-        imCopy.save(f, "png")
-        #tstart = printdelta(tstart, "save to mem io")
+        if pic.is_pil_image(imCopy):
+            # write to PNG file in memory
+            f = io.BytesIO()
+            imCopy.save(f, "png")
 
-        # append to byte array and compute offset, length
-        offset = len(buf)
-        buf.extend(f.getvalue())
-        #tstart = printdelta(tstart, "copy to buf")
+            # append to byte array and compute offset, length
+            offset = len(buf)
+            buf.extend(f.getvalue())
+        else:
+            # it was PNG data, no need to make image
+            buf.extend(imCopy)
 
         length = len(buf) - offset
         f.close()
