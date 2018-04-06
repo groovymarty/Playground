@@ -25,7 +25,7 @@ class Nailer:
         self.instNum = nextInstNum
         nextInstNum += 1
         self.top = Toplevel()
-        self.top.geometry("800x180")
+        self.top.geometry("800x200")
         self.top.title("Nailer {:d}".format(self.instNum))
         self.top.bind('<Destroy>', self.on_destroy)
         instances.append(self)
@@ -63,6 +63,11 @@ class Nailer:
         self.totalLabel = ttk.Label(self.garden.curParent)
         self.garden.grid_widget(self.totalLabel)
         self.garden.next_row()
+        self.garden.grid_widget(ttk.Label(self.garden.curParent, text="Cache:"))
+        self.garden.next_col()
+        self.cacheLabel = ttk.Label(self.garden.curParent)
+        self.garden.grid_widget(self.cacheLabel)
+        self.garden.next_row()
         self.garden.next_col()
         self.stopButton = ttk.Button(self.garden.curParent, text="Stop", command=self.do_stop)
         self.garden.grid_widget(self.stopButton)
@@ -86,6 +91,7 @@ class Nailer:
         self.nFolders = 0
         self.nPictures = 0
         self.tstart = None
+        self.update_cache_status()
 
     # called when my top-level window is closed
     # this is the easiest and most common way to destroy Nailer,
@@ -196,6 +202,7 @@ class Nailer:
     # update totals
     def update_totals(self):
         self.totalLabel.configure(text="{:d} folders, {:d} pictures".format(self.nFolders, self.nPictures))
+        self.update_cache_status()
 
     # begin processing a folder
     def begin_folder(self):
@@ -213,7 +220,10 @@ class Nailer:
 
         # first check loose file cache
         imCopy = nailcache.get_loose_file(self.curEnt.path, sz)
-        if not imCopy:
+        if imCopy:
+            # found it, clear from cache
+            nailcache.clear_loose_file(self.curEnt.path, sz)
+        else:
             # open and read picture file (this is expensive because pic files are a couple GB or larger)
             if self.curImage is None:
                 im = Image.open(self.curEnt.path)
@@ -277,3 +287,8 @@ class Nailer:
         self.garden.disable_widget(self.pathButton, disable)
         self.garden.disable_widget(self.startButton, disable)
         self.garden.disable_widget(self.stopButton, not disable)
+
+    # update cache status
+    def update_cache_status(self):
+        msg = "{} nails, {} looose files".format(nailcache.cacheCount, nailcache.looseCount)
+        self.cacheLabel.configure(text=msg)

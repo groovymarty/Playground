@@ -1181,10 +1181,17 @@ class Px(LogHelper, WidgetHelper):
     # put the images in the loose file cache so we can keep using them,
     # and the nailer can use them to build a new nails file
     def nuke_nails(self):
+        # preload all sizes
+        for sz in pic.nailSizes:
+            try:
+                nailcache.get_nails(self.curFolder.path, sz, self.env)
+            except:
+                pass
         # explode any nails files we have in cache for this folder to the loose file cache
         nailcache.explode_nails(self.curFolder.path)
-        # delete them from the cache
-        nailcache.invalidate_nails(self.curFolder.path)
+        self.log_info("{} loose files after exploding".format(nailcache.looseCount))
+        # clear them from the cache
+        nailcache.clear_nails(self.curFolder.path)
         self.nails = None
         self.nailsTried = True
         # delete the actual files
