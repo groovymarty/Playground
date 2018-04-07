@@ -240,20 +240,20 @@ class Nailer:
             # make thumbnail of desired size
             imCopy.thumbnail((sz, sz))
 
+        offset = len(buf)
         if pic.is_pil_image(imCopy):
             # write to PNG file in memory
             f = io.BytesIO()
             imCopy.save(f, "png")
 
-            # append to byte array and compute offset, length
-            offset = len(buf)
+            # append to byte array
             buf.extend(f.getvalue())
+            f.close()
         else:
             # it was PNG data, no need to make image
             buf.extend(imCopy)
 
         length = len(buf) - offset
-        f.close()
         # add to index
         indx[self.curEnt.name] = (offset, length)
 
@@ -288,5 +288,5 @@ class Nailer:
 
     # update cache status
     def update_cache_status(self):
-        msg = "{} nails, {} looose files".format(nailcache.cacheCount, nailcache.looseCount)
+        msg = "{} nails, {} loose files".format(nailcache.cacheCount, nailcache.looseCount)
         self.cacheLabel.configure(text=msg)

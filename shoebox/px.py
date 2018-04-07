@@ -770,7 +770,10 @@ class Px(LogHelper, WidgetHelper):
         if photo is None:
             try:
                 self.log_info("Making thumbnail size {:d} for {}".format(self.nailSz, ent.name), True)
-                im = Image.open(ent.path)
+                f = open(ent.path, "rb")
+                im = Image.open(f)
+                im.load()
+                f.close()
                 im = pic.fix_image_orientation(im)
                 im.thumbnail((self.nailSz, self.nailSz))
                 photo = ImageTk.PhotoImage(im)
