@@ -115,6 +115,7 @@ class Px(LogHelper, WidgetHelper):
         self.dragStart = None
         self.dragTiles = None
         self.dragColor = None
+        self.dragCopy = False
         self.canvasItems = {} #canvas id of image to tile object
         self.canvasWidth = 0
         self.hTotal = 0
@@ -465,10 +466,10 @@ class Px(LogHelper, WidgetHelper):
             elif abs(event.x - self.dragStart[0]) > 10 or abs(event.y - self.dragStart[1]) > 10:
                 # have dragged far enough to call it a real drag
                 self.dragging = True
-                self.canvas.configure(cursor="box_spiral")
+                self.dragCopy = event.state & 4
+                self.canvas.configure(cursor="cross_reverse" if self.dragCopy else "box_spiral")
                 self.set_status("Dragging {:d} {} items".format(len(self.dragTiles),
                                                                 selectColors[self.dragColor]))
-
     # on mouse button release
     def on_canvas_dnd_release(self, event):
         if self.dragging:
@@ -477,24 +478,25 @@ class Px(LogHelper, WidgetHelper):
                 # dnd to a different window
                 items = [DndItemEnt(DirEntryFile(os.path.join(self.curFolder.path, t.name)))
                          for t in self.dragTiles]
-                accepted = dnd.try_drop(w, items, event)
+                accepted = dnd.try_drop(w, items, self.dragCopy, event)
                 nAccepted = 0
                 if accepted:
                     for i, tile in enumerate(self.dragTiles):
                         if accepted is True or i < len(accepted) and accepted[i]:
-                            self.remove_tile(tile, True)
+                            if not self.dragCopy:
+                                self.remove_tile(tile, True)
                             nAccepted += 1
                     self.set_status("{:d} of {:d} items accepted by {}".format(nAccepted, len(items),
                                                                                dnd.get_target_name(w)))
                     self.update_select_button()
-                    if nAccepted:
+                    if nAccepted and not self.dragCopy:
                         self.sweep_out_of_order()
                 else:
                     self.set_status("No items accepted")
             else:
                 # dnd within same window
                 targ = self.get_target_tile(event)
-                if isinstance(targ, PxTileHole):
+                if isinstance(targ, PxTileHole) and not self.dragCopy:
                     toIndex = self.tilesOrder.index(targ)
                     toIndexStart = toIndex
                     minIndex = toIndex
@@ -522,16 +524,17 @@ class Px(LogHelper, WidgetHelper):
                     self.check_out_of_order(toIndexStart, toIndex)
                     self.sweep_out_of_order()
                 else:
-                    self.set_status_default()
+                    self.set_status("No drop target")
 
         self.dragging = False
         self.dragStart = None
         self.dragTiles = None
         self.dragColor = None
+        self.dragCopy = False
         self.canvas.configure(cursor="")
 
     # called by dnd, return true if drop accepted (or array of true/false)
-    def receive_drop(self, items, event):
+    def receive_drop(self, items, doCopy, event):
         if not self.curFolder:
             return False
         entries = []
@@ -541,7 +544,10 @@ class Px(LogHelper, WidgetHelper):
             if isinstance(item, DndItemEnt):
                 ent = item.thing
                 try:
-                    newPath = self.move_file_to_cur_folder(ent.path)
+                    if doCopy:
+                        newPath = self.copy_file_to_cur_folder(ent.path)
+                    else:
+                        newPath = self.move_file_to_cur_folder(ent.path)
                     entries.append(DirEntryFile(newPath))
                     accepted = True
                 except RuntimeError as e:
@@ -1198,6 +1204,17 @@ class Px(LogHelper, WidgetHelper):
             return newPath
         except BaseException as e:
             raise RuntimeError("Move failed for {}: {}".format(oldPath, str(e)))
+
+    # copy file to current folder, return new path
+    def copy_file_to_cur_folder(self, oldPath):
+        newPath = os.path.join(self.curFolder.path, os.path.basename(oldPath))
+        self.log_info("Copying {} to {}".format(oldPath, self.curFolder.path))
+        try:
+            shutil.copy(oldPath, newPath)
+            nailcache.change_loose_file(oldPath, newPath)
+            return newPath
+        except BaseException as e:
+            raise RuntimeError("Copy failed for {}: {}".format(oldPath, str(e)))
 
     # blow away the nails file for this folder
     # put the images in the loose file cache so we can keep using them,
