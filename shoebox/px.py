@@ -2,7 +2,7 @@
 
 import os, shutil
 from tkinter import *
-from tkinter import ttk
+from tkinter import ttk, messagebox
 from PIL import Image
 import ImageTk
 from shoebox import pic, nails, nailcache, dnd
@@ -123,6 +123,7 @@ class Px(LogHelper, WidgetHelper):
         self.canvas.bind('<Button-1>', self.on_canvas_click)
         self.canvas.bind('<B1-Motion>', self.on_canvas_dnd_motion)
         self.canvas.bind('<ButtonRelease>', self.on_canvas_dnd_release)
+        self.canvas.bind('<Key>', self.on_canvas_key)
         dnd.add_target(self.canvas, self, self.pxName)
 
         self.lastError = ""
@@ -332,6 +333,9 @@ class Px(LogHelper, WidgetHelper):
 
     # when user clicks in canvas
     def on_canvas_click(self, event):
+        # get keyboard focus
+        self.canvas.focus_set()
+        # find item that was clicked
         items = self.canvas.find_withtag(CURRENT)
         if len(items) and items[0] in self.canvasItems:
             tile = self.canvasItems[items[0]]
@@ -574,6 +578,26 @@ class Px(LogHelper, WidgetHelper):
             return self.canvasItems[hits[0]]
         else:
             return None
+
+    # handle keyboard event for canvas
+    def on_canvas_key(self, event):
+        if event.keycode == 46: #delete key
+            tilesToDelete = [t for t in self.tilesOrder if t.selected == self.curSelectColor]
+            if len(tilesToDelete):
+                msg = "{:d} {} items selected, are you sure you want to delete them?".format(
+                    len(tilesToDelete), selectColors[self.curSelectColor])
+                if messagebox.askyesno("Confirm Delete", msg):
+                    nDeleted = 0
+                    for tile in tilesToDelete:
+                        try:
+                            self.delete_file_in_cur_folder(tile.name)
+                            self.remove_tile(tile, True)
+                            nDeleted += 1
+                        except RuntimeError as e:
+                            self.log_error(str(e))
+                    self.set_status("{:d} items deleted".format(nDeleted))
+            else:
+                self.set_status("No items selected")
 
     # delete all items in canvas
     def clear_canvas(self):
@@ -1193,6 +1217,15 @@ class Px(LogHelper, WidgetHelper):
             return newPath
         except BaseException as e:
             raise RuntimeError("Rename failed for {}: {}".format(oldPath, str(e)))
+
+    # delete file in current folder
+    def delete_file_in_cur_folder(self, name):
+        path = os.path.join(self.curFolder.path, name)
+        self.log_info("Deleting {}".format(path))
+        try:
+            os.remove(path)
+        except BaseException as e:
+            raise RuntimeError("Delete failed for {}: {}".format(path, str(e)))
 
     # move file to current folder, return new path
     def move_file_to_cur_folder(self, oldPath):
