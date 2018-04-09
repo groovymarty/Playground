@@ -988,14 +988,6 @@ class Px(LogHelper, WidgetHelper):
             # ok if start index goes to -1, will reflow all tiles
             self.reflow(len(self.tilesOrder) - n - 1)
 
-    # return highest numbered tile
-    def get_highest_num(self):
-        n = 0
-        for tile in self.tilesOrder:
-            if tile.id and not tile.errors and tile.parts.num > n:
-                n = tile.parts.num
-        return n
-
     # number selected tiles that aren't already numbered
     def do_num(self):
         if self.curFolder.noncanon:
@@ -1194,13 +1186,16 @@ class Px(LogHelper, WidgetHelper):
     # rely on above function to set OOO errors in the local context of moved or added tiles
     # this function also clears any stray OOO errors on unnumbered tiles
     def sweep_out_of_order(self):
+        def check_these(tiles, prevNum, endNum):
+            for tile in tiles:
+                if tile.parts.num > prevNum and tile.parts.num < endNum:
+                    self.clear_tile_out_of_order(tile)
+                    prevNum = tile.parts.num
+
+        # find ranges of numbered tiles with OOO errors
+        # check each range using adjacent numbered tiles to define the correct numbering for that range
         startNum = 0
         tilesToCheck = []
-        def check_these(tiles, endNum):
-            for tile in tiles:
-                if tile.parts.num > startNum and tile.parts.num < endNum:
-                    self.clear_tile_out_of_order(tile)
-
         for tile in self.tilesOrder:
             if tile.is_numbered():
                 if tile.is_error(pic.OOO):
@@ -1213,7 +1208,7 @@ class Px(LogHelper, WidgetHelper):
             else:
                 self.clear_tile_out_of_order(tile)
         if len(tilesToCheck):
-            check_these(tilesToCheck, pic.MAXNUM)
+            check_these(tilesToCheck, startNum, pic.MAXNUM)
 
     # rename file in current folder, return new path
     def rename_file_in_cur_folder(self, oldName, newName):
