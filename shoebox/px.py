@@ -121,6 +121,7 @@ class Px(LogHelper, WidgetHelper):
         self.hTotal = 0
         self.canvas.bind('<Configure>', self.on_canvas_resize)
         self.canvas.bind('<Button-1>', self.on_canvas_click)
+        self.canvas.bind('<Button-3>', self.on_canvas_rclick)
         self.canvas.bind('<B1-Motion>', self.on_canvas_dnd_motion)
         self.canvas.bind('<ButtonRelease>', self.on_canvas_dnd_release)
         self.canvas.bind('<Key>', self.on_canvas_key)
@@ -488,6 +489,7 @@ class Px(LogHelper, WidgetHelper):
                     for i, tile in enumerate(self.dragTiles):
                         if accepted is True or i < len(accepted) and accepted[i]:
                             if not self.dragCopy:
+                                self.nuke_nails(tile.name)
                                 self.remove_tile(tile, True)
                             nAccepted += 1
                     self.set_status("{:d} of {:d} items accepted by {}".format(nAccepted, len(items),
@@ -596,8 +598,17 @@ class Px(LogHelper, WidgetHelper):
                         except RuntimeError as e:
                             self.log_error(str(e))
                     self.set_status("{:d} items deleted".format(nDeleted))
+                    self.sweep_out_of_order()
             else:
                 self.set_status("No items selected")
+
+    # when user right-clicks in canvas
+    def on_canvas_rclick(self, event):
+        # find item that was clicked
+        items = self.canvas.find_withtag(CURRENT)
+        if len(items) and items[0] in self.canvasItems:
+            tile = self.canvasItems[items[0]]
+            print("TODO: context menu for {}".format(tile.name))
 
     # delete all items in canvas
     def clear_canvas(self):
@@ -1211,8 +1222,7 @@ class Px(LogHelper, WidgetHelper):
         self.log_info("Renaming {} to {}".format(oldPath, newName))
         try:
             shutil.move(oldPath, newPath)
-            # once we start renaming files the nail cache can no longer be trusted
-            self.nuke_nails()
+            self.nuke_nails(oldName)
             nailcache.change_loose_file(oldPath, newPath)
             return newPath
         except BaseException as e:
@@ -1224,6 +1234,8 @@ class Px(LogHelper, WidgetHelper):
         self.log_info("Deleting {}".format(path))
         try:
             os.remove(path)
+            self.nuke_nails(name)
+            nailcache.clear_loose_file(path)
         except BaseException as e:
             raise RuntimeError("Delete failed for {}: {}".format(path, str(e)))
 
@@ -1252,24 +1264,28 @@ class Px(LogHelper, WidgetHelper):
     # blow away the nails file for this folder
     # put the images in the loose file cache so we can keep using them,
     # and the nailer can use them to build a new nails file
-    def nuke_nails(self):
+    # if name specified, nuke only if that name appears in nails file
+    def nuke_nails(self, name=None):
         # preload all sizes
+        any = False
         for sz in pic.nailSizes:
             try:
-                nailcache.get_nails(self.curFolder.path, sz, self.env)
+                tmpNails = nailcache.get_nails(self.curFolder.path, sz, self.env)
+                any = name is None or tmpNails.has_name(name)
             except:
                 pass
-        # explode any nails files we have in cache for this folder to the loose file cache
-        nailcache.explode_nails(self.curFolder.path)
-        self.log_info("{} loose files after exploding".format(nailcache.looseCount))
-        # clear them from the cache
-        nailcache.clear_nails(self.curFolder.path)
-        self.nails = None
-        self.nailsTried = True
-        # delete the actual files
-        for sz in pic.nailSizes:
-            nails.delete_nails(self.curFolder.path, sz)
-            # turn file tile into a hole
-            name = nails.build_file_name(sz)
-            if name in self.tilesByName:
-                self.remove_tile(self.tilesByName[name], True)
+        if any:
+            # explode any nails files we have in cache for this folder to the loose file cache
+            nailcache.explode_nails(self.curFolder.path)
+            self.log_info("{} loose files after exploding".format(nailcache.looseCount))
+            # clear them from the cache
+            nailcache.clear_nails(self.curFolder.path)
+            self.nails = None
+            self.nailsTried = True
+            # delete the actual files
+            for sz in pic.nailSizes:
+                nails.delete_nails(self.curFolder.path, sz)
+                # turn file tile into a hole
+                name = nails.build_file_name(sz)
+                if name in self.tilesByName:
+                    self.remove_tile(self.tilesByName[name], True)

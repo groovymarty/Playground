@@ -68,6 +68,9 @@ class Nails:
         (self.indx, self.buf) = indxAndBytes
         self.lastTouch = 0
 
+    def has_name(self, name):
+        return name in self.indx
+
     def get_by_name(self, name):
         if name in self.indx:
             (offset, length) = self.indx[name]
