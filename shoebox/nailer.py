@@ -7,6 +7,7 @@ from tkit.widgetgarden import WidgetGarden
 from shoebox import pic, nails, nailcache
 from PIL import Image
 from datetime import datetime
+from tkit.loghelper import LogHelper
 
 instances = []
 nextInstNum = 1
@@ -19,8 +20,10 @@ def printdelta(tstart, what):
         print("{:02d}.{:06d} {}".format(delta.seconds, delta.microseconds, what))
     return tnow
 
-class Nailer:
+class Nailer(LogHelper):
     def __init__(self, path):
+        self.env = {}
+        LogHelper.__init__(self, self.env)
         global nextInstNum
         self.instNum = nextInstNum
         nextInstNum += 1
@@ -40,6 +43,8 @@ class Nailer:
         self.garden.next_row()
         self.garden.next_col()
         self.garden.make_checkbutton('recursive')
+        self.logButton = ttk.Button(self.garden.curParent, text="Log", command=self.do_log)
+        self.garden.grid_widget(self.logButton)
         self.garden.next_row()
         self.garden.next_col()
         self.garden.make_checkbutton('fast')
@@ -122,6 +127,10 @@ class Nailer:
         if newDir:
             self.absPath = newDir
             self.garden.write_var('path', self.absPath)
+
+    # when Log button clicked
+    def do_log(self):
+        self.open_log_window("Log - Nailer {:d}".format(self.instNum))
 
     # return delay in milliseconds
     def get_delay_ms(self):
