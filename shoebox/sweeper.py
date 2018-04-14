@@ -204,10 +204,16 @@ class Sweeper(LogHelper):
                 id = parts.id
                 if len(parts.ver) > 1:
                     self.log_info("Has long ver: {}".format(self.curEnt.name))
+                # check for duplicate ID
                 if id in self.dupIdCheck:
                     self.log_error("Duplicate ID: {}".format(self.curEnt.path))
                 else:
                     self.dupIdCheck[id] = True
+                # verify ID correctly predicts the folder where item can be found
+                folderId = pic.get_folder_id(parts)
+                if folderId != self.curFolder.parts.id:
+                    self.log_error("Picture out of place: {}".format(self.curEnt.path))
+
             else:
                 self.log_error("Noncanonical: {}".format(self.curEnt.path))
 
