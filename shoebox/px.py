@@ -1202,7 +1202,7 @@ class Px(LogHelper, WidgetHelper):
                     tilesToCheck.append(tile)
                 else:
                     if len(tilesToCheck):
-                        check_these(tilesToCheck, tile.parts.num)
+                        check_these(tilesToCheck, startNum, tile.parts.num)
                         tilesToCheck = []
                     startNum = tile.parts.num
             else:
