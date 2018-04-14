@@ -4,6 +4,7 @@ import os, io
 from tkinter import *
 from tkinter import ttk, filedialog
 from tkit.widgetgarden import WidgetGarden
+from tkit.direntry import DirEntry
 from shoebox import pic, nails, nailcache
 from PIL import Image
 from datetime import datetime
@@ -19,6 +20,11 @@ def printdelta(tstart, what):
     if (delta.seconds or delta.microseconds > 10000):
         print("{:02d}.{:06d} {}".format(delta.seconds, delta.microseconds, what))
     return tnow
+
+class Folder:
+    def __init__(self, ent, parent):
+        self.ent = ent
+        self.parent = parent
 
 class Nailer(LogHelper):
     def __init__(self, path):
@@ -86,11 +92,11 @@ class Nailer(LogHelper):
         self.fast = False
         self.garden.write_var('fast', self.fast)
         self.foldersToScan = None
+        self.curFolder = None
         self.curScan = None
         self.curEnt = None
         self.curSzIndx = 0
         self.curImage = None
-        self.curFolder = ""
         self.quit = False
         self.bufs = []
         self.nFolders = 0
@@ -142,7 +148,7 @@ class Nailer(LogHelper):
         self.absPath = self.garden.read_var('path')
         self.recursive = self.garden.read_var('recursive')
         self.fast = self.garden.read_var('fast')
-        self.foldersToScan = [self.absPath]
+        self.foldersToScan = [Folder(DirEntry(self.absPath), None)]
         self.curFolder = None
         self.curScan = None
         self.curEnt = None
@@ -174,10 +180,10 @@ class Nailer(LogHelper):
             if self.curScan is None:
                 if len(self.foldersToScan):
                     self.curFolder = self.foldersToScan.pop()
-                    self.curFolderLabel.configure(text=self.curFolder)
+                    self.curFolderLabel.configure(text=self.curFolder.ent.path)
                     self.nFolders += 1
                     self.update_totals()
-                    self.curScan = os.scandir(self.curFolder)
+                    self.curScan = os.scandir(self.curFolder.ent.path)
                     self.curEnt = None
                     self.begin_folder()
                 else:
@@ -195,7 +201,7 @@ class Nailer(LogHelper):
                 elif ent.is_dir():
                     # is a directory, remember for later if recursive
                     if self.recursive:
-                       self.foldersToScan.append(ent.path)
+                        self.foldersToScan.append(Folder(ent, self.curFolder))
                 elif os.path.splitext(ent.path)[1].lower() in pic.pictureExts:
                     # is a picture, set up size iteration
                     self.curPictureLabel.configure(text=ent.name)
@@ -271,7 +277,7 @@ class Nailer(LogHelper):
         for i, (indx, buf) in enumerate(self.bufs):
             # don't write empty files
             if len(buf):
-                nails.write_nails(self.curFolder, pic.nailSizes[i], indx, buf)
+                nails.write_nails(self.curFolder.ent.path, pic.nailSizes[i], indx, buf)
 
     # when nothing more to do (or quitting because stop button clicked)
     def do_end(self):
@@ -291,6 +297,7 @@ class Nailer(LogHelper):
     def disable_widgets(self, disable=True):
         self.garden.set_widget_disable('path', disable)
         self.garden.set_widget_disable('recursive', disable)
+        self.garden.set_widget_disable('fast', disable)
         self.garden.disable_widget(self.pathButton, disable)
         self.garden.disable_widget(self.startButton, disable)
         self.garden.disable_widget(self.stopButton, not disable)

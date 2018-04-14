@@ -7,6 +7,7 @@ from shoebox import services
 from shoebox.medit import Medit
 from shoebox.px import Px
 from shoebox.nailer import Nailer
+from shoebox.sweeper import Sweeper
 import shoebox
 
 root = Tk()
@@ -29,6 +30,11 @@ def launch_nailer():
 nailerButton = ttk.Button(root, text="Nailer", command=launch_nailer)
 nailerButton.pack(side=LEFT, fill=X, expand=True)
 
+def launch_sweeper():
+    Sweeper(".")
+sweeperButton = ttk.Button(root, text="Sweeper", command=launch_sweeper)
+sweeperButton.pack(side=LEFT, fill=X, expand=True)
+
 def close_all():
     for px in list(shoebox.px.instances):
         px.destroy()
@@ -36,6 +42,8 @@ def close_all():
         medit.destroy()
     for nailer in list(shoebox.nailer.instances):
         nailer.destroy()
+    for sweeper in list(shoebox.sweeper.instances):
+        sweeper.destroy()
 closeAllButton = ttk.Button(root, text="Close All", command=close_all)
 closeAllButton.pack(side=LEFT, fill=X, expand=True)
 
