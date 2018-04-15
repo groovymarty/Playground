@@ -1114,7 +1114,7 @@ class Px(LogHelper, WidgetHelper):
         # pull out the numbered tiles into a separate array
         a = [t for t in self.tilesOrder if t.is_numbered()]
         # sort them by number
-        a.sort(key=lambda t: t.parts.num)
+        a.sort(key=lambda t: t.parts.sortNum)
         # weave in the sorted tiles with the unnumbered ones in their original order
         it = iter(a)
         self.tilesOrder = [next(it) if t.is_numbered() else t for t in self.tilesOrder]
@@ -1139,7 +1139,8 @@ class Px(LogHelper, WidgetHelper):
 
     # check range of tiles for OOO error
     def check_out_of_order(self, startIndex, endIndex):
-        startNum = 0
+        startSortNum = 0
+        endSortNum = pic.MAXSORTNUM
         # anchor the range to existing numbered tiles by expanding it by one at each end
         while startIndex > 0:
             startIndex -= 1
@@ -1156,28 +1157,28 @@ class Px(LogHelper, WidgetHelper):
             startIndex += 1
             if startTile.is_numbered():
                 self.clear_tile_out_of_order(startTile)
-                startNum = startTile.parts.num
+                startSortNum = startTile.parts.sortNum
                 break
-        # find last numbered tile at end of range that's greater than startNum
+        # find last numbered tile at end of range that's greater than startSortNum
         # it is deemed correct also (other numbered tiles we pass on the way are OOO)
         while startIndex < endIndex:
             endTile = self.tilesOrder[endIndex-1]
             endIndex -= 1
             if endTile.is_numbered():
-                if endTile.parts.num > startNum:
+                if endTile.parts.sortNum > startSortNum:
                     self.clear_tile_out_of_order(endTile)
-                    endNum = endTile.parts.num
+                    endSortNum = endTile.parts.sortNum
                     break
                 else:
                     self.set_tile_out_of_order(endTile)
         # now test the remaining tiles
-        # they must ascend from startNum but cannot exceed endNum
-        priorNum = startNum
+        # they must ascend from startSortNum but cannot exceed endSortNum
+        priorSortNum = startSortNum
         for tile in self.tilesOrder[startIndex:endIndex]:
             if tile.is_numbered():
-                if tile.parts.num > priorNum and tile.parts.num < endNum:
+                if tile.parts.sortNum > priorSortNum and tile.parts.sortNum < endSortNum:
                     self.clear_tile_out_of_order(tile)
-                    priorNum = tile.parts.num
+                    priorSortNum = tile.parts.sortNum
                 else:
                     self.set_tile_out_of_order(tile)
 
@@ -1186,15 +1187,15 @@ class Px(LogHelper, WidgetHelper):
     # rely on above function to set OOO errors in the local context of moved or added tiles
     # this function also clears any stray OOO errors on unnumbered tiles
     def sweep_out_of_order(self):
-        def check_these(tiles, prevNum, endNum):
+        def check_these(tiles, priorSortNum, endSortNum):
             for tile in tiles:
-                if tile.parts.num > prevNum and tile.parts.num < endNum:
+                if tile.parts.sortNum > priorSortNum and tile.parts.sortNum < endSortNum:
                     self.clear_tile_out_of_order(tile)
-                    prevNum = tile.parts.num
+                    priorSortNum = tile.parts.sortNum
 
         # find ranges of numbered tiles with OOO errors
         # check each range using adjacent numbered tiles to define the correct numbering for that range
-        startNum = 0
+        startSortNum = 0
         tilesToCheck = []
         for tile in self.tilesOrder:
             if tile.is_numbered():
@@ -1202,13 +1203,13 @@ class Px(LogHelper, WidgetHelper):
                     tilesToCheck.append(tile)
                 else:
                     if len(tilesToCheck):
-                        check_these(tilesToCheck, startNum, tile.parts.num)
+                        check_these(tilesToCheck, startSortNum, tile.parts.sortNum)
                         tilesToCheck = []
-                    startNum = tile.parts.num
+                        startSortNum = tile.parts.sortNum
             else:
                 self.clear_tile_out_of_order(tile)
         if len(tilesToCheck):
-            check_these(tilesToCheck, startNum, pic.MAXNUM)
+            check_these(tilesToCheck, startSortNum, pic.MAXSORTNUM)
 
     # rename file in current folder, return new path
     def rename_file_in_cur_folder(self, oldName, newName):

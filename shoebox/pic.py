@@ -10,16 +10,28 @@ nailSizes = [128, 244]
 nailSizeNames = ["Small", "Large"]
 
 # error bits
-DUP = 0x01  #duplicate
-OOP = 0x02  #out of place
-OOO = 0x04  #out of order
+DUP = 0x01  # duplicate
+OOP = 0x02  # out of place
+OOO = 0x04  # out of order
 
 # max picture number, for sorting
-MAXNUM = 9999999
+MAXNUM = 999999
+MAXSORTNUM = MAXNUM * 729
 
 # named tuple returned by parse functions
-#                            |0        |1       |2      |3       |4     |5     |6     |7         |8     |9      |10
-Parts = namedtuple('Parts', ['parent', 'child', 'type', 'zeros', 'num', 'ver', 'sep', 'comment', 'ext', 'what', 'id'])
+Parts = namedtuple('Parts', [
+    'parent',   # 0
+    'child',    # 1
+    'type',     # 2
+    'zeros',    # 3
+    'num',      # 4
+    'ver',      # 5
+    'sep',      # 6
+    'comment',  # 7
+    'ext',      # 8
+    'what',     # 9
+    'id',       # 10
+    'sortNum']) # 11
 
 #                         parentBase    parentSfx  child          sep    comment
 #                         |1            |2         |3             |4     |5
@@ -41,20 +53,21 @@ def parse_folder(name, env=None):
     mr = folderPat.match(name)
     if mr:
         parts = [
-            (mr.group(1) + mr.group(2)).upper(), #parent
-            trim_child(mr, env), #child
-            None, #type
-            None, #zeros
+            (mr.group(1) + mr.group(2)).upper(),  # parent
+            trim_child(mr, env),  # child
+            None,  # type
+            None,  # zeros
             # child number for sorting or 0 if no child string
             # note rfind returns -1 if not found, plus 1 gives 0 resulting in entire string
-            int(mr.group(3)[mr.group(3).rfind("+")+1:] or "0"), #num
-            None, #ver
-            mr.group(4), #sep
-            mr.group(5), #comment
-            None, #ext
-            "folder"] #what
-        if parts[6] or not parts[7]: #has separator or comment is empty
-            parts.append("{0}{1}".format(*parts)) #id
+            int(mr.group(3)[mr.group(3).rfind("+") + 1:] or "0"),  # num
+            None,  # ver
+            mr.group(4),  # sep
+            mr.group(5),  # comment
+            None,  # ext
+            "folder"]  # what
+        if parts[6] or not parts[7]:  # has separator or comment is empty
+            parts.append("{0}{1}".format(*parts))  # id
+            parts.append(parts[4])  # sortNum
             return Parts._make(parts)
     return None
 
@@ -67,18 +80,26 @@ def parse_file(name, env=None):
         if idot < 0:
             idot = len(mr.group(9))
         parts = [
-            (mr.group(1) + mr.group(2)).upper(), #parent
-            trim_child(mr, env), #child
-            mr.group(4).upper(), #type
-            mr.group(5), #zeros
-            int(mr.group(6)), #num
-            mr.group(7).upper(), #ver
-            mr.group(8), #sep
-            mr.group(9)[0:idot], #comment
-            mr.group(9)[idot:].lower(), #ext
-            "file"] #what
-        if parts[6] or not parts[7]: #has separator or comment is empty
-            parts.append("{0}{1}-{2}{4:d}{5}".format(*parts)) #id
+            (mr.group(1) + mr.group(2)).upper(),  # parent
+            trim_child(mr, env),  # child
+            mr.group(4).upper(),  # type
+            mr.group(5),  # zeros
+            int(mr.group(6)),  # num
+            mr.group(7).upper(),  # ver
+            mr.group(8),  # sep
+            mr.group(9)[0:idot],  # comment
+            mr.group(9)[idot:].lower(),  # ext
+            "file"]  # what
+        if parts[6] or not parts[7]:  # has separator or comment is empty
+            parts.append("{0}{1}-{2}{4:d}{5}".format(*parts))  # id
+            # make sort number from picture number and version
+            # version is up to 2 letters A-Z so 26 letters + 1 for not present = 27
+            sortNum = parts[4] * 729  # 27 squared
+            if parts[5]:
+                sortNum += (ord(parts[5][0]) - ord('A') + 1) * 27
+                if len(parts[5]) > 1:
+                    sortNum += ord(parts[5][1]) - ord('A') + 1
+            parts.append(sortNum)
             return Parts._make(parts)
     return None
 
