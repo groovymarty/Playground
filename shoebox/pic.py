@@ -25,9 +25,9 @@ Parts = namedtuple('Parts', ['parent', 'child', 'type', 'zeros', 'num', 'ver', '
 #                         |1            |2         |3             |4     |5
 folderPat = re.compile(r"^([A-Za-z]+\d*)([A-Za-z]*)(\d*(?:\+\d+)*)([- ]*)(.*)")
 
-#                       parentBase    parentSfx  child           type       z   num       ver           sep  commentExt
-#                       |1            |2         |3              |4         |5  |6        |7            |8     |9
-filePat = re.compile(r"^([A-Za-z]+\d*)([A-Za-z]*)(\d*(?:\+\d+)*)-([A-Za-z]*)(0*)([1-9]\d*)([A-Za-z]{,2})([- ]*)(.*)")
+#                       parentBase    parentSfx  child           type       z   num       ver            sep  commentExt
+#                       |1            |2         |3              |4         |5  |6        |7             |8     |9
+filePat = re.compile(r"^([A-Za-z]+\d*)([A-Za-z]*)(\d*(?:\+\d+)*)-([A-Za-z]*)(0*)([1-9]\d*)([A-Za-z]{0,2})([- ]*)(.*)")
 
 # leading plus unnecessary if parent has suffix (and therefore ends with a letter)
 def trim_child(mr, env):
