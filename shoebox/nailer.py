@@ -9,6 +9,7 @@ from shoebox import pic, nails, nailcache
 from PIL import Image
 from datetime import datetime
 from tkit.loghelper import LogHelper
+from pathlib import Path
 
 instances = []
 nextInstNum = 1
@@ -34,13 +35,17 @@ class Nailer(LogHelper):
         self.instNum = nextInstNum
         nextInstNum += 1
         self.top = Toplevel()
-        self.top.geometry("800x200")
+        self.top.geometry("800x250")
         self.top.title("Nailer {:d}".format(self.instNum))
         self.top.bind('<Destroy>', self.on_destroy)
         instances.append(self)
 
         self.garden = WidgetGarden()
-        self.garden.labelText = {'path': "Starting Path:", 'recursive': "Recursive", 'force': "Force"}
+        self.garden.labelText = {
+            'path': "Starting Path:",
+            'recursive': "Recursive",
+            'quick': "Quick, create missing nail files only",
+            'force': "Force, make all new thumbnails"}
         self.garden.begin_layout(self.top, 3)
         self.top.grid_columnconfigure(1, weight=1)
         self.garden.make_entry('path')
@@ -51,6 +56,9 @@ class Nailer(LogHelper):
         self.garden.make_checkbutton('recursive')
         self.logButton = ttk.Button(self.garden.curParent, text="Log", command=self.do_log)
         self.garden.grid_widget(self.logButton)
+        self.garden.next_row()
+        self.garden.next_col()
+        self.garden.make_checkbutton('quick')
         self.garden.next_row()
         self.garden.next_col()
         self.garden.make_checkbutton('force')
@@ -74,6 +82,11 @@ class Nailer(LogHelper):
         self.totalLabel = ttk.Label(self.garden.curParent)
         self.garden.grid_widget(self.totalLabel)
         self.garden.next_row()
+        self.garden.grid_widget(ttk.Label(self.garden.curParent, text="Nails made:"))
+        self.garden.next_col()
+        self.madeLabel = ttk.Label(self.garden.curParent)
+        self.garden.grid_widget(self.madeLabel)
+        self.garden.next_row()
         self.garden.grid_widget(ttk.Label(self.garden.curParent, text="Cache:"))
         self.garden.next_col()
         self.cacheLabel = ttk.Label(self.garden.curParent)
@@ -89,11 +102,14 @@ class Nailer(LogHelper):
         self.garden.write_var('path', self.absPath)
         self.recursive = True
         self.garden.write_var('recursive', self.recursive)
+        self.quick = False
+        self.garden.write_var('quick', self.quick)
         self.force = False
         self.garden.write_var('force', self.force)
         self.foldersToScan = None
         self.curFolder = None
         self.curScan = None
+        self.skipping = False
         self.curEnt = None
         self.curSzIndx = 0
         self.curImage = None
@@ -101,7 +117,8 @@ class Nailer(LogHelper):
         self.bufs = []
         self.nFolders = 0
         self.nPictures = 0
-        self.nImagesMade = 0
+        self.nNailImagesMade = 0
+        self.nNailFilesMade = 0
         self.tstart = None
         self.update_cache_status()
 
@@ -149,17 +166,20 @@ class Nailer(LogHelper):
         self.disable_widgets()
         self.absPath = self.garden.read_var('path')
         self.recursive = self.garden.read_var('recursive')
+        self.quick = self.garden.read_var('quick')
         self.force = self.garden.read_var('force')
         self.foldersToScan = [Folder(DirEntry(self.absPath), None)]
         self.curFolder = None
         self.curScan = None
+        self.skipping = False
         self.curEnt = None
         self.curSzIndx = 0
         self.curImage = None
         self.quit = False
         self.nFolders = 0
         self.nPictures = 0
-        self.nImagesMade = 0
+        self.nNailFilesMade = 0
+        self.nNailImagesMade = 0
         self.update_totals()
         self.tstart = datetime.now()
         self.top.after(self.get_delay_ms(), self.do_next)
@@ -184,6 +204,7 @@ class Nailer(LogHelper):
                 if len(self.foldersToScan):
                     self.curFolder = self.foldersToScan.pop()
                     self.curFolderLabel.configure(text=self.curFolder.ent.path)
+                    self.curPictureLabel.configure(text="")
                     self.nFolders += 1
                     self.update_totals()
                     self.curScan = os.scandir(self.curFolder.ent.path)
@@ -207,38 +228,41 @@ class Nailer(LogHelper):
                         self.foldersToScan.append(Folder(ent, self.curFolder))
                 elif os.path.splitext(ent.path)[1].lower() in pic.pictureExts:
                     # is a picture, set up size iteration
-                    self.curPictureLabel.configure(text=ent.name)
                     self.nPictures += 1
                     self.update_totals()
-                    self.curEnt = ent
-                    self.curSzIndx = 0
-                    self.curImage = None
-                    break
+                    if not self.skipping:
+                        self.curPictureLabel.configure(text=ent.name)
+                        self.curEnt = ent
+                        self.curSzIndx = 0
+                        self.curImage = None
+                        break
         # that's all for now, come back soon
         self.top.after(self.get_delay_ms(), self.do_next)
 
     # update totals
     def update_totals(self):
-        self.totalLabel.configure(text="{:d} folders, {:d} pictures, {:d} images made".format(
-            self.nFolders, self.nPictures, self.nImagesMade))
+        self.totalLabel.configure(text="{:d} folders, {:d} pictures".format(self.nFolders, self.nPictures))
+        self.madeLabel.configure(text="{:d} files, {:d} images".format(self.nNailFilesMade, self.nNailImagesMade))
         self.update_cache_status()
 
     # begin processing a folder
     def begin_folder(self):
-        # bufs is array of (index dictionary, byte array of concatenated PNG files) for each thumbnail size
-        # index key is picture file name
-        # index value is (offset, length) of PNG file in byte array
-        self.bufs = [({}, bytearray()) for sz in pic.nailSizes]
-        if not self.force:
-            # preload all sizes
-            for sz in pic.nailSizes:
-                try:
-                    nailcache.get_nails(self.curFolder.ent.path, sz, self.env)
-                except:
-                    pass
-            # explode any nails files we have in cache for this folder to the loose file cache
-            nailcache.explode_nails(self.curFolder.ent.path)
-            self.update_cache_status()
+        self.skipping = self.quick and self.all_nails_exist(self.curFolder.ent.path)
+        if not self.skipping:
+            # bufs is array of (index dictionary, byte array of concatenated PNG files) for each thumbnail size
+            # index key is picture file name
+            # index value is (offset, length) of PNG file in byte array
+            self.bufs = [({}, bytearray()) for sz in pic.nailSizes]
+            if not self.force:
+                # preload all sizes
+                for sz in pic.nailSizes:
+                    try:
+                        nailcache.get_nails(self.curFolder.ent.path, sz, self.env)
+                    except:
+                        pass
+                # explode any nails files we have in cache for this folder to the loose file cache
+                nailcache.explode_nails(self.curFolder.ent.path)
+                self.update_cache_status()
 
     # process one picture, one size
     def do_picture(self):
@@ -271,7 +295,7 @@ class Nailer(LogHelper):
 
             # make thumbnail of desired size
             imCopy.thumbnail((sz, sz))
-            self.nImagesMade += 1
+            self.nNailImagesMade += 1
             self.update_totals()
 
         offset = len(buf)
@@ -293,13 +317,16 @@ class Nailer(LogHelper):
 
     # finish processing a folder
     def finish_folder(self):
-        for i, (indx, buf) in enumerate(self.bufs):
-            # don't write empty files
-            if len(buf):
-                nails.write_nails(self.curFolder.ent.path, pic.nailSizes[i], indx, buf)
-                # clear any leftover files from cache
-                nailcache.clear_nails(self.curFolder.ent.path, self.env)
-                self.update_cache_status()
+        if not self.skipping:
+            for i, (indx, buf) in enumerate(self.bufs):
+                # don't write empty files
+                if len(buf):
+                    nails.write_nails(self.curFolder.ent.path, pic.nailSizes[i], indx, buf)
+                    self.nNailFilesMade += 1
+                    self.update_totals()
+                    # clear any leftover files from cache
+                    nailcache.clear_nails(self.curFolder.ent.path, self.env)
+                    self.update_cache_status()
 
     # when nothing more to do (or quitting because stop button clicked)
     def do_end(self):
@@ -319,6 +346,7 @@ class Nailer(LogHelper):
     def disable_widgets(self, disable=True):
         self.garden.set_widget_disable('path', disable)
         self.garden.set_widget_disable('recursive', disable)
+        self.garden.set_widget_disable('quick', disable)
         self.garden.set_widget_disable('force', disable)
         self.garden.disable_widget(self.pathButton, disable)
         self.garden.disable_widget(self.startButton, disable)
@@ -328,3 +356,11 @@ class Nailer(LogHelper):
     def update_cache_status(self):
         msg = "{} nails, {} loose files".format(nailcache.cacheCount, nailcache.looseCount)
         self.cacheLabel.configure(text=msg)
+
+    # return true if all nail files exist for specified folder
+    def all_nails_exist(self, folderPath):
+        for sz in pic.nailSizes:
+            path = os.path.join(folderPath, nails.build_file_name(sz))
+            if not Path(path).exists():
+                return False
+        return True
