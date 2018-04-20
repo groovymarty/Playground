@@ -64,13 +64,17 @@ def change_loose_file(oldPath, newPath):
             del looseCache[sz][oldPath]
 
 # clear loose file from cache
-def clear_loose_file(path, sz):
-    path = os.path.abspath(path)
-    global looseCount
-    if sz in looseCache:
-        if path in looseCache[sz]:
-            del looseCache[sz][path]
-            looseCount -= 1
+def clear_loose_file(path, sz=None):
+    if sz is None:
+        for sz in looseCache:
+            clear_loose_file(path, sz)
+    else:
+        path = os.path.abspath(path)
+        global looseCount
+        if sz in looseCache:
+            if path in looseCache[sz]:
+                del looseCache[sz][path]
+                looseCount -= 1
 
 # add thumbnails to loose file cache, all sizes
 def explode_nails(folderPath):

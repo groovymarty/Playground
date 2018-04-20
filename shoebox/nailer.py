@@ -101,6 +101,7 @@ class Nailer(LogHelper):
         self.bufs = []
         self.nFolders = 0
         self.nPictures = 0
+        self.nImagesMade = 0
         self.tstart = None
         self.update_cache_status()
 
@@ -158,6 +159,7 @@ class Nailer(LogHelper):
         self.quit = False
         self.nFolders = 0
         self.nPictures = 0
+        self.nImagesMade = 0
         self.update_totals()
         self.tstart = datetime.now()
         self.top.after(self.get_delay_ms(), self.do_next)
@@ -217,7 +219,8 @@ class Nailer(LogHelper):
 
     # update totals
     def update_totals(self):
-        self.totalLabel.configure(text="{:d} folders, {:d} pictures".format(self.nFolders, self.nPictures))
+        self.totalLabel.configure(text="{:d} folders, {:d} pictures, {:d} images made".format(
+            self.nFolders, self.nPictures, self.nImagesMade))
         self.update_cache_status()
 
     # begin processing a folder
@@ -268,6 +271,8 @@ class Nailer(LogHelper):
 
             # make thumbnail of desired size
             imCopy.thumbnail((sz, sz))
+            self.nImagesMade += 1
+            self.update_totals()
 
         offset = len(buf)
         if pic.is_pil_image(imCopy):
