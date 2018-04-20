@@ -1205,7 +1205,7 @@ class Px(LogHelper, WidgetHelper):
                     if len(tilesToCheck):
                         check_these(tilesToCheck, startSortNum, tile.parts.sortNum)
                         tilesToCheck = []
-                        startSortNum = tile.parts.sortNum
+                    startSortNum = tile.parts.sortNum
             else:
                 self.clear_tile_out_of_order(tile)
         if len(tilesToCheck):
@@ -1275,12 +1275,12 @@ class Px(LogHelper, WidgetHelper):
             nailcache.explode_nails(self.curFolder.path)
             self.log_info("{} loose files after exploding".format(nailcache.looseCount))
             # clear them from the cache
-            nailcache.clear_nails(self.curFolder.path)
+            nailcache.clear_nails(self.curFolder.path, self.env)
             self.nails = None
             self.nailsTried = True
             # delete the actual files
             for sz in pic.nailSizes:
-                nails.delete_nails(self.curFolder.path, sz)
+                nails.delete_nails(self.curFolder.path, sz, self.env)
                 # turn file tile into a hole
                 name = nails.build_file_name(sz)
                 if name in self.tilesByName:

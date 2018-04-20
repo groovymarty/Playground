@@ -61,7 +61,7 @@ def change_loose_file(oldPath, newPath):
     for sz in looseCache:
         if oldPath in looseCache[sz]:
             looseCache[sz][newPath] = looseCache[sz][oldPath]
-            del looseCache[sz][newPath]
+            del looseCache[sz][oldPath]
 
 # clear loose file from cache
 def clear_loose_file(path, sz):

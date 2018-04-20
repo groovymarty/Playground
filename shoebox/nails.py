@@ -1,6 +1,7 @@
 # shoebox.nails
 
 import os
+from tkit import environ
 
 # build thumbnail file name for specified size
 def build_file_name(sz):
@@ -56,10 +57,11 @@ def read_nails(folderPath, sz):
         pngBytes = f.read()
     return (indx, pngBytes)
 
-def delete_nails(folderPath, sz):
+def delete_nails(folderPath, sz, env=None):
     path = os.path.join(folderPath, build_file_name(sz))
     try:
         os.remove(path)
+        environ.log_info(env, "Deleted {}".format(path))
     except FileNotFoundError:
         pass
 

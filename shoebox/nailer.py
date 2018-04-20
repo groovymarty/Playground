@@ -40,7 +40,7 @@ class Nailer(LogHelper):
         instances.append(self)
 
         self.garden = WidgetGarden()
-        self.garden.labelText = {'path': "Starting Path:", 'recursive': "Recursive", 'fast': "Fast"}
+        self.garden.labelText = {'path': "Starting Path:", 'recursive': "Recursive", 'force': "Force"}
         self.garden.begin_layout(self.top, 3)
         self.top.grid_columnconfigure(1, weight=1)
         self.garden.make_entry('path')
@@ -53,7 +53,7 @@ class Nailer(LogHelper):
         self.garden.grid_widget(self.logButton)
         self.garden.next_row()
         self.garden.next_col()
-        self.garden.make_checkbutton('fast')
+        self.garden.make_checkbutton('force')
         self.garden.next_row()
         self.garden.next_col()
         self.startButton = ttk.Button(self.garden.curParent, text="Start", command=self.do_start)
@@ -89,8 +89,8 @@ class Nailer(LogHelper):
         self.garden.write_var('path', self.absPath)
         self.recursive = True
         self.garden.write_var('recursive', self.recursive)
-        self.fast = False
-        self.garden.write_var('fast', self.fast)
+        self.force = False
+        self.garden.write_var('force', self.force)
         self.foldersToScan = None
         self.curFolder = None
         self.curScan = None
@@ -116,6 +116,7 @@ class Nailer(LogHelper):
     # so this function removes all known references then closes the top level window
     # note this will result in a second call from the on_destroy event handler; that's ok
     def destroy(self):
+        self.close_log_windows()
         if self in instances:
             instances.remove(self)
         if self.top is not None:
@@ -140,14 +141,14 @@ class Nailer(LogHelper):
 
     # return delay in milliseconds
     def get_delay_ms(self):
-        return 0 if self.fast else delayMs
+        return delayMs
 
     # when start button is clicked
     def do_start(self):
         self.disable_widgets()
         self.absPath = self.garden.read_var('path')
         self.recursive = self.garden.read_var('recursive')
-        self.fast = self.garden.read_var('fast')
+        self.force = self.garden.read_var('force')
         self.foldersToScan = [Folder(DirEntry(self.absPath), None)]
         self.curFolder = None
         self.curScan = None
@@ -225,7 +226,16 @@ class Nailer(LogHelper):
         # index key is picture file name
         # index value is (offset, length) of PNG file in byte array
         self.bufs = [({}, bytearray()) for sz in pic.nailSizes]
-        pass
+        if not self.force:
+            # preload all sizes
+            for sz in pic.nailSizes:
+                try:
+                    nailcache.get_nails(self.curFolder.ent.path, sz, self.env)
+                except:
+                    pass
+            # explode any nails files we have in cache for this folder to the loose file cache
+            nailcache.explode_nails(self.curFolder.ent.path)
+            self.update_cache_status()
 
     # process one picture, one size
     def do_picture(self):
@@ -233,12 +243,16 @@ class Nailer(LogHelper):
         sz = pic.nailSizes[self.curSzIndx]
 
         # first check loose file cache
-        imCopy = nailcache.get_loose_file(self.curEnt.path, sz)
-        if imCopy:
-            # found it, clear from cache
+        imCopy = None
+        if not self.force:
             # note this could be image or PNG data, assume image for now
-            nailcache.clear_loose_file(self.curEnt.path, sz)
-        else:
+            imCopy = nailcache.get_loose_file(self.curEnt.path, sz)
+
+        # clear loose file from cache in any case
+        nailcache.clear_loose_file(self.curEnt.path, sz)
+
+        # if still no image, make new thumbnail
+        if not imCopy:
             # open and read picture file (this is expensive because pic files are a couple GB or larger)
             if self.curImage is None:
                 im = Image.open(self.curEnt.path)
@@ -278,6 +292,9 @@ class Nailer(LogHelper):
             # don't write empty files
             if len(buf):
                 nails.write_nails(self.curFolder.ent.path, pic.nailSizes[i], indx, buf)
+                # clear any leftover files from cache
+                nailcache.clear_nails(self.curFolder.ent.path, self.env)
+                self.update_cache_status()
 
     # when nothing more to do (or quitting because stop button clicked)
     def do_end(self):
@@ -297,7 +314,7 @@ class Nailer(LogHelper):
     def disable_widgets(self, disable=True):
         self.garden.set_widget_disable('path', disable)
         self.garden.set_widget_disable('recursive', disable)
-        self.garden.set_widget_disable('fast', disable)
+        self.garden.set_widget_disable('force', disable)
         self.garden.disable_widget(self.pathButton, disable)
         self.garden.disable_widget(self.startButton, disable)
         self.garden.disable_widget(self.stopButton, not disable)

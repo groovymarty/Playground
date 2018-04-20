@@ -91,6 +91,7 @@ class Sweeper(LogHelper):
     # so this function removes all known references then closes the top level window
     # note this will result in a second call from the on_destroy event handler; that's ok
     def destroy(self):
+        self.close_log_windows()
         if self in instances:
             instances.remove(self)
         if self.top is not None:
