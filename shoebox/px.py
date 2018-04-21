@@ -1040,7 +1040,7 @@ class Px(LogHelper, WidgetHelper):
 
         # number by tens if possible, otherwise by ones
         lastNumSeen10 = int(lastNumSeen / 10) * 10
-        if lastNumSeen10 + (nCanDo * 10) < nextNumSeen:
+        if lastNumSeen10 + (nCanDo * 10) < nextNumSeen and len(self.tilesOrder) < 500:
             step = 10
             firstAvailNum = lastNumSeen10 + step
             endAvailNum = int(nextNumSeen / 10) * 10

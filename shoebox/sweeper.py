@@ -74,6 +74,7 @@ class Sweeper(LogHelper):
         self.curScan = None
         self.curEnt = None
         self.dupIdCheck = None
+        self.prevSortNum = 0
         self.quit = False
         self.nFolders = 0
         self.nPictures = 0
@@ -195,6 +196,7 @@ class Sweeper(LogHelper):
     # begin processing a folder
     def begin_folder(self):
         self.dupIdCheck = {}
+        self.prevSortNum = 0
         pass
 
     # process one picture
@@ -203,17 +205,24 @@ class Sweeper(LogHelper):
             parts = pic.parse_file(self.curEnt.name, self.env)
             if parts and parts.id:
                 id = parts.id
-                if len(parts.ver) > 1:
-                    self.log_info("Has long ver: {}".format(self.curEnt.name))
+                error = False
                 # check for duplicate ID
                 if id in self.dupIdCheck:
                     self.log_error("Duplicate ID: {}".format(self.curEnt.path))
+                    error = True
                 else:
                     self.dupIdCheck[id] = True
                 # verify ID correctly predicts the folder where item can be found
                 folderId = pic.get_folder_id(parts)
                 if folderId != self.curFolder.parts.id:
                     self.log_error("Picture out of place: {}".format(self.curEnt.path))
+                    error = True
+                # check for out of order
+                if not error:
+                    if parts.sortNum > self.prevSortNum:
+                        self.prevSortNum = parts.sortNum
+                    else:
+                        self.log_error("Out of order: {}".format(self.curEnt.path))
 
             else:
                 self.log_error("Noncanonical: {}".format(self.curEnt.path))
