@@ -2,7 +2,7 @@
 
 import os, shutil
 from tkinter import *
-from tkinter import ttk, messagebox
+from tkinter import ttk, messagebox, simpledialog
 from PIL import Image
 import ImageTk
 from shoebox import pic, nails, nailcache, dnd
@@ -18,6 +18,27 @@ instances = []
 nextInstNum = 1
 
 tileGap = 14
+
+class PxOptionsDialog(simpledialog.Dialog):
+    def __init__(self, px):
+        self.px = px
+        simpledialog.Dialog.__init__(self, px.top, title="Options - {}".format(px.pxName))
+
+    def body(self, master):
+        master.columnconfigure(1, weight=1)
+        Label(master, text="Comment Mode").grid(row=0, sticky=W)
+        self.commentMode = ttk.Combobox(master, values=("Discard", "Trim 2", "Keep All"))
+        self.commentMode.current(self.px.commentMode)
+        self.commentMode.state(['readonly'])
+        self.commentMode.grid(row=0, column=1, sticky=W)
+        self.numByTensVar = BooleanVar()
+        self.numByTensVar.set(self.px.numByTens)
+        self.numByTens = ttk.Checkbutton(master, variable=self.numByTensVar, text="Number by tens")
+        self.numByTens.grid(row=1, column=1, sticky=W)
+
+    def apply(self):
+        self.px.commentMode = self.commentMode.current()
+        self.px.numByTens = self.numByTensVar.get()
 
 class Px(LogHelper, WidgetHelper):
     def __init__(self):
@@ -61,6 +82,8 @@ class Px(LogHelper, WidgetHelper):
         self.statusLabel.pack(side=LEFT, fill=X, expand=True)
         self.logButton = ttk.Button(self.statusBar, text="Log", command=self.do_log)
         self.logButton.pack(side=RIGHT)
+        self.optionsButton = ttk.Button(self.statusBar, text="Options", command=self.do_options)
+        self.optionsButton.pack(side=RIGHT)
 
         # created paned window for tree and canvas
         self.panedWin = PanedWindow(self.top, orient=HORIZONTAL, width=800, height=800, sashwidth=5, sashrelief=GROOVE)
@@ -134,6 +157,8 @@ class Px(LogHelper, WidgetHelper):
         self.loaded = False
         self.nPictures = 0
         self.numDigits = 0
+        self.numByTens = True
+        self.commentMode = pic.TRIM2
         self.rootFolder = PxFolder(None, "", ".", "")
         self.folders = {"": self.rootFolder} #folder id to folder object
         self.populate_tree(self.rootFolder)
@@ -259,7 +284,11 @@ class Px(LogHelper, WidgetHelper):
 
     # when Log button clicked
     def do_log(self):
-        self.open_log_window("Log - Px {:d}".format(self.instNum))
+        self.open_log_window("Log - {}".format(self.pxName))
+
+    # when Options button clicked
+    def do_options(self):
+        PxOptionsDialog(self)
 
     # enable/disable buttons
     def enable_buttons(self, enable=True):
@@ -1040,7 +1069,7 @@ class Px(LogHelper, WidgetHelper):
 
         # number by tens if possible, otherwise by ones
         lastNumSeen10 = int(lastNumSeen / 10) * 10
-        if lastNumSeen10 + (nCanDo * 10) < nextNumSeen and len(self.tilesOrder) < 500:
+        if lastNumSeen10 + (nCanDo * 10) < nextNumSeen and len(self.tilesOrder) < 500 and self.numByTens:
             step = 10
             firstAvailNum = lastNumSeen10 + step
             endAvailNum = int(nextNumSeen / 10) * 10
@@ -1063,7 +1092,7 @@ class Px(LogHelper, WidgetHelper):
 
         num = firstNum
         for tile in tilesToDo:
-            junk, comment, ext = pic.parse_noncanon(tile.name)
+            junk, comment, ext = pic.parse_noncanon(tile.name, self.commentMode)
             lumps = [folderId]
             if self.numDigits == 3:
                 lumps.append("{:03d}".format(num))

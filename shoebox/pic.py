@@ -18,6 +18,11 @@ OOO = 0x04  # out of order
 MAXNUM = 999999
 MAXSORTNUM = MAXNUM * 729
 
+# comment modes
+DISCARD = 0
+TRIM2 = 1
+KEEPALL = 2
+
 # named tuple returned by parse functions
 Parts = namedtuple('Parts', [
     'parent',   # 0
@@ -122,10 +127,15 @@ def get_num_digits(parts):
     return len(parts.zeros) + len(str(parts.num))
 
 # parse a noncanonical name, return tuple (junk, comment, ext)
-def parse_noncanon(name):
+def parse_noncanon(name, commentMode):
     basename, ext = os.path.splitext(name)
-    lumps = basename.split("-")
-    return "-".join(lumps[:2]), "-".join(lumps[2:]), ext
+    if commentMode == TRIM2:
+        lumps = basename.split("-")
+        return "-".join(lumps[:2]), "-".join(lumps[2:]), ext
+    elif commentMode == KEEPALL:
+        return "", basename, ext
+    else:  # DISCARD
+        return basename, "", ext
 
 # return PIL image rotated according to EXIF orientation value
 def fix_image_orientation(im):
