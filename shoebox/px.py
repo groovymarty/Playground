@@ -1092,12 +1092,12 @@ class Px(LogHelper, WidgetHelper):
 
         num = firstNum
         for tile in tilesToDo:
-            junk, comment, ext = pic.parse_noncanon(tile.name, self.commentMode)
+            junk, ver, comment, ext = pic.parse_noncanon(tile.name, self.commentMode)
             lumps = [folderId]
             if self.numDigits == 3:
-                lumps.append("{:03d}".format(num))
+                lumps.append("{:03d}{}".format(num, ver))
             else:
-                lumps.append("{:04d}".format(num))
+                lumps.append("{:04d}{}".format(num, ver))
             if comment:
                 lumps.append(comment)
             newName = "-".join(lumps) + ext

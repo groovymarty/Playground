@@ -46,6 +46,10 @@ folderPat = re.compile(r"^([A-Za-z]+\d*)([A-Za-z]*)(\d*(?:\+\d+)*)([- ]*)(.*)")
 #                       |1            |2         |3              |4         |5  |6        |7             |8     |9
 filePat = re.compile(r"^([A-Za-z]+\d*)([A-Za-z]*)(\d*(?:\+\d+)*)-([A-Za-z]*)(0*)([1-9]\d*)([A-Za-z]{0,2})([- ]*)(.*)")
 
+#                            type       z   num       ver
+#                            |1         |2  |3        |4
+secondLumpPat = re.compile(r"([A-Za-z]*)(0*)([1-9]\d*)([A-Za-z]{0,2})")
+
 # leading plus unnecessary if parent has suffix (and therefore ends with a letter)
 def trim_child(mr, env):
     if mr.group(3).startswith("+") and mr.group(2):
@@ -126,16 +130,21 @@ def get_parent_id(parts):
 def get_num_digits(parts):
     return len(parts.zeros) + len(str(parts.num))
 
-# parse a noncanonical name, return tuple (junk, comment, ext)
+# parse a noncanonical name, return tuple (junk, version, comment, ext)
 def parse_noncanon(name, commentMode):
     basename, ext = os.path.splitext(name)
     if commentMode == TRIM2:
         lumps = basename.split("-")
-        return "-".join(lumps[:2]), "-".join(lumps[2:]), ext
+        ver = ""
+        if len(lumps) > 1:
+            mr = secondLumpPat.fullmatch(lumps[1])
+            if mr:
+                ver = mr.group(4)
+        return "-".join(lumps[:2]), ver, "-".join(lumps[2:]), ext
     elif commentMode == KEEPALL:
-        return "", basename, ext
+        return "", "", basename, ext
     else:  # DISCARD
-        return basename, "", ext
+        return basename, "", "", ext
 
 # return PIL image rotated according to EXIF orientation value
 def fix_image_orientation(im):
