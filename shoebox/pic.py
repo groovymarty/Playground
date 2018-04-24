@@ -137,8 +137,11 @@ def parse_noncanon(name, commentMode):
         lumps = basename.split("-")
         ver = ""
         if len(lumps) > 1:
+            # parse second lump and extract version
             mr = secondLumpPat.fullmatch(lumps[1])
             if mr:
+                # remove version from second lump
+                lumps[1] = "".join(mr.group(1,2,3))
                 ver = mr.group(4)
         return "-".join(lumps[:2]), ver, "-".join(lumps[2:]), ext
     elif commentMode == KEEPALL:

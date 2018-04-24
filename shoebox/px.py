@@ -1062,10 +1062,22 @@ class Px(LogHelper, WidgetHelper):
     def number_group_of_tiles(self, tilesInGroup, lastNumSeen, nextNumSeen, stickRight):
         folderId = pic.get_folder_id(self.curFolder.parts)
         nChanged = 0
-        nNeeded = len(tilesInGroup)
         nAvail = nextNumSeen - lastNumSeen - 1
-        nCanDo = min(nNeeded, nAvail)
-        nCantDo = nNeeded - nCanDo
+        nCanDo = 0
+
+        # make a quick pass to see how many we can do, taking into account versions sharing same number
+        prevParts = "", "", "", ""
+        for tile in tilesInGroup:
+            junk, ver, comment, ext = parts = pic.parse_noncanon(tile.name, self.commentMode)
+            # if same name as previous but different version, use same number
+            if junk == prevParts[0] and ver != prevParts[1]:
+                nCanDo += 1
+            elif nAvail:
+                nCanDo += 1
+                nAvail -= 1
+            prevParts = parts
+
+        nCantDo = len(tilesInGroup) - nCanDo
 
         # number by tens if possible, otherwise by ones
         lastNumSeen10 = int(lastNumSeen / 10) * 10
@@ -1091,10 +1103,16 @@ class Px(LogHelper, WidgetHelper):
             errMsgSide = "after"
 
         num = firstNum
+        prevParts = "", "", "", ""
         for tile in tilesToDo:
-            junk, ver, comment, ext = pic.parse_noncanon(tile.name, self.commentMode)
+            junk, ver, comment, ext = parts = pic.parse_noncanon(tile.name, self.commentMode)
+            # if same name as previous but different version, use same number
+            if junk == prevParts[0] and ver != prevParts[1]:
+                num -= step
+            prevParts = parts
+
             lumps = [folderId]
-            if self.numDigits == 3:
+            if self.numDigits == 3 or (self.numDigits < 3 and step == 1):
                 lumps.append("{:03d}{}".format(num, ver))
             else:
                 lumps.append("{:04d}{}".format(num, ver))
