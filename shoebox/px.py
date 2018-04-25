@@ -8,6 +8,7 @@ import ImageTk
 from shoebox import pic, nails, nailcache, dnd
 from shoebox.dnd import DndItemEnt
 from shoebox.nailer import Nailer
+from shoebox.sweeper import Sweeper
 from shoebox.pxfolder import PxFolder
 from shoebox.pxtile import PxTilePic, PxTileFile, PxTileHole, selectColors
 from tkit.direntry import DirEntryFile
@@ -71,6 +72,8 @@ class Px(LogHelper, WidgetHelper):
         self.unnumButton.pack(side=LEFT)
         self.sortButton = ttk.Button(self.topBar, text="Sort", command=self.do_sort)
         self.sortButton.pack(side=LEFT)
+        self.sweeperButton = ttk.Button(self.topBar, text="Sweeper", command=self.do_sweeper)
+        self.sweeperButton.pack(side=RIGHT)
         self.nailerButton = ttk.Button(self.topBar, text="Nailer", command=self.do_nailer)
         self.nailerButton.pack(side=RIGHT)
         self.enable_buttons(False)
@@ -144,11 +147,20 @@ class Px(LogHelper, WidgetHelper):
         self.hTotal = 0
         self.canvas.bind('<Configure>', self.on_canvas_resize)
         self.canvas.bind('<Button-1>', self.on_canvas_click)
+        self.canvas.bind('<Double-Button-1>', self.on_canvas_doubleclick)
         self.canvas.bind('<Button-3>', self.on_canvas_rclick)
         self.canvas.bind('<B1-Motion>', self.on_canvas_dnd_motion)
         self.canvas.bind('<ButtonRelease>', self.on_canvas_dnd_release)
         self.canvas.bind('<Key>', self.on_canvas_key)
         dnd.add_target(self.canvas, self, self.pxName)
+
+        # popup menu
+        self.popMenu = Menu(self.top, tearoff=0)
+        self.popMenu.add_command(label="Rename", command=self.do_rename)
+        self.popMenu.add_command(label="Delete", command=self.do_delete)
+        self.popMenu.add_separator()
+        self.popMenu.add_command(label="[X] Close Menu", command=self.do_close_menu)
+        self.popMenuTile = None
 
         self.lastError = ""
         self.curFolder = None
@@ -282,6 +294,13 @@ class Px(LogHelper, WidgetHelper):
         else:
             Nailer(self.curFolder.path)
 
+    # when Sweeper button clicked
+    def do_sweeper(self):
+        if self.curFolder is None:
+            Sweeper(".")
+        else:
+            Sweeper(self.curFolder.path)
+
     # when Log button clicked
     def do_log(self):
         self.open_log_window("Log - {}".format(self.pxName))
@@ -299,6 +318,7 @@ class Px(LogHelper, WidgetHelper):
         self.enable_widget(self.unnumButton, enable)
         self.enable_widget(self.sortButton, enable)
         self.enable_widget(self.nailerButton, enable)
+        self.enable_widget(self.sweeperButton, enable)
 
     # populate tree
     def populate_tree(self, parent):
@@ -630,14 +650,6 @@ class Px(LogHelper, WidgetHelper):
                     self.sweep_out_of_order()
             else:
                 self.set_status("No items selected")
-
-    # when user right-clicks in canvas
-    def on_canvas_rclick(self, event):
-        # find item that was clicked
-        items = self.canvas.find_withtag(CURRENT)
-        if len(items) and items[0] in self.canvasItems:
-            tile = self.canvasItems[items[0]]
-            print("TODO: context menu for {}".format(tile.name))
 
     # delete all items in canvas
     def clear_canvas(self):
@@ -1332,3 +1344,39 @@ class Px(LogHelper, WidgetHelper):
                 name = nails.build_file_name(sz)
                 if name in self.tilesByName:
                     self.remove_tile(self.tilesByName[name], True)
+
+    # when user right-clicks in canvas
+    def on_canvas_rclick(self, event):
+        # find item that was clicked
+        items = self.canvas.find_withtag(CURRENT)
+        if len(items) and items[0] in self.canvasItems:
+            self.popMenuTile = self.canvasItems[items[0]]
+            self.popMenu.post(event.x_root, event.y_root)
+
+    # when user double clicks in canvas
+    def on_canvas_doubleclick(self, event):
+        # find item that was clicked
+        items = self.canvas.find_withtag(CURRENT)
+        if len(items) and items[0] in self.canvasItems:
+            tile = self.canvasItems[items[0]]
+            print("TODO: double click for {}".format(tile.name))
+
+    # menu delete
+    def do_delete(self):
+        msg = "Are you sure you want to delete {}?".format(self.popMenuTile.name)
+        if messagebox.askyesno("Confirm Delete", msg):
+            try:
+                self.delete_file_in_cur_folder(self.popMenuTile.name)
+                self.remove_tile(self.popMenuTile, True)
+                self.set_status("1 item deleted")
+                self.sweep_out_of_order()
+            except RuntimeError as e:
+                self.log_error(str(e))
+
+    # menu rename
+    def do_rename(self):
+        print("you picked rename")
+
+    # menu close
+    def do_close_menu(self):
+        self.popMenu.unpost()
