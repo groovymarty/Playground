@@ -41,6 +41,24 @@ class PxOptionsDialog(simpledialog.Dialog):
         self.px.commentMode = self.commentMode.current()
         self.px.numByTens = self.numByTensVar.get()
 
+class PxRenameDialog(simpledialog.Dialog):
+    def __init__(self, px, tile):
+        self.px = px
+        self.tile = tile
+        simpledialog.Dialog.__init__(self, px.top, title="Rename - {}".format(px.pxName))
+
+    def body(self, master):
+        master.columnconfigure(1, weight=1, minsize=500)
+        Label(master, text="Old Name:").grid(row=0, sticky=W)
+        Label(master, text=self.tile.name).grid(row=0, column=1, sticky=W)
+        Label(master, text="New Name:").grid(row=1, sticky=W)
+        self.newName = ttk.Entry(master)
+        self.newName.grid(row=1, column=1, sticky=(W,E))
+        self.newName.insert(0, self.tile.name)
+
+    def apply(self):
+        self.px.do_rename_apply(self.tile, self.newName.get())
+
 class Px(LogHelper, WidgetHelper):
     def __init__(self):
         self.env = {}
@@ -270,6 +288,8 @@ class Px(LogHelper, WidgetHelper):
             self.select_all(self.curSelectColor)
         self.update_select_button()
         self.update_select_status()
+        # send focus back to canvas
+        self.canvas.focus_set()
 
     # update Select All/Deselect button
     def update_select_button(self):
@@ -1375,7 +1395,17 @@ class Px(LogHelper, WidgetHelper):
 
     # menu rename
     def do_rename(self):
-        print("you picked rename")
+        PxRenameDialog(self, self.popMenuTile)
+
+    # when ok clicked in rename menu
+    def do_rename_apply(self, tile, newName):
+        try:
+            self.rename_file_in_cur_folder(tile.name, newName)
+            self.rename_tile(tile, newName)
+            self.set_status("1 item renamed")
+            self.sweep_out_of_order()
+        except RuntimeError as e:
+            self.log_error(str(e))
 
     # menu close
     def do_close_menu(self):
