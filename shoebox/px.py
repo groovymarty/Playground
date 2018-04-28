@@ -36,10 +36,15 @@ class PxOptionsDialog(simpledialog.Dialog):
         self.numByTensVar.set(self.px.numByTens)
         self.numByTens = ttk.Checkbutton(master, variable=self.numByTensVar, text="Number by tens")
         self.numByTens.grid(row=1, column=1, sticky=W)
+        self.reformatEnabVar = BooleanVar()
+        self.reformatEnabVar.set(self.px.reformatEnab)
+        self.reformatEnab = ttk.Checkbutton(master, variable=self.reformatEnabVar, text="Reformat existing numbers")
+        self.reformatEnab.grid(row=2, column=1, sticky=W)
 
     def apply(self):
         self.px.commentMode = self.commentMode.current()
         self.px.numByTens = self.numByTensVar.get()
+        self.px.reformatEnab = self.reformatEnabVar.get()
 
 class PxRenameDialog(simpledialog.Dialog):
     def __init__(self, px, tile):
@@ -188,6 +193,7 @@ class Px(LogHelper, WidgetHelper):
         self.nPictures = 0
         self.numDigits = 0
         self.numByTens = True
+        self.reformatEnab = False
         self.commentMode = pic.TRIM2
         self.rootFolder = PxFolder(None, "", ".", "")
         self.folders = {"": self.rootFolder} #folder id to folder object
@@ -1063,9 +1069,14 @@ class Px(LogHelper, WidgetHelper):
             for tile in self.tilesOrder:
                 if tile.selected == self.curSelectColor:
                     nSelected += 1
-                    if not tile.id and isinstance(tile, PxTilePic):
-                        # found unnumbered picture tile, add to current group
-                        tilesInGroup.append(tile)
+                    if isinstance(tile, PxTilePic):
+                        if not tile.id:
+                            # found unnumbered picture tile, add to current group
+                            tilesInGroup.append(tile)
+                        elif self.reformatEnab:
+                            # tile is already numbered, check format
+                            if self.reformat_name(tile):
+                                nChanged += 1
                 if tile.id and not tile.errors:
                     # found numbered tile, end current group
                     if len(tilesInGroup):
@@ -1113,7 +1124,7 @@ class Px(LogHelper, WidgetHelper):
 
         # number by tens if possible, otherwise by ones
         lastNumSeen10 = int(lastNumSeen / 10) * 10
-        if lastNumSeen10 + (nCanDo * 10) < nextNumSeen and len(self.tilesOrder) < 500 and self.numByTens:
+        if lastNumSeen10 + (nCanDo * 10) < nextNumSeen and self.want_num_by_tens():
             step = 10
             firstAvailNum = lastNumSeen10 + step
             endAvailNum = int(nextNumSeen / 10) * 10
@@ -1163,6 +1174,34 @@ class Px(LogHelper, WidgetHelper):
         if nCantDo:
             self.log_error("{:d} files {} {:d} could not be numbered".format(nCantDo, errMsgSide, errMsgNum))
         return nChanged
+
+    # return true if numbering by tens is desired
+    def want_num_by_tens(self):
+        return self.numByTens and len(self.tilesOrder) < 500
+
+    # if name is not correctly formatted, fix it and return true
+    def reformat_name(self, tile):
+        if (tile.id):
+            if self.numDigits == 3 or (self.numDigits < 3 and self.want_num_by_tens()):
+                num = "{:03d}".format(tile.parts.num)
+            else:
+                num = "{:04d}".format(tile.parts.num)
+
+            newName = "{}{}-{}{}{}".format(tile.parts.parent, tile.parts.child,
+                                           tile.parts.type, num, tile.parts.ver)
+            if tile.parts.comment:
+                newName = "{}-{}{}".format(newName, tile.parts.comment, tile.parts.ext)
+            else:
+                newName = "{}{}".format(newName, tile.parts.ext)
+
+            if newName != tile.name:
+                try:
+                    self.rename_file_in_cur_folder(tile.name, newName)
+                    self.rename_tile(tile, newName)
+                    return True
+                except RuntimeError as e:
+                    self.log_error(str(e))
+        return False
 
     # unnumber selected tiles
     def do_unnum(self):
