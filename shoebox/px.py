@@ -1182,7 +1182,7 @@ class Px(LogHelper, WidgetHelper):
     # if name is not correctly formatted, fix it and return true
     def reformat_name(self, tile):
         if (tile.id):
-            if self.numDigits == 3 or (self.numDigits < 3 and self.want_num_by_tens()):
+            if self.numDigits == 3 or (self.numDigits < 3 and not self.want_num_by_tens()):
                 num = "{:03d}".format(tile.parts.num)
             else:
                 num = "{:04d}".format(tile.parts.num)
