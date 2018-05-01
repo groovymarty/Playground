@@ -5,7 +5,7 @@ from tkinter import *
 from tkinter import ttk, messagebox, simpledialog
 from PIL import Image
 import ImageTk
-from shoebox import pic, nails, nailcache, dnd
+from shoebox import pic, nails, nailcache, dnd, metacache
 from shoebox.dnd import DndItemEnt
 from shoebox.nailer import Nailer
 from shoebox.sweeper import Sweeper
@@ -189,6 +189,7 @@ class Px(LogHelper, WidgetHelper):
         self.curFolder = None
         self.nails = None
         self.nailsTried = False
+        self.metaDict = None
         self.loaded = False
         self.nPictures = 0
         self.numDigits = 0
@@ -690,6 +691,7 @@ class Px(LogHelper, WidgetHelper):
         self.hTotal = tileGap / 2
         self.nails = None
         self.nailsTried = False
+        self.metaDict = None
 
     # add specified pictures to canvas
     # argument is return value from scandir() or equivalent
@@ -698,6 +700,7 @@ class Px(LogHelper, WidgetHelper):
         self.clear_error()
         self.set_status("Loading...")
         prevLen = len(self.tilesOrder)
+        self.metaDict = metacache.get_meta_dict(self.curFolder.path, self.env)
 
         # bump start position for next tile,
         # possibly bump to next row
@@ -893,7 +896,7 @@ class Px(LogHelper, WidgetHelper):
         if photo is None:
             return self.make_file_tile(ent)
         else:
-            return PxTilePic(ent.name, photo, self.env)
+            return PxTilePic(ent.name, photo, self.metaDict, self.env)
 
     # make Tkinter photo image from PIL image or PNG data bytes
     def make_tk_photo_image(self, imgOrData, name):

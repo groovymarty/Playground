@@ -93,10 +93,13 @@ class PxTile:
             canvas.move(item, dx, dy)
 
 class PxTilePic(PxTile):
-    def __init__(self, name, photo, env=None):
+    def __init__(self, name, photo, metaDict=None, env=None):
         super().__init__(name, env)
         self.photo = photo
         self.parse_name(env)
+        self.caption = None
+        if self.id and metaDict:
+            self.set_caption(metaDict.get_caption(self.id))
 
     def parse_name(self, env):
         self.parts = pic.parse_file(self.name, env)
@@ -111,6 +114,16 @@ class PxTilePic(PxTile):
         bb = canvas.bbox(txt)
         self.h = self.h0 + bb[3] - bb[1]
         self.items = (img, txt)
+
+    def set_caption(self, caption):
+        self.caption = caption
+        self.make_text()
+
+    def make_text(self):
+        lines = [self.name]
+        if self.caption:
+            lines.append(self.caption)
+        self.text = "\n".join(lines)
 
 class PxTileFile(PxTile):
     def __init__(self, name, env=None):
