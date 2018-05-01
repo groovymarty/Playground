@@ -128,7 +128,7 @@ class PxTilePic(PxTile):
 
     def make_text(self):
         if self.rating:
-            lines = ["[{}] {}".format(self.rating, self.name)]
+            lines = ["({}) {}".format(self.rating, self.name)]
         else:
             lines = [self.name]
         if self.caption:

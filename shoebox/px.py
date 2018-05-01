@@ -64,6 +64,31 @@ class PxRenameDialog(simpledialog.Dialog):
     def apply(self):
         self.px.do_rename_apply(self.tile, self.newName.get())
 
+class PxMetaDialog(simpledialog.Dialog):
+    def __init__(self, px, tile):
+        self.px = px
+        self.tile = tile
+        simpledialog.Dialog.__init__(self, px.top, title="Edit Metadata - {}".format(px.pxName))
+
+    def body(self, master):
+        master.columnconfigure(1, weight=1, minsize=500)
+        Label(master, text="Picture ID:").grid(row=0, sticky=W)
+        Label(master, text=self.tile.id).grid(row=0, column=1, sticky=W)
+        Label(master, text="Rating").grid(row=1, sticky=W)
+        self.rating = ttk.Combobox(master, values=list(reversed(pic.ratings)))
+        self.rating.current(pic.flip_rating(self.tile.rating))
+        self.rating.state(['readonly'])
+        self.rating.grid(row=1, column=1, sticky=W)
+        Label(master, text="Caption").grid(row=2, sticky=W)
+        self.caption = ttk.Entry(master)
+        self.caption.grid(row=2, column=1, sticky=(W,E))
+        self.caption.insert(0, self.tile.caption)
+
+    def apply(self):
+        self.tile.set_rating(pic.flip_rating(self.rating.current()))
+        self.tile.set_caption(self.caption.get())
+        self.tile.redraw_text(self.px.canvas, self.px.nailSz)
+
 class Px(LogHelper, WidgetHelper):
     def __init__(self):
         self.env = {}
@@ -180,6 +205,7 @@ class Px(LogHelper, WidgetHelper):
         # popup menu
         self.popMenu = Menu(self.top, tearoff=0)
         self.popMenu.add_command(label="Rename", command=self.do_rename)
+        self.popMenu.add_command(label="Edit Metadata", command=self.do_edit_meta)
         self.popMenu.add_command(label="Delete", command=self.do_delete)
         self.popMenu.add_separator()
         self.popMenu.add_command(label="[X] Close Menu", command=self.do_close_menu)
@@ -1448,6 +1474,10 @@ class Px(LogHelper, WidgetHelper):
             self.sweep_out_of_order()
         except RuntimeError as e:
             self.log_error(str(e))
+
+    # menu edit metadata
+    def do_edit_meta(self):
+        PxMetaDialog(self, self.popMenuTile)
 
     # menu close
     def do_close_menu(self):

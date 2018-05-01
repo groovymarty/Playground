@@ -23,6 +23,23 @@ DISCARD = 0
 TRIM2 = 1
 KEEPALL = 2
 
+# ratings
+ratings = [
+    "0 - No Rating",
+    "1 - Delete Me",
+    "2 - Poor But Keep",
+    "3 - Good",
+    "4 - Better",
+    "5 - Love it!"
+]
+
+# flip ratings order for dropdown
+def flip_rating(r):
+    if r >= 0 and r < len(ratings):
+        return len(ratings) - r - 1
+    else:
+        return len(ratings) - 1
+
 # named tuple returned by parse functions
 Parts = namedtuple('Parts', [
     'parent',   # 0
