@@ -14,7 +14,7 @@ def get_meta_dict(folderPath, env=None):
     if folderPath in cache:
         metaDict = cache[folderPath]
     else:
-        metaDict = MetaDict(folderPath)
+        metaDict = MetaDict(folderPath, env)
         cache[folderPath] = metaDict
         cacheCount += 1
         environ.log_info(env, "Added '{}' to meta cache, n={}".format(folderPath, cacheCount))

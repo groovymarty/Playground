@@ -98,8 +98,11 @@ class PxTilePic(PxTile):
         self.photo = photo
         self.parse_name(env)
         self.caption = None
+        self.rating = 0
         if self.id and metaDict:
             self.set_caption(metaDict.get_caption(self.id))
+        if self.id and metaDict:
+            self.set_rating(metaDict.get_rating(self.id))
 
     def parse_name(self, env):
         self.parts = pic.parse_file(self.name, env)
@@ -119,8 +122,15 @@ class PxTilePic(PxTile):
         self.caption = caption
         self.make_text()
 
+    def set_rating(self, rating):
+        self.rating = rating
+        self.make_text()
+
     def make_text(self):
-        lines = [self.name]
+        if self.rating:
+            lines = ["[{}] {}".format(self.rating, self.name)]
+        else:
+            lines = [self.name]
         if self.caption:
             lines.append(self.caption)
         self.text = "\n".join(lines)
