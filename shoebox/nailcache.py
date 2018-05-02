@@ -45,8 +45,9 @@ def add_loose_file(path, sz, imgOrData):
     path = os.path.abspath(path)
     if sz not in looseCache:
         looseCache[sz] = {}
+    if path not in looseCache[sz]:
+        looseCount += 1
     looseCache[sz][path] = imgOrData
-    looseCount += 1
 
 def get_loose_file(path, sz):
     path = os.path.abspath(path)
@@ -56,10 +57,13 @@ def get_loose_file(path, sz):
         return None
 
 def change_loose_file(oldPath, newPath):
+    global looseCount
     oldPath = os.path.abspath(oldPath)
     newPath = os.path.abspath(newPath)
     for sz in looseCache:
         if oldPath in looseCache[sz]:
+            if newPath in looseCache[sz]:
+                looseCount -= 1
             looseCache[sz][newPath] = looseCache[sz][oldPath]
             del looseCache[sz][oldPath]
 

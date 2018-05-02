@@ -661,6 +661,9 @@ class Px(LogHelper, WidgetHelper):
                         newPath = self.copy_file_to_cur_folder(ent.path)
                     else:
                         newPath = self.move_file_to_cur_folder(ent.path)
+                        # stash metadata in loose cache for later use
+                        metacache.remove_meta_to_loose_cache(ent.path, self.env)
+
                     entries.append(DirEntryFile(newPath))
                     accepted = True
                 except RuntimeError as e:
@@ -678,6 +681,8 @@ class Px(LogHelper, WidgetHelper):
             for ent in entries:
                 if ent.name in self.tilesByName:
                     self.select_tile(self.tilesByName[ent.name], self.curSelectColor)
+            # save meta changes
+            metacache.write_all_changes(self.env)
         return result
 
     # return target tile for mouse event or None
@@ -1378,6 +1383,7 @@ class Px(LogHelper, WidgetHelper):
             shutil.move(oldPath, newPath)
             self.nuke_nails(oldName)
             nailcache.change_loose_file(oldPath, newPath)
+            metacache.change_loose_meta(oldPath, newPath)
             return newPath
         except BaseException as e:
             raise RuntimeError("Rename failed for {}: {}".format(oldPath, str(e)))
@@ -1390,6 +1396,7 @@ class Px(LogHelper, WidgetHelper):
             os.remove(path)
             self.nuke_nails(name)
             nailcache.clear_loose_file(path)
+            metacache.clear_loose_meta(path)
         except BaseException as e:
             raise RuntimeError("Delete failed for {}: {}".format(path, str(e)))
 
@@ -1402,6 +1409,7 @@ class Px(LogHelper, WidgetHelper):
         try:
             shutil.move(oldPath, newPath)
             nailcache.change_loose_file(oldPath, newPath)
+            metacache.change_loose_meta(oldPath, newPath)
             return newPath
         except BaseException as e:
             raise RuntimeError("Move failed for {}: {}".format(oldPath, str(e)))
@@ -1415,6 +1423,7 @@ class Px(LogHelper, WidgetHelper):
         try:
             shutil.copy(oldPath, newPath)
             nailcache.change_loose_file(oldPath, newPath)
+            metacache.change_loose_meta(oldPath, newPath)
             return newPath
         except BaseException as e:
             raise RuntimeError("Copy failed for {}: {}".format(oldPath, str(e)))

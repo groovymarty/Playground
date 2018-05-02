@@ -100,8 +100,8 @@ class PxTilePic(PxTile):
         self.caption = None
         self.rating = 0
         if self.id and metaDict:
+            metaDict.restore_meta_from_loose_cache(self.id, name)
             self.set_caption(metaDict.get_caption(self.id))
-        if self.id and metaDict:
             self.set_rating(metaDict.get_rating(self.id))
 
     def parse_name(self, env):
