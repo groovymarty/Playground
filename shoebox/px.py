@@ -674,6 +674,10 @@ class Px(LogHelper, WidgetHelper):
             else:
                 # not dropped onto a hole, add to end
                 self.populate_canvas(entries)
+            # select the new tiles
+            for ent in entries:
+                if ent.name in self.tilesByName:
+                    self.select_tile(self.tilesByName[ent.name], self.curSelectColor)
         return result
 
     # return target tile for mouse event or None
