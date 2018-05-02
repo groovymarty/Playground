@@ -1368,6 +1368,8 @@ class Px(LogHelper, WidgetHelper):
         oldPath = os.path.join(self.curFolder.path, oldName)
         newPath = os.path.join(self.curFolder.path, newName)
         self.log_info("Renaming {} to {}".format(oldPath, newName))
+        if os.path.exists(newPath):
+            raise RuntimeError("Rename failed for {}: File already exists".format(oldPath))
         try:
             shutil.move(oldPath, newPath)
             self.nuke_nails(oldName)
@@ -1391,6 +1393,8 @@ class Px(LogHelper, WidgetHelper):
     def move_file_to_cur_folder(self, oldPath):
         newPath = os.path.join(self.curFolder.path, os.path.basename(oldPath))
         self.log_info("Moving {} to {}".format(oldPath, self.curFolder.path))
+        if os.path.exists(newPath):
+            raise RuntimeError("Move failed for {}: File already exists".format(oldPath))
         try:
             shutil.move(oldPath, newPath)
             nailcache.change_loose_file(oldPath, newPath)
@@ -1402,6 +1406,8 @@ class Px(LogHelper, WidgetHelper):
     def copy_file_to_cur_folder(self, oldPath):
         newPath = os.path.join(self.curFolder.path, os.path.basename(oldPath))
         self.log_info("Copying {} to {}".format(oldPath, self.curFolder.path))
+        if os.path.exists(newPath):
+            raise RuntimeError("Copy failed for {}: File already exists".format(oldPath))
         try:
             shutil.copy(oldPath, newPath)
             nailcache.change_loose_file(oldPath, newPath)
