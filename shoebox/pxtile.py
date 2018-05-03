@@ -33,6 +33,9 @@ class PxTile:
         self.h = 0 #total height of tile
         self.text = name
 
+    def set_name(self, name, env=None):
+        self.text = self.name = name
+
     def set_error(self, errBit):
         self.errors |= errBit
 
@@ -103,6 +106,11 @@ class PxTilePic(PxTile):
             metaDict.restore_meta_from_loose_cache(self.id, name)
             self.set_caption(metaDict.get_caption(self.id))
             self.set_rating(metaDict.get_rating(self.id))
+
+    def set_name(self, name, env=None):
+        self.name = name
+        self.parse_name(env)
+        self.make_text()
 
     def parse_name(self, env):
         self.parts = pic.parse_file(self.name, env)

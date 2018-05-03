@@ -681,6 +681,7 @@ class Px(LogHelper, WidgetHelper):
             for ent in entries:
                 if ent.name in self.tilesByName:
                     self.select_tile(self.tilesByName[ent.name], self.curSelectColor)
+            self.update_select_button()
             # save meta changes
             metacache.write_all_changes(self.env)
         return result
@@ -1056,11 +1057,8 @@ class Px(LogHelper, WidgetHelper):
         self.tilesByName[newName] = tile
         if tile.id:
             self.remove_tile_id(tile)
-        tile.name = newName
-        tile.text = newName
         tile.errors = 0
-        if isinstance(tile, PxTilePic):
-            tile.parse_name(self.env)
+        tile.set_name(newName, self.env)
         if tile.id:
             self.add_tile_id(tile)
         tile.redraw_text(self.canvas, self.nailSz)
@@ -1132,6 +1130,7 @@ class Px(LogHelper, WidgetHelper):
             # do the last group, if any
             if len(tilesInGroup):
                 nChanged += self.number_group_of_tiles(tilesInGroup, lastNumSeen, pic.MAXNUM, False)
+            metacache.write_all_changes(self.env)
             if not self.lastError:
                 if nSelected:
                     self.set_status("{:d} files changed".format(nChanged))
@@ -1208,6 +1207,9 @@ class Px(LogHelper, WidgetHelper):
             try:
                 self.rename_file_in_cur_folder(tile.name, newName)
                 self.rename_tile(tile, newName)
+                # apply metadata from loose cache, if any
+                # use newName because above rename changed name in loose cache
+                self.metaDict.restore_meta_from_loose_cache(tile.id, newName)
                 nChanged += 1
                 errMsgNum = num
                 num += step
@@ -1257,12 +1259,16 @@ class Px(LogHelper, WidgetHelper):
                 if tile.id:
                     newName = "_{}".format(tile.name)
                     try:
-                        self.rename_file_in_cur_folder(tile.name, newName)
+                        oldId = tile.id
+                        newPath = self.rename_file_in_cur_folder(tile.name, newName)
                         self.rename_tile(tile, newName)
+                        # save any metadata in loose cache for later use
+                        self.metaDict.remove_meta(oldId, newPath)
                         nChanged += 1
                     except RuntimeError as e:
                         self.log_error(str(e))
         self.sweep_out_of_order()
+        metacache.write_all_changes(self.env)
         if not self.lastError:
             if nSelected:
                 self.set_status("{:d} files changed".format(nChanged))

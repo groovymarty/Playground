@@ -75,6 +75,7 @@ class MetaDict:
     def touch(self, value):
         self.lastTouch = value
 
+    # remove metadata from dictionary
     # if path specified copy metadata to loose cache
     def remove_meta(self, id, path=None):
         if id in self.dict:
@@ -83,6 +84,7 @@ class MetaDict:
             del self.dict[id]
             self.changed = True
 
+    # if named file has metadata in loose cache, add to this dictionary
     def restore_meta_from_loose_cache(self, id, name):
         path = os.path.join(self.folderPath, name)
         meta = metacache.get_loose_meta(path, remove=True)
