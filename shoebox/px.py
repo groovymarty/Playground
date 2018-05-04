@@ -23,7 +23,7 @@ tileGap = 14
 class PxOptionsDialog(simpledialog.Dialog):
     def __init__(self, px):
         self.px = px
-        simpledialog.Dialog.__init__(self, px.top, title="Options - {}".format(px.pxName))
+        simpledialog.Dialog.__init__(self, px.top, title="Options - {}".format(px.myName))
 
     def body(self, master):
         master.columnconfigure(1, weight=1)
@@ -50,7 +50,7 @@ class PxRenameDialog(simpledialog.Dialog):
     def __init__(self, px, tile):
         self.px = px
         self.tile = tile
-        simpledialog.Dialog.__init__(self, px.top, title="Rename - {}".format(px.pxName))
+        simpledialog.Dialog.__init__(self, px.top, title="Rename - {}".format(px.myName))
 
     def body(self, master):
         master.columnconfigure(1, weight=1, minsize=500)
@@ -68,7 +68,7 @@ class PxMetaDialog(simpledialog.Dialog):
     def __init__(self, px, tile):
         self.px = px
         self.tile = tile
-        simpledialog.Dialog.__init__(self, px.top, title="Edit Metadata - {}".format(px.pxName))
+        simpledialog.Dialog.__init__(self, px.top, title="Edit Metadata - {}".format(px.myName))
 
     def body(self, master):
         master.columnconfigure(1, weight=1, minsize=500)
@@ -104,9 +104,9 @@ class Px(LogHelper, WidgetHelper):
 
         # create top level window
         self.top = Toplevel()
-        self.pxName = "Px {:d}".format(self.instNum)
+        self.myName = "Px {:d}".format(self.instNum)
         self.styleRoot = "Px{:d}".format(self.instNum)
-        self.top.title(self.pxName)
+        self.top.title(self.myName)
         self.top.bind('<Destroy>', self.on_destroy)
 
         # create top button bar
@@ -205,7 +205,7 @@ class Px(LogHelper, WidgetHelper):
         self.canvas.bind('<B1-Motion>', self.on_canvas_dnd_motion)
         self.canvas.bind('<ButtonRelease>', self.on_canvas_dnd_release)
         self.canvas.bind('<Key>', self.on_canvas_key)
-        dnd.add_target(self.canvas, self, self.pxName)
+        dnd.add_target(self.canvas, self, self.myName)
 
         # popup menu
         self.popMenu = Menu(self.top, tearoff=0)
@@ -361,7 +361,7 @@ class Px(LogHelper, WidgetHelper):
 
     # when Log button clicked
     def do_log(self):
-        self.open_log_window("Log - {}".format(self.pxName))
+        self.open_log_window("Log - {}".format(self.myName))
 
     # when Options button clicked
     def do_options(self):
@@ -426,7 +426,7 @@ class Px(LogHelper, WidgetHelper):
         sel = self.tree.selection()
         if sel and sel[0] in self.treeItems:
             self.curFolder = self.treeItems[sel[0]]
-            self.top.title("{} - {}".format(self.pxName, self.curFolder.path[2:]))
+            self.top.title("{} - {}".format(self.myName, self.curFolder.path[2:]))
             self.clear_canvas()
             self.update_select_button()
             self.populate_canvas(os.scandir(self.curFolder.path))
