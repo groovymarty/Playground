@@ -4,11 +4,13 @@ import os, json
 from tkinter import *
 from tkinter import ttk, filedialog
 from tkit.loghelper import LogHelper
+from tkit.widgethelper import WidgetHelper
+from datetime import datetime
 
 instances = []
 nextInstNum = 1
 
-class Medit(LogHelper):
+class Medit(LogHelper, WidgetHelper):
     def __init__(self):
         self.env = {}
         LogHelper.__init__(self, self.env)
@@ -27,7 +29,6 @@ class Medit(LogHelper):
         self.topBar.grid(column=0, row=0, sticky=(N, W, E))
         self.loadButton = ttk.Button(self.topBar, text="Load", command=self.do_load)
         self.loadButton.pack(side=LEFT)
-        self.enable_buttons(False)
 
         # style for error messages (status bar)
         s = ttk.Style()
@@ -45,17 +46,17 @@ class Medit(LogHelper):
         self.treeFrame = Frame(self.top)
         self.treeScroll = Scrollbar(self.treeFrame)
         self.treeScroll.pack(side=RIGHT, fill=Y)
-        self.tree = ttk.Treeview(self.treeFrame, columns=('prop', 'val', 'ts', 'userId'))
+        self.tree = ttk.Treeview(self.treeFrame, columns=('prop', 'val', 'dt', 'user'), height=36)
         self.tree.column('#0', width=100, stretch=False)
         self.tree.heading('#0', text="ID")
         self.tree.column('prop', width=100, stretch=False)
         self.tree.heading('prop', text="Property")
-        self.tree.column('val', width=100, stretch=True)
+        self.tree.column('val', width=300, stretch=True)
         self.tree.heading('val', text="Value")
-        self.tree.column('ts', width=100, stretch=False)
-        self.tree.heading('ts', text="Date/Time")
-        self.tree.column('userId', width=100, stretch=False)
-        self.tree.heading('userId', text="User")
+        self.tree.column('dt', width=180, stretch=False)
+        self.tree.heading('dt', text="Date/Time")
+        self.tree.column('user', width=100, stretch=False)
+        self.tree.heading('user', text="User")
         self.tree.pack(side=RIGHT, fill=BOTH, expand=True)
         self.tree.bind("<<TreeviewSelect>>", self.on_tree_select)
         self.tree.configure(yscrollcommand=self.treeScroll.set)
@@ -71,9 +72,11 @@ class Medit(LogHelper):
         #self.treeItems = {} #tree iid to file object
 
         self.journalFile = None
-        self.nMetaChgs = 0
+        self.loaded = False
+        self.nEntries = 0
         self.lastError = ""
         self.set_status_default_or_error()
+        self.update_buttons()
         instances.append(self)
 
     # called when my top-level window is closed
@@ -105,10 +108,10 @@ class Medit(LogHelper):
 
     # set status to default message
     def set_status_default(self):
-        if self.journalFile is None:
+        if not self.loaded:
             self.set_status("Load a journal file")
         else:
-            self.set_status("Ready ({:d} meta changes)".format(self.nMetaChgs))
+            self.set_status("Ready ({:d} meta changes)".format(self.nEntries))
 
     # set status to default message or error
     def set_status_default_or_error(self):
@@ -139,8 +142,8 @@ class Medit(LogHelper):
         super().log_info(msg)
 
     # enable/disable buttons
-    def enable_buttons(self, enable=True):
-        pass
+    def update_buttons(self):
+        self.enable_widget(self.loadButton, not self.loaded)
 
     # when Log button clicked
     def do_log(self):
@@ -148,16 +151,46 @@ class Medit(LogHelper):
 
    # when load button is clicked
     def do_load(self):
-        journalFile = filedialog.askopenfilename(title="{} - Load metajournal".format(self.myName))
-        with open(journalFile, mode='r', encoding='UTF-8') as f:
-            for line in f:
-                metaChg = json.loads(line)
-                if 'rating' in metaChg:
-                    iid = self.tree.insert('', 'end', text=metaChg['id'],
-                                           values=('rating', metaChg['rating'], metaChg['ts'], metaChg['userId']))
-                if 'caption' in metaChg:
-                    iid = self.tree.insert('', 'end', text=metaChg['id'],
-                                           values=('caption', metaChg['caption'], metaChg['ts'], metaChg['userId']))
+        self.journalFile = filedialog.askopenfilename(title="{} - Load Journal".format(self.myName))
+        if self.journalFile:
+            try:
+                self.clear_tree()
+                with open(self.journalFile, mode='r', encoding='UTF-8') as f:
+                    for line in f:
+                        metaChg = json.loads(line)
+                        if 'rating' in metaChg:
+                            self.add_entry(metaChg, 'rating', metaChg['rating'])
+                        if 'caption' in metaChg:
+                            self.add_entry(metaChg, 'caption', metaChg['caption'])
+                self.loaded = True
+            except Exception as e:
+                self.log_error("Error reading {}: {}", journalFile, e.str())
+        self.set_status_default_or_error()
+        self.update_buttons()
+
+    # clear all tree entries
+    def clear_tree(self):
+        for i in self.tree.get_children():
+            self.tree.delete(i)
+        self.nEntries = 0
+        self.loaded = False
+
+    # add entry to tree
+    def add_entry(self, metaChg, prop, val):
+        try:
+            id = metaChg['id']
+            ts = metaChg['ts']
+            user = metaChg['userId']
+        except KeyError as e:
+            self.log_error("Journal entry lacks required field: {}".format(e.str()))
+            return
+        try:
+            dt = datetime.utcfromtimestamp(ts / 1e3).astimezone().strftime("%a %b %d %Y  %I:%M %p")
+        except Exception as e:
+            self.log_error("Bad timestamp in journal entry: {}".format(e.str()))
+            return
+        iid = self.tree.insert('', 'end', text=id, values=(prop, val, dt, user))
+        self.nEntries += 1
 
     # when user clicks tree item
     def on_tree_select(self, event):
