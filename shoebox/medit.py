@@ -6,9 +6,25 @@ from tkinter import ttk, filedialog
 from tkit.loghelper import LogHelper
 from tkit.widgethelper import WidgetHelper
 from datetime import datetime
+from shoebox import px
 
 instances = []
 nextInstNum = 1
+
+class MetaChg:
+    def __init__(self, id, prop, val, ts, userId):
+        self.id = id
+        self.prop = prop
+        self.val = val
+        self.ts = ts
+        self.userId = userId
+
+    def format_ts(self):
+        try:
+            return datetime.utcfromtimestamp(self.ts / 1e3).astimezone().strftime("%a %b %d %Y  %I:%M %p")
+        except Exception as e:
+            self.log_error("Bad timestamp in journal entry: {}".format(e.str()))
+            return ""
 
 class Medit(LogHelper, WidgetHelper):
     def __init__(self):
@@ -73,8 +89,9 @@ class Medit(LogHelper, WidgetHelper):
 
         self.journalFile = None
         self.loaded = False
-        self.nEntries = 0
+        self.treeItems = {}
         self.lastError = ""
+        self.pxInstNum = None
         self.set_status_default_or_error()
         self.update_buttons()
         instances.append(self)
@@ -110,8 +127,10 @@ class Medit(LogHelper, WidgetHelper):
     def set_status_default(self):
         if not self.loaded:
             self.set_status("Load a journal file")
+        elif self.pxInstNum is not None:
+            self.set_status("Using Px {:d}, {:d} meta changes". format(self.pxInstNum, len(self.treeItems)))
         else:
-            self.set_status("Ready ({:d} meta changes)".format(self.nEntries))
+            self.set_status("Ready ({:d} meta changes)".format(len(self.treeItems)))
 
     # set status to default message or error
     def set_status_default_or_error(self):
@@ -157,14 +176,21 @@ class Medit(LogHelper, WidgetHelper):
                 self.clear_tree()
                 with open(self.journalFile, mode='r', encoding='UTF-8') as f:
                     for line in f:
-                        metaChg = json.loads(line)
-                        if 'rating' in metaChg:
-                            self.add_entry(metaChg, 'rating', metaChg['rating'])
-                        if 'caption' in metaChg:
-                            self.add_entry(metaChg, 'caption', metaChg['caption'])
+                        dict = json.loads(line)
+                        try:
+                            id = dict['id']
+                            ts = dict['ts']
+                            userId = dict['userId']
+                        except KeyError as e:
+                            self.log_error("Journal entry lacks required field: {}".format(e.str()))
+                            continue
+                        if 'rating' in dict:
+                            self.add_entry(MetaChg(id, 'rating', dict['rating'], ts, userId))
+                        if 'caption' in dict:
+                            self.add_entry(MetaChg(id, 'caption', dict['caption'], ts, userId))
                 self.loaded = True
             except Exception as e:
-                self.log_error("Error reading {}: {}", journalFile, e.str())
+                self.log_error("Error reading {}: {}", self.journalFile, e.str())
         self.set_status_default_or_error()
         self.update_buttons()
 
@@ -172,28 +198,29 @@ class Medit(LogHelper, WidgetHelper):
     def clear_tree(self):
         for i in self.tree.get_children():
             self.tree.delete(i)
-        self.nEntries = 0
+        self.treeItems = {}
         self.loaded = False
 
     # add entry to tree
-    def add_entry(self, metaChg, prop, val):
-        try:
-            id = metaChg['id']
-            ts = metaChg['ts']
-            user = metaChg['userId']
-        except KeyError as e:
-            self.log_error("Journal entry lacks required field: {}".format(e.str()))
-            return
-        try:
-            dt = datetime.utcfromtimestamp(ts / 1e3).astimezone().strftime("%a %b %d %Y  %I:%M %p")
-        except Exception as e:
-            self.log_error("Bad timestamp in journal entry: {}".format(e.str()))
-            return
-        iid = self.tree.insert('', 'end', text=id, values=(prop, val, dt, user))
-        self.nEntries += 1
+    def add_entry(self, metaChg):
+        iid = self.tree.insert('', 'end',
+                               text=metaChg.id,
+                               values=(metaChg.prop, metaChg.val, metaChg.format_ts(), metaChg.userId))
+        self.treeItems[iid] = metaChg
 
     # when user clicks tree item
     def on_tree_select(self, event):
         sel = self.tree.selection()
-        print("you clicked", sel)
-
+        if sel and sel[0] in self.treeItems:
+            pxInst = px.get_instance(self.pxInstNum)
+            if pxInst:
+                oldInstNum = self.pxInstNum
+                self.pxInstNum = pxInst.instNum
+                if pxInst.instNum != oldInstNum and oldInstNum is not None:
+                    self.set_status("Can't find Px {:d}, switching to Px {:d}".format(oldInstNum, pxInst.instNum))
+                else:
+                    self.set_status_default()
+                pxInst.goto(self.treeItems[sel[0]].id)
+            else:
+                self.set_status("No Px found, please create one")
+                self.pxInstNum = None

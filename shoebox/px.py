@@ -20,6 +20,13 @@ nextInstNum = 1
 
 tileGap = 14
 
+# return an instance
+def get_instance(instNum=None):
+    try:
+        return next(inst for inst in instances if inst.instNum == instNum)
+    except StopIteration:
+        return instances[0] if len(instances) else None
+
 class PxOptionsDialog(simpledialog.Dialog):
     def __init__(self, px):
         self.px = px
@@ -425,7 +432,11 @@ class Px(LogHelper, WidgetHelper):
     def on_tree_select(self, event):
         sel = self.tree.selection()
         if sel and sel[0] in self.treeItems:
-            self.curFolder = self.treeItems[sel[0]]
+            self.loadFolder(self.treeItems[sel[0]])
+
+    # load specified folder
+    def load_folder(self, folder):
+            self.curFolder = folder
             self.top.title("{} - {}".format(self.myName, self.curFolder.path[2:]))
             self.clear_canvas()
             self.update_select_button()
@@ -1512,3 +1523,39 @@ class Px(LogHelper, WidgetHelper):
     # menu close
     def do_close_menu(self):
         self.popMenu.unpost()
+
+    # possibly change folder then scroll to specified tile
+    def goto(self, id):
+        parts = pic.parse_file(id, self.env)
+        if (parts):
+            folderId = pic.get_folder_id(parts)
+            if folderId in self.folders:
+                folder = self.folders[folderId]
+                if (folder is not self.curFolder):
+                    self.log_info("Switching folder for goto {}".format(id))
+                    self.load_folder(folder)
+                if id in self.tiles:
+                    tile = self.tiles[id]
+                    self.select_all(None, self.curSelectColor)
+                    self.select_tile(tile, self.curSelectColor)
+                    self.scroll_into_view(tile)
+                else:
+                    self.log_error("Goto failed, {} not found".format(id))
+            else:
+                self.log_error("Goto failed, folder {} not found".format(folderId))
+        else:
+            self.log_error("Goto failed, can't parse {}".format(id))
+
+    # scroll tile into view
+    def scroll_into_view(self, tile):
+        if not self.is_tile_in_view(tile):
+            x, y = self.canvas.coords(tile.items[0])[:2]
+            self.canvas.yview_moveto(float(max(0, y - tileGap)) / self.hTotal)
+
+    # is tile in view?
+    def is_tile_in_view(self, tile):
+        x, y = self.canvas.coords(tile.items[0])[:2]
+        top = float(max(0, y - tileGap)) / self.hTotal
+        bottom = float(y + tile.h) / self.hTotal
+        slider = self.canvasScroll.get()
+        return top >= slider[0] and bottom <= slider[1]
