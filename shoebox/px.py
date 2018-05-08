@@ -99,6 +99,7 @@ class PxMetaDialog(simpledialog.Dialog):
         self.tile.set_caption(caption)
         self.px.metaDict.set_caption(self.tile.id, caption)
         self.tile.redraw_text(self.px.canvas, self.px.nailSz)
+        self.tile.redraw_icon(self.px.canvas)
         self.px.metaDict.write(self.px.env)
 
 class Px(LogHelper, WidgetHelper):
@@ -432,7 +433,7 @@ class Px(LogHelper, WidgetHelper):
     def on_tree_select(self, event):
         sel = self.tree.selection()
         if sel and sel[0] in self.treeItems:
-            self.loadFolder(self.treeItems[sel[0]])
+            self.load_folder(self.treeItems[sel[0]])
 
     # load specified folder
     def load_folder(self, folder):

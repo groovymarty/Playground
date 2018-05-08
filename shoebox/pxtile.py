@@ -1,7 +1,7 @@
 # shoebox.pxtile
 
 from tkinter import *
-from tkinter import ttk
+from tkinter import ttk, font
 from shoebox import pic
 
 fileBoxSz = 128
@@ -14,6 +14,33 @@ selectColors = {
     5:  "cyan",
     6:  "dodgerblue"
 }
+
+fontSymbol = None
+fontWingdings2 = None
+ratingIcons = []
+
+def make_fonts():
+    global fontSymbol, fontWingDings2, ratingIcons
+    fontSymbol = font.Font(family="Symbol")
+    fontWingdings2 = font.Font(family="Wingdings 2")
+    ratingIcons = [
+        (fontWingdings2, chr(42),  -3, "white"),      # 0: empty box
+        (fontWingdings2, chr(79),  0,  "red"),        # 1: X
+        (fontWingdings2, chr(80),  0,  "white"),      # 2: check
+        (fontSymbol,     chr(187), -4, "white"),      # 3: wavy lines
+        (fontWingdings2, chr(234), 0,  "gold"),       # 4: star
+        (fontSymbol,     chr(169), -3, "red"),        # 5: heart
+    ]
+
+def make_rating_icon(canvas, x, y, rating):
+    try:
+        fnt, ch, dy, color = ratingIcons[rating]
+    except IndexError:
+        if fontSymbol is None:
+            make_fonts()
+            return make_rating_icon(canvas, x, y, rating)
+        fnt, ch, dy, color = ratingIcons[0]
+    return canvas.create_text(x, y + dy, text=ch, font=fnt, fill=color, anchor=NW)
 
 class PxTile:
     def __init__(self, name, env=None):
@@ -106,6 +133,8 @@ class PxTilePic(PxTile):
             metaDict.restore_meta_from_loose_cache(self.id, name)
             self.set_caption(metaDict.get_caption(self.id))
             self.set_rating(metaDict.get_rating(self.id))
+        else:
+            self.make_text()
 
     def set_name(self, name, env=None):
         self.name = name
@@ -124,7 +153,8 @@ class PxTilePic(PxTile):
         txt = canvas.create_text(x, y + self.h0, text=self.text, anchor=NW, width=w, fill=self.pick_text_color())
         bb = canvas.bbox(txt)
         self.h = self.h0 + bb[3] - bb[1]
-        self.items = (img, txt)
+        icon = make_rating_icon(canvas, x, y + self.h0, self.rating)
+        self.items = (img, txt, icon)
 
     def set_caption(self, caption):
         self.caption = caption
@@ -132,16 +162,23 @@ class PxTilePic(PxTile):
 
     def set_rating(self, rating):
         self.rating = rating
-        self.make_text()
 
     def make_text(self):
-        if self.rating:
-            lines = ["({}) {}".format(self.rating, self.name)]
-        else:
-            lines = [self.name]
+        lines = ["     {}".format(self.name)]
         if self.caption:
             lines.append(self.caption)
         self.text = "\n".join(lines)
+
+    def redraw_icon(self, canvas):
+        if len(self.items) >= 3:
+            # get coordinates of tile
+            x, y = canvas.coords(self.items[0])[:2]
+            # delete old icon
+            canvas.delete(self.items[2])
+            # create new icon
+            icon = make_rating_icon(canvas, x, y + self.h0, self.rating)
+            # update items tuple
+            self.items = (self.items[0], self.items[1], icon) + self.items[3:]
 
 class PxTileFile(PxTile):
     def __init__(self, name, env=None):
