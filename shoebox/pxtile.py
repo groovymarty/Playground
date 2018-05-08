@@ -24,9 +24,9 @@ def make_fonts():
     fontSymbol = font.Font(family="Symbol")
     fontWingdings2 = font.Font(family="Wingdings 2")
     ratingIcons = [
-        (fontWingdings2, chr(42),  -3, "white"),       # 0: empty box
+        (fontWingdings2, chr(42),  -3, "gray"),        # 0: empty box
         (fontWingdings2, chr(210),  0, "fuchsia"),     # 1: X
-        (fontWingdings2, chr(80),   0, "white"),       # 2: check
+        (fontWingdings2, chr(80),   0, "lime"),        # 2: check
         (fontSymbol,     chr(187), -4, "white"),       # 3: wavy lines
         (fontWingdings2, chr(234),  0, "deepskyblue"), # 4: star
         (fontSymbol,     chr(169), -3, "red"),         # 5: heart
