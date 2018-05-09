@@ -17,8 +17,11 @@ class MetaChg:
         self.id = id
         self.prop = prop
         self.val = val
+        self.oldval = ""
         self.ts = ts
         self.userId = userId
+        self.status = ""
+        self.shadowed = False
         self.parts = pic.parse_file(id)
         if not self.parts:
             raise RuntimeError("Bad ID in journal entry: {}".format(id))
@@ -64,17 +67,21 @@ class Medit(LogHelper, WidgetHelper):
         self.treeFrame = Frame(self.top)
         self.treeScroll = Scrollbar(self.treeFrame)
         self.treeScroll.pack(side=RIGHT, fill=Y)
-        self.tree = ttk.Treeview(self.treeFrame, columns=('prop', 'val', 'dt', 'user'), height=36)
+        self.tree = ttk.Treeview(self.treeFrame, columns=('prop', 'val', 'was', 'dt', 'user', 'status'), height=36)
         self.tree.column('#0', width=100, stretch=False)
         self.tree.heading('#0', text="ID")
         self.tree.column('prop', width=100, stretch=False)
         self.tree.heading('prop', text="Property")
-        self.tree.column('val', width=300, stretch=True)
+        self.tree.column('val', width=250, stretch=True)
         self.tree.heading('val', text="Value")
+        self.tree.column('was', width=100, stretch=False)
+        self.tree.heading('was', text="Was")
         self.tree.column('dt', width=180, stretch=False)
         self.tree.heading('dt', text="Date/Time")
         self.tree.column('user', width=100, stretch=False)
         self.tree.heading('user', text="User")
+        self.tree.column('status', width=100, stretch=False)
+        self.tree.heading('status', text="Status")
         self.tree.pack(side=RIGHT, fill=BOTH, expand=True)
         self.tree.bind("<<TreeviewSelect>>", self.on_tree_select)
         self.tree.configure(yscrollcommand=self.treeScroll.set)
@@ -84,14 +91,12 @@ class Medit(LogHelper, WidgetHelper):
         self.top.grid_rowconfigure(2, weight=1)
 
         # tree stuff
-        #self.tree.tag_configure('noncanon', background='cyan')
-        #self.tree.tag_configure('error', background='orange')
-        #self.tree.tag_configure('childerror', background='tan')
-        #self.treeItems = {} #tree iid to file object
+        self.tree.tag_configure('shadowed', background='gray')
 
         self.journalFile = None
         self.loaded = False
-        self.treeItems = {}
+        self.mcOrder = []  # meta changes in sorted order
+        self.treeItems = {}  # tree id to meta change
         self.lastError = ""
         self.pxInstNum = None
         self.set_status_default_or_error()
@@ -178,29 +183,33 @@ class Medit(LogHelper, WidgetHelper):
         if self.journalFile:
             try:
                 with open(self.journalFile, mode='r', encoding='UTF-8') as f:
-                    a = []
+                    self.mcOrder = []
                     lineNum = 0
                     for line in f:
                         lineNum += 1
-                        dict = json.loads(line)
+                        ent = json.loads(line)
                         try:
-                            id = dict['id']
-                            ts = dict['ts']
-                            userId = dict['userId']
+                            id = ent['id']
+                            ts = ent['ts']
+                            userId = ent['userId']
                         except KeyError as e:
                             self.log_error("Line {}: Journal entry lacks required field: {}".format(lineNum, str(e)))
                             continue
+                        # create a separate MetaChg object for each property changed
                         try:
-                            if 'rating' in dict:
-                                a.append(MetaChg(id, 'rating', dict['rating'], ts, userId))
-                            if 'caption' in dict:
-                                a.append(MetaChg(id, 'caption', dict['caption'], ts, userId))
+                            if 'rating' in ent:
+                                self.mcOrder.append(MetaChg(id, 'rating', ent['rating'], ts, userId))
+                            if 'caption' in ent:
+                                self.mcOrder.append(MetaChg(id, 'caption', ent['caption'], ts, userId))
                         except RuntimeError as e:
                             self.log_error("Line {}: {}".format(lineNum, str(e)))
-                # sort by ID then timestamp
-                a.sort(key=lambda m: (m.parts.parent, m.parts.child, m.parts.sortNum, m.ts))
+
+                # sort by ID then property then timestamp
+                self.mcOrder.sort(key=lambda mc: (mc.parts.parent, mc.parts.child, mc.parts.sortNum, mc.prop, mc.ts))
                 self.clear_tree()
-                self.populate_tree(a)
+                self.populate_tree(self.mcOrder)
+                self.update_status_all()
+                self.update_tree()
                 self.loaded = True
             except Exception as e:
                 self.log_error("Error reading {}: {}", self.journalFile, str(e))
@@ -216,11 +225,34 @@ class Medit(LogHelper, WidgetHelper):
 
     # populate tree
     def populate_tree(self, metaChgs):
-        for metaChg in metaChgs:
+        for mc in metaChgs:
             iid = self.tree.insert('', 'end',
-                                   text=metaChg.id,
-                                   values=(metaChg.prop, metaChg.val, metaChg.formattedTs, metaChg.userId))
-            self.treeItems[iid] = metaChg
+                                   text=mc.id,
+                                   values=(mc.prop, mc.val, mc.oldval, mc.formattedTs, mc.userId, mc.status))
+            self.treeItems[iid] = mc
+
+    # update status for all meta changes
+    def update_status_all(self):
+        prevMc = None
+        for mc in self.mcOrder:
+            status = "Pending"
+            mc.shadowed = False
+            # if same ID and property as previous entry, previous is shadowed
+            if prevMc and prevMc.id == mc.id and prevMc.prop == mc.prop:
+                prevMc.shadowed = True
+                prevMc.status = "Shadowed"
+            mc.status = status
+            prevMc = mc
+
+    # update tree
+    def update_tree(self):
+        for iid, mc in self.treeItems.items():
+            tags = ''
+            if mc.shadowed:
+                tags = 'shadowed'
+
+            self.tree.set(iid, 'status', mc.status)
+            self.tree.item(iid, tags=tags)
 
     # when user clicks tree item
     def on_tree_select(self, event):
