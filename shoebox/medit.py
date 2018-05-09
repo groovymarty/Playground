@@ -5,8 +5,9 @@ from tkinter import *
 from tkinter import ttk, filedialog
 from tkit.loghelper import LogHelper
 from tkit.widgethelper import WidgetHelper
+from tkit import environ
 from datetime import datetime
-from shoebox import px
+from shoebox import px, pic
 
 instances = []
 nextInstNum = 1
@@ -18,13 +19,14 @@ class MetaChg:
         self.val = val
         self.ts = ts
         self.userId = userId
-
-    def format_ts(self):
+        self.parts = pic.parse_file(id)
+        if not self.parts:
+            raise RuntimeError("Bad ID in journal entry: {}".format(id))
         try:
-            return datetime.utcfromtimestamp(self.ts / 1e3).astimezone().strftime("%a %b %d %Y  %I:%M %p")
+            self.formattedTs = datetime.utcfromtimestamp(self.ts / 1e3).astimezone()\
+                .strftime("%a %b %d %Y  %I:%M %p")
         except Exception as e:
-            self.log_error("Bad timestamp in journal entry: {}".format(e.str()))
-            return ""
+            raise RuntimeError("Bad timestamp in journal entry: {}, {}".format(ts, str(e)))
 
 class Medit(LogHelper, WidgetHelper):
     def __init__(self):
@@ -108,6 +110,7 @@ class Medit(LogHelper, WidgetHelper):
     # so this function removes all known references then closes the top level window
     # note this will result in a second call from the on_destroy event handler; that's ok
     def destroy(self):
+        self.close_log_windows()
         if self in instances:
             instances.remove(self)
         if self.top is not None:
@@ -117,6 +120,7 @@ class Medit(LogHelper, WidgetHelper):
     # Medit destructor
     def __del__(self):
         self.destroy() #probably already called
+        LogHelper.__del__(self)
 
     # set status to specified string
     def set_status(self, msg, error=False):
@@ -173,24 +177,33 @@ class Medit(LogHelper, WidgetHelper):
         self.journalFile = filedialog.askopenfilename(title="{} - Load Journal".format(self.myName))
         if self.journalFile:
             try:
-                self.clear_tree()
                 with open(self.journalFile, mode='r', encoding='UTF-8') as f:
+                    a = []
+                    lineNum = 0
                     for line in f:
+                        lineNum += 1
                         dict = json.loads(line)
                         try:
                             id = dict['id']
                             ts = dict['ts']
                             userId = dict['userId']
                         except KeyError as e:
-                            self.log_error("Journal entry lacks required field: {}".format(e.str()))
+                            self.log_error("Line {}: Journal entry lacks required field: {}".format(lineNum, str(e)))
                             continue
-                        if 'rating' in dict:
-                            self.add_entry(MetaChg(id, 'rating', dict['rating'], ts, userId))
-                        if 'caption' in dict:
-                            self.add_entry(MetaChg(id, 'caption', dict['caption'], ts, userId))
+                        try:
+                            if 'rating' in dict:
+                                a.append(MetaChg(id, 'rating', dict['rating'], ts, userId))
+                            if 'caption' in dict:
+                                a.append(MetaChg(id, 'caption', dict['caption'], ts, userId))
+                        except RuntimeError as e:
+                            self.log_error("Line {}: {}".format(lineNum, str(e)))
+                # sort by ID then timestamp
+                a.sort(key=lambda m: (m.parts.parent, m.parts.child, m.parts.sortNum, m.ts))
+                self.clear_tree()
+                self.populate_tree(a)
                 self.loaded = True
             except Exception as e:
-                self.log_error("Error reading {}: {}", self.journalFile, e.str())
+                self.log_error("Error reading {}: {}", self.journalFile, str(e))
         self.set_status_default_or_error()
         self.update_buttons()
 
@@ -201,12 +214,13 @@ class Medit(LogHelper, WidgetHelper):
         self.treeItems = {}
         self.loaded = False
 
-    # add entry to tree
-    def add_entry(self, metaChg):
-        iid = self.tree.insert('', 'end',
-                               text=metaChg.id,
-                               values=(metaChg.prop, metaChg.val, metaChg.format_ts(), metaChg.userId))
-        self.treeItems[iid] = metaChg
+    # populate tree
+    def populate_tree(self, metaChgs):
+        for metaChg in metaChgs:
+            iid = self.tree.insert('', 'end',
+                                   text=metaChg.id,
+                                   values=(metaChg.prop, metaChg.val, metaChg.formattedTs, metaChg.userId))
+            self.treeItems[iid] = metaChg
 
     # when user clicks tree item
     def on_tree_select(self, event):
