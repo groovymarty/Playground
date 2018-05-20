@@ -48,29 +48,38 @@ class MetaDict:
         else:
             self.set_meta(id, meta)
 
-    def get_caption(self, id):
-        try:
-            return self.dict[id]['caption']
-        except KeyError:
+    def get_default(self, prop):
+        if prop == "rating":
+            return 0
+        else:
             return ""
 
-    def set_caption(self, id, caption):
+    def get_value(self, id, prop, default=None):
+        try:
+            return self.dict[id][prop]
+        except KeyError:
+            if default is None:
+                return self.get_default(prop)
+            else:
+                return default
+
+    def set_value(self, id, prop, val):
         if id not in self.dict:
             self.dict[id] = {}
-        self.dict[id]['caption'] = caption
+        self.dict[id][prop] = val
         self.changed = True
+
+    def get_caption(self, id):
+        return self.get_value(id, 'caption')
+
+    def set_caption(self, id, caption):
+        self.set_value(id, 'caption', caption)
 
     def get_rating(self, id):
-        try:
-            return self.dict[id]['rating']
-        except KeyError:
-            return 0
+        return self.get_value(id, 'rating')
 
     def set_rating(self, id, rating):
-        if id not in self.dict:
-            self.dict[id] = {}
-        self.dict[id]['rating'] = rating
-        self.changed = True
+        self.set_value(id, 'rating', rating)
 
     def touch(self, value):
         self.lastTouch = value

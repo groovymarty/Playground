@@ -510,7 +510,7 @@ class Px(LogHelper, WidgetHelper):
             else:
                 self.set_status_default()
         else:
-            if not len(items):
+            if self.loaded and not len(items):
                 # clicked outside or between items, insert hole before next item
                 # if clicked after last item, add hole at end of canvas
                 ex = self.canvas.canvasx(event.x)

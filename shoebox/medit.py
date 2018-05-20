@@ -7,7 +7,7 @@ from tkit.loghelper import LogHelper
 from tkit.widgethelper import WidgetHelper
 from tkit import environ
 from datetime import datetime
-from shoebox import px, pic
+from shoebox import px, pic, finder, metacache
 
 instances = []
 nextInstNum = 1
@@ -35,28 +35,44 @@ class MetaChg:
         except Exception as e:
             raise RuntimeError("Bad timestamp in journal entry: {}, {}".format(ts, str(e)))
 
-    def apply(self):
+    def apply(self, env=None):
         if not self.applied and not self.shadowed:
-            # TODO apply it!
-            self.applied = True
-            self.rejected = False
-            return True
+            folderPath = finder.find_folder(pic.get_folder_id(self.parts))
+            if folderPath:
+                md = metacache.get_meta_dict(folderPath, env)
+                if md:
+                    self.oldval = md.get_value(self.id, self.prop)
+                    md.apply_meta(self.id, {self.prop: self.val})
+                    self.applied = True
+                    self.rejected = False
+                    return True
+                else:
+                    environ.log_error(env, "Can't find meta dictionary for {}".format(self.id))
+                    return False
+            else:
+                environ.log_error(env, "Can't find folder for {}".format(self.id))
+                return False
         else:
             return False
 
-    def reject(self):
+    def reject(self, env=None):
         if not self.rejected and not self.shadowed:
             if self.applied:
-                self.undo()
+                self.undo(env)
             self.rejected = True
             return True
         else:
             return False
 
-    def undo(self):
+    def undo(self, env=None):
         if self.applied or self.rejected:
             if self.applied:
-                pass  # unapply it!
+                folderPath = finder.find_folder(pic.get_folder_id(self.parts))
+                if folderPath:
+                    md = metacache.get_meta_dict(folderPath, env)
+                    if md:
+                        md.apply_meta(self.id, {self.prop: self.oldval})
+                        self.oldval = ""
             self.applied = False
             self.rejected = False
             return True
@@ -317,6 +333,7 @@ class Medit(LogHelper, WidgetHelper):
             tags.append("softsel")
 
         self.tree.set(iid, 'status', mc.status)
+        self.tree.set(iid, 'was', mc.oldval)
         self.tree.item(iid, tags=tags)
 
     # when user clicks tree item
@@ -368,7 +385,7 @@ class Medit(LogHelper, WidgetHelper):
         for mc in self.get_selected_items():
             self.tree.selection_remove(mc.iid)
             mc.softSelected = True
-            if mc.apply():
+            if mc.apply(self.env):
                 n += 1
         self.update_status_all()
         self.update_tree_all()
@@ -381,7 +398,7 @@ class Medit(LogHelper, WidgetHelper):
         for mc in self.get_selected_items():
             self.tree.selection_remove(mc.iid)
             mc.softSelected = True
-            if mc.reject():
+            if mc.reject(self.env):
                 n += 1
         self.update_status_all()
         self.update_tree_all()
@@ -394,7 +411,7 @@ class Medit(LogHelper, WidgetHelper):
         for mc in self.get_selected_items():
             self.tree.selection_remove(mc.iid)
             mc.softSelected = True
-            if mc.undo():
+            if mc.undo(self.env):
                 n += 1
         self.update_status_all()
         self.update_tree_all()
