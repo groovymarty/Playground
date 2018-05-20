@@ -381,42 +381,54 @@ class Medit(LogHelper, WidgetHelper):
 
     # when apply clicked
     def do_apply(self):
-        n = 0
+        ids = []
         for mc in self.get_selected_items():
             self.tree.selection_remove(mc.iid)
             mc.softSelected = True
             if mc.apply(self.env):
-                n += 1
+                ids.append(mc.id)
         self.update_status_all()
         self.update_tree_all()
-        self.set_status("{} items applied".format(n))
+        self.set_status("{} items applied".format(len(ids)))
         self.update_buttons()
+        self.update_px_from_meta(ids)
+        metacache.write_all_changes(self.env)
 
     # when reject clicked
     def do_reject(self):
-        n = 0
+        ids = []
         for mc in self.get_selected_items():
             self.tree.selection_remove(mc.iid)
             mc.softSelected = True
             if mc.reject(self.env):
-                n += 1
+                ids.append(mc.id)
         self.update_status_all()
         self.update_tree_all()
-        self.set_status("{} items rejected".format(n))
+        self.set_status("{} items rejected".format(len(ids)))
         self.update_buttons()
+        self.update_px_from_meta(ids)
+        metacache.write_all_changes(self.env)
 
     # when undo clicked
     def do_undo(self):
-        n = 0
+        ids = []
         for mc in self.get_selected_items():
             self.tree.selection_remove(mc.iid)
             mc.softSelected = True
             if mc.undo(self.env):
-                n += 1
+                ids.append(mc.id)
         self.update_status_all()
         self.update_tree_all()
-        self.set_status("{} items undone".format(n))
+        self.set_status("{} items undone".format(len(ids)))
         self.update_buttons()
+        self.update_px_from_meta(ids)
+        metacache.write_all_changes(self.env)
+
+    # update px instance from metadata
+    def update_px_from_meta(self, ids):
+        pxInst = px.get_instance(self.pxInstNum)
+        if pxInst:
+            pxInst.update_from_meta(ids)
 
     # handle keyboard events for tree
     def on_tree_key(self, event):

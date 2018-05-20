@@ -14,6 +14,7 @@ from shoebox.pxtile import PxTilePic, PxTileFile, PxTileHole, selectColors
 from tkit.direntry import DirEntryFile
 from tkit.loghelper import LogHelper
 from tkit.widgethelper import WidgetHelper
+from tkit import tkit
 
 instances = []
 nextInstNum = 1
@@ -1527,11 +1528,8 @@ class Px(LogHelper, WidgetHelper):
 
     # possibly change folder then scroll to specified tile
     def goto(self, ids):
-        try:
-            id0 = ids[0]
-        except TypeError:
-            id0 = ids
-            ids = [id0]
+        ids = tkit.make_array(ids)
+        id0 = ids[0]
         parts = pic.parse_file(id0, self.env)
         if (parts):
             folderId = pic.get_folder_id(parts)
@@ -1572,3 +1570,17 @@ class Px(LogHelper, WidgetHelper):
         bottom = float(y + tile.h) / self.hTotal
         slider = self.canvasScroll.get()
         return top >= slider[0] and bottom <= slider[1]
+
+    # update specified IDs from metadata
+    def update_from_meta(self, ids):
+        for id in tkit.make_array(ids):
+            if id in self.tiles:
+                self.update_tile_from_meta(self.tiles[id])
+
+    # update tile from metadata
+    def update_tile_from_meta(self, tile):
+        if tile.id and self.metaDict:
+            tile.set_rating(self.metaDict.get_rating(tile.id))
+            tile.set_caption(self.metaDict.get_caption(tile.id))
+            tile.redraw_text(self.canvas, self.nailSz)
+            tile.redraw_icon(self.canvas)
