@@ -333,7 +333,9 @@ class Medit(LogHelper, WidgetHelper):
                     self.set_status("Can't find Px {:d}, switching to Px {:d}".format(oldInstNum, pxInst.instNum))
                 else:
                     self.set_status_default()
-                pxInst.goto(self.treeItems[sel[0]].id)
+                items = [self.treeItems[iid] for iid in sel]
+                folderId = pic.get_folder_id(items[0].parts)
+                pxInst.goto([item.id for item in items if pic.get_folder_id(item.parts) == folderId])
             else:
                 self.set_status("No Px found, please create one")
                 self.pxInstNum = None

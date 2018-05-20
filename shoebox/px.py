@@ -1526,22 +1526,34 @@ class Px(LogHelper, WidgetHelper):
         self.popMenu.unpost()
 
     # possibly change folder then scroll to specified tile
-    def goto(self, id):
-        parts = pic.parse_file(id, self.env)
+    def goto(self, ids):
+        try:
+            id0 = ids[0]
+        except TypeError:
+            id0 = ids
+            ids = [id0]
+        parts = pic.parse_file(id0, self.env)
         if (parts):
             folderId = pic.get_folder_id(parts)
             if folderId in self.folders:
                 folder = self.folders[folderId]
                 if (folder is not self.curFolder):
-                    self.log_info("Switching folder for goto {}".format(id))
+                    self.log_info("Switching folder for goto {}".format(id0))
                     self.load_folder(folder)
-                if id in self.tiles:
-                    tile = self.tiles[id]
+                if id0 in self.tiles:
+                    # select first tile
+                    tile0 = self.tiles[id0]
                     self.select_all(None, self.curSelectColor)
-                    self.select_tile(tile, self.curSelectColor)
-                    self.scroll_into_view(tile)
+                    self.select_tile(tile0, self.curSelectColor)
+                    self.scroll_into_view(tile0)
+                    self.set_status_default()
+                    # select additional tiles
+                    for id in ids[1:]:
+                        if id in self.tiles:
+                            tile = self.tiles[id]
+                            self.select_tile(tile, self.curSelectColor)
                 else:
-                    self.log_error("Goto failed, {} not found".format(id))
+                    self.log_error("Goto failed, {} not found".format(id0))
             else:
                 self.log_error("Goto failed, folder {} not found".format(folderId))
         else:
