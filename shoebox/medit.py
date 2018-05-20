@@ -15,6 +15,7 @@ nextInstNum = 1
 class MetaChg:
     def __init__(self, id, prop, val, ts, userId):
         self.id = id
+        self.iid = None  # see populate_tree()
         self.prop = prop
         self.val = val
         self.oldval = ""
@@ -22,6 +23,9 @@ class MetaChg:
         self.userId = userId
         self.status = ""
         self.shadowed = False
+        self.applied = False
+        self.rejected = False
+        self.softSelected = False
         self.parts = pic.parse_file(id)
         if not self.parts:
             raise RuntimeError("Bad ID in journal entry: {}".format(id))
@@ -30,6 +34,34 @@ class MetaChg:
                 .strftime("%a %b %d %Y  %I:%M %p")
         except Exception as e:
             raise RuntimeError("Bad timestamp in journal entry: {}, {}".format(ts, str(e)))
+
+    def apply(self):
+        if not self.applied and not self.shadowed:
+            # TODO apply it!
+            self.applied = True
+            self.rejected = False
+            return True
+        else:
+            return False
+
+    def reject(self):
+        if not self.rejected and not self.shadowed:
+            if self.applied:
+                self.undo()
+            self.rejected = True
+            return True
+        else:
+            return False
+
+    def undo(self):
+        if self.applied or self.rejected:
+            if self.applied:
+                pass  # unapply it!
+            self.applied = False
+            self.rejected = False
+            return True
+        else:
+            return False
 
 class Medit(LogHelper, WidgetHelper):
     def __init__(self):
@@ -50,6 +82,12 @@ class Medit(LogHelper, WidgetHelper):
         self.topBar.grid(column=0, row=0, sticky=(N, W, E))
         self.loadButton = ttk.Button(self.topBar, text="Load", command=self.do_load)
         self.loadButton.pack(side=LEFT)
+        self.applyButton = ttk.Button(self.topBar, text="Apply", command=self.do_apply)
+        self.applyButton.pack(side=LEFT)
+        self.rejectButton = ttk.Button(self.topBar, text="Reject", command=self.do_reject)
+        self.rejectButton.pack(side=LEFT)
+        self.undoButton = ttk.Button(self.topBar, text="Undo", command=self.do_undo)
+        self.undoButton.pack(side=LEFT)
 
         # style for error messages (status bar)
         s = ttk.Style()
@@ -92,6 +130,9 @@ class Medit(LogHelper, WidgetHelper):
 
         # tree stuff
         self.tree.tag_configure('shadowed', background='gray')
+        self.tree.tag_configure('applied', background='lime')
+        self.tree.tag_configure('rejected', background='pink')
+        self.tree.tag_configure('softsel', foreground='blue', font=('Helvetica', 9, 'italic'))
 
         self.journalFile = None
         self.loaded = False
@@ -171,7 +212,11 @@ class Medit(LogHelper, WidgetHelper):
 
     # enable/disable buttons
     def update_buttons(self):
+        anySel = len(self.get_selected_items())
         self.enable_widget(self.loadButton, not self.loaded)
+        self.enable_widget(self.applyButton, self.loaded and anySel)
+        self.enable_widget(self.rejectButton, self.loaded and anySel)
+        self.enable_widget(self.undoButton, self.loaded and anySel)
 
     # when Log button clicked
     def do_log(self):
@@ -209,7 +254,7 @@ class Medit(LogHelper, WidgetHelper):
                 self.clear_tree()
                 self.populate_tree(self.mcOrder)
                 self.update_status_all()
-                self.update_tree()
+                self.update_tree_all()
                 self.loaded = True
             except Exception as e:
                 self.log_error("Error reading {}: {}", self.journalFile, str(e))
@@ -230,6 +275,7 @@ class Medit(LogHelper, WidgetHelper):
                                    text=mc.id,
                                    values=(mc.prop, mc.val, mc.oldval, mc.formattedTs, mc.userId, mc.status))
             self.treeItems[iid] = mc
+            mc.iid = iid
 
     # update status for all meta changes
     def update_status_all(self):
@@ -237,27 +283,48 @@ class Medit(LogHelper, WidgetHelper):
         for mc in self.mcOrder:
             status = "Pending"
             mc.shadowed = False
-            # if same ID and property as previous entry, previous is shadowed
-            if prevMc and prevMc.id == mc.id and prevMc.prop == mc.prop:
+            if mc.rejected:
+                status = "Rejected"
+            elif mc.applied:
+                status = "Applied"
+
+            # if same ID and property as previous entry, and not rejected, previous is shadowed
+            if prevMc and prevMc.id == mc.id and prevMc.prop == mc.prop and not mc.rejected:
                 prevMc.shadowed = True
+                prevMc.applied = False
+                prevMc.rejected = False
                 prevMc.status = "Shadowed"
             mc.status = status
             prevMc = mc
 
-    # update tree
-    def update_tree(self):
-        for iid, mc in self.treeItems.items():
-            tags = ''
-            if mc.shadowed:
-                tags = 'shadowed'
+    # update all tree items
+    def update_tree_all(self):
+        for iid in self.treeItems:
+            self.update_tree_item(iid)
 
-            self.tree.set(iid, 'status', mc.status)
-            self.tree.item(iid, tags=tags)
+    # update tree item
+    def update_tree_item(self, iid):
+        mc = self.treeItems[iid]
+        tags = []
+        if mc.shadowed:
+            tags.append("shadowed")
+        elif mc.rejected:
+            tags.append("rejected")
+        elif mc.applied:
+            tags.append("applied")
+        if mc.softSelected:
+            tags.append("softsel")
+
+        self.tree.set(iid, 'status', mc.status)
+        self.tree.item(iid, tags=tags)
 
     # when user clicks tree item
     def on_tree_select(self, event):
+        self.deselect_shadowed_items()
+        self.update_buttons()
         sel = self.tree.selection()
-        if sel and sel[0] in self.treeItems:
+        if len(sel):
+            self.soft_deselect_all()
             pxInst = px.get_instance(self.pxInstNum)
             if pxInst:
                 oldInstNum = self.pxInstNum
@@ -270,3 +337,63 @@ class Medit(LogHelper, WidgetHelper):
             else:
                 self.set_status("No Px found, please create one")
                 self.pxInstNum = None
+
+    # clear shadowed items from selection
+    def deselect_shadowed_items(self):
+        for iid in self.tree.selection():
+            if self.treeItems[iid].shadowed:
+                self.tree.selection_remove(iid)
+
+    # get selected items
+    def get_selected_items(self):
+        sel = self.tree.selection()
+        if len(sel):
+            return [self.treeItems[iid] for iid in sel]
+        else:
+            return [mc for mc in self.mcOrder if mc.softSelected]
+
+    # clear soft selections
+    def soft_deselect_all(self):
+        for iid, mc in self.treeItems.items():
+            if mc.softSelected:
+                mc.softSelected = False
+                self.update_tree_item(iid)
+
+    # when apply clicked
+    def do_apply(self):
+        n = 0
+        for mc in self.get_selected_items():
+            self.tree.selection_remove(mc.iid)
+            mc.softSelected = True
+            if mc.apply():
+                n += 1
+        self.update_status_all()
+        self.update_tree_all()
+        self.set_status("{} items applied".format(n))
+        self.update_buttons()
+
+    # when reject clicked
+    def do_reject(self):
+        n = 0
+        for mc in self.get_selected_items():
+            self.tree.selection_remove(mc.iid)
+            mc.softSelected = True
+            if mc.reject():
+                n += 1
+        self.update_status_all()
+        self.update_tree_all()
+        self.set_status("{} items rejected".format(n))
+        self.update_buttons()
+
+    # when undo clicked
+    def do_undo(self):
+        n = 0
+        for mc in self.get_selected_items():
+            self.tree.selection_remove(mc.iid)
+            mc.softSelected = True
+            if mc.undo():
+                n += 1
+        self.update_status_all()
+        self.update_tree_all()
+        self.set_status("{} items undone".format(n))
+        self.update_buttons()
