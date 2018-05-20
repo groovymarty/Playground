@@ -274,7 +274,7 @@ class Medit(LogHelper, WidgetHelper):
                 self.update_tree_all()
                 self.loaded = True
             except Exception as e:
-                self.log_error("Error reading {}: {}", self.journalFile, str(e))
+                self.log_error("Error reading {}: {}".format(self.journalFile, str(e)))
         self.set_status_default_or_error()
         self.update_buttons()
 
@@ -290,9 +290,22 @@ class Medit(LogHelper, WidgetHelper):
         for mc in metaChgs:
             iid = self.tree.insert('', 'end',
                                    text=mc.id,
-                                   values=(mc.prop, mc.val, mc.oldval, mc.formattedTs, mc.userId, mc.status))
+                                   values=(mc.prop,
+                                           self.annotate_value(mc.prop, mc.val),
+                                           self.annotate_value(mc.prop, mc.oldval),
+                                           mc.formattedTs, mc.userId, mc.status))
             self.treeItems[iid] = mc
             mc.iid = iid
+
+    # annotate value
+    def annotate_value(self, prop, val):
+        if prop == 'rating':
+            try:
+                return pic.ratings[val]
+            except:
+                return val
+        else:
+            return val
 
     # update status for all meta changes
     def update_status_all(self):
@@ -333,7 +346,7 @@ class Medit(LogHelper, WidgetHelper):
             tags.append("softsel")
 
         self.tree.set(iid, 'status', mc.status)
-        self.tree.set(iid, 'was', mc.oldval)
+        self.tree.set(iid, 'was', self.annotate_value(mc.prop, mc.oldval))
         self.tree.item(iid, tags=tags)
 
     # when user clicks tree item
