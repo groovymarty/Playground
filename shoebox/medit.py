@@ -82,11 +82,11 @@ class Medit(LogHelper, WidgetHelper):
         self.topBar.grid(column=0, row=0, sticky=(N, W, E))
         self.loadButton = ttk.Button(self.topBar, text="Load", command=self.do_load)
         self.loadButton.pack(side=LEFT)
-        self.applyButton = ttk.Button(self.topBar, text="Apply", command=self.do_apply)
+        self.applyButton = ttk.Button(self.topBar, text="Apply (A)", command=self.do_apply)
         self.applyButton.pack(side=LEFT)
-        self.rejectButton = ttk.Button(self.topBar, text="Reject", command=self.do_reject)
+        self.rejectButton = ttk.Button(self.topBar, text="Reject (R)", command=self.do_reject)
         self.rejectButton.pack(side=LEFT)
-        self.undoButton = ttk.Button(self.topBar, text="Undo", command=self.do_undo)
+        self.undoButton = ttk.Button(self.topBar, text="Undo (U)", command=self.do_undo)
         self.undoButton.pack(side=LEFT)
 
         # style for error messages (status bar)
@@ -122,6 +122,7 @@ class Medit(LogHelper, WidgetHelper):
         self.tree.heading('status', text="Status")
         self.tree.pack(side=RIGHT, fill=BOTH, expand=True)
         self.tree.bind("<<TreeviewSelect>>", self.on_tree_select)
+        self.tree.bind("<Key>", self.on_tree_key)
         self.tree.configure(yscrollcommand=self.treeScroll.set)
         self.treeScroll.configure(command=self.tree.yview)
         self.treeFrame.grid(column=0, row=2, sticky=(N,W,E,S))
@@ -399,3 +400,12 @@ class Medit(LogHelper, WidgetHelper):
         self.update_tree_all()
         self.set_status("{} items undone".format(n))
         self.update_buttons()
+
+    # handle keyboard events for tree
+    def on_tree_key(self, event):
+        if (event.keycode == ord('A')):
+            self.do_apply()
+        elif (event.keycode == ord('R')):
+            self.do_reject()
+        elif (event.keycode == ord('U')):
+            self.do_undo()
