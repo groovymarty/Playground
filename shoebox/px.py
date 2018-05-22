@@ -93,6 +93,7 @@ class PxMetaDialog(simpledialog.Dialog):
         self.caption.insert(0, self.tile.caption)
 
     def apply(self):
+        self.px.get_meta_dict()
         rating = pic.flip_rating(self.rating.current())
         self.tile.set_rating(rating)
         self.px.metaDict.set_rating(self.tile.id, rating)
@@ -102,6 +103,7 @@ class PxMetaDialog(simpledialog.Dialog):
         self.tile.redraw_text(self.px.canvas, self.px.nailSz)
         self.tile.redraw_icon(self.px.canvas)
         self.px.metaDict.write(self.px.env)
+        self.px.forget_meta_dict()
 
 class Px(LogHelper, WidgetHelper):
     def __init__(self):
@@ -230,6 +232,7 @@ class Px(LogHelper, WidgetHelper):
         self.nails = None
         self.nailsTried = False
         self.metaDict = None
+        self.metaDictRefCnt = 0
         self.loaded = False
         self.nPictures = 0
         self.numDigits = 0
@@ -746,6 +749,7 @@ class Px(LogHelper, WidgetHelper):
         self.nails = None
         self.nailsTried = False
         self.metaDict = None
+        self.metaDictRefCnt = 0
 
     # add specified pictures to canvas
     # argument is return value from scandir() or equivalent
@@ -754,7 +758,7 @@ class Px(LogHelper, WidgetHelper):
         self.clear_error()
         self.set_status("Loading...")
         prevLen = len(self.tilesOrder)
-        self.metaDict = metacache.get_meta_dict(self.curFolder.path, self.env)
+        self.get_meta_dict()
 
         # bump start position for next tile,
         # possibly bump to next row
@@ -803,6 +807,7 @@ class Px(LogHelper, WidgetHelper):
         self.enable_buttons()
         # check tiles just added for OOO errors
         self.check_out_of_order(prevLen, len(self.tilesOrder))
+        self.forget_meta_dict()
 
     # fill hole(s) with specified files
     # similarity to populate_canvas noted, but trying to factor the similar parts would be too complicated
@@ -810,6 +815,8 @@ class Px(LogHelper, WidgetHelper):
         self.clear_error()
         self.set_status("Loading...")
         prevLen = len(self.tilesOrder)
+        self.get_meta_dict()
+
         # make sure there are enough holes
         nHoles = self.count_holes(startIndex)
         if nHoles < len(entries):
@@ -828,6 +835,7 @@ class Px(LogHelper, WidgetHelper):
         self.set_status_default_or_error()
         # check tiles just added for OOO errors
         self.check_out_of_order(prevLen, len(self.tilesOrder))
+        self.forget_meta_dict()
 
     # reflow starting at specified index, optionally removing holes
     # similarity to populate_canvas noted, but trying to factor the similar parts would be too complicated
@@ -950,7 +958,7 @@ class Px(LogHelper, WidgetHelper):
         if photo is None:
             return self.make_file_tile(ent)
         else:
-            return PxTilePic(ent.name, photo, self.metaDict, self.env)
+            return PxTilePic(ent.name, photo, self.get_meta_dict(0), self.env)
 
     # make Tkinter photo image from PIL image or PNG data bytes
     def make_tk_photo_image(self, imgOrData, name):
@@ -1222,7 +1230,7 @@ class Px(LogHelper, WidgetHelper):
                 self.rename_tile(tile, newName)
                 # apply metadata from loose cache, if any
                 # use newName because above rename changed name in loose cache
-                self.metaDict.restore_meta_from_loose_cache(tile.id, newName)
+                self.get_meta_dict(0).restore_meta_from_loose_cache(tile.id, newName)
                 nChanged += 1
                 errMsgNum = num
                 num += step
@@ -1276,7 +1284,7 @@ class Px(LogHelper, WidgetHelper):
                         newPath = self.rename_file_in_cur_folder(tile.name, newName)
                         self.rename_tile(tile, newName)
                         # save any metadata in loose cache for later use
-                        self.metaDict.remove_meta(oldId, newPath)
+                        self.get_meta_dict(0).remove_meta(oldId, newPath)
                         nChanged += 1
                     except RuntimeError as e:
                         self.log_error(str(e))
@@ -1571,16 +1579,44 @@ class Px(LogHelper, WidgetHelper):
         slider = self.canvasScroll.get()
         return top >= slider[0] and bottom <= slider[1]
 
+    # get meta dictionary for current folder
+    # usually bump ref count to hold dictionary for later use
+    # call forget_meta_dict() when you are done with it
+    # this helps ensure we are not stuck with an old copy of the dictionary
+    # for example suppose we get dict from metacache and hold it for a long time
+    # meanwhile metacache decides to clear that dict from cache
+    # then somebody loads it again and makes changes
+    # we would not see the changes because we're pointing to a different dict object
+    # if you just need the dictionary once, pass bump=0 to skip the ref count business
+    def get_meta_dict(self, bump=1):
+        if self.metaDict:
+            self.metaDictRefCnt += bump
+        else:
+            self.metaDict = metacache.get_meta_dict(self.curFolder.path, self.env)
+            self.metaDictRefCnt = bump
+        return self.metaDict
+
+    # done with meta dictionary
+    def forget_meta_dict(self):
+        self.metaDictRefCnt -= 1
+        if self.metaDictRefCnt == 0:
+            self.metaDict = None
+
     # update specified IDs from metadata
     def update_from_meta(self, ids):
+        # prefetch meta dict
+        self.get_meta_dict()
         for id in tkit.make_array(ids):
             if id in self.tiles:
                 self.update_tile_from_meta(self.tiles[id])
+        self.forget_meta_dict()
 
     # update tile from metadata
     def update_tile_from_meta(self, tile):
-        if tile.id and self.metaDict:
+        if tile.id:
+            self.get_meta_dict()
             tile.set_rating(self.metaDict.get_rating(tile.id))
             tile.set_caption(self.metaDict.get_caption(tile.id))
             tile.redraw_text(self.canvas, self.nailSz)
             tile.redraw_icon(self.canvas)
+            self.forget_meta_dict()
