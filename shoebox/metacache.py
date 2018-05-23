@@ -15,9 +15,11 @@ def get_meta_dict(folderPath, env=None, okToCreate=True):
     if folderPath in cache:
         metaDict = cache[folderPath]
     else:
-        if not okToCreate:
+        try:
+            metaDict = MetaDict(folderPath, env, okToCreate)
+        except FileNotFoundError:
+            # only happens if okToCreate is false
             return None
-        metaDict = MetaDict(folderPath, env)
         cache[folderPath] = metaDict
         cacheCount += 1
         environ.log_info(env, "Added '{}' to meta cache, n={}".format(folderPath, cacheCount))

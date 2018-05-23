@@ -2,10 +2,10 @@
 
 import os, io
 from tkinter import *
-from tkinter import ttk, filedialog
+from tkinter import ttk, filedialog, messagebox
 from tkit.widgetgarden import WidgetGarden
 from tkit.direntry import DirEntry
-from shoebox import pic, nails, nailcache
+from shoebox import pic, nails, nailcache, metacache
 from tkit.loghelper import LogHelper
 
 instances = []
@@ -33,7 +33,7 @@ class Sweeper(LogHelper):
         instances.append(self)
 
         self.garden = WidgetGarden()
-        self.garden.labelText = {'path': "Starting Path:", 'recursive': "Recursive"}
+        self.garden.labelText = {'path': "Starting Path:", 'recursive': "Recursive", 'checkmeta': "Check Meta"}
         self.garden.begin_layout(self.top, 3)
         self.top.grid_columnconfigure(1, weight=1)
         self.garden.make_entry('path')
@@ -42,6 +42,9 @@ class Sweeper(LogHelper):
         self.garden.next_row()
         self.garden.next_col()
         self.garden.make_checkbutton('recursive')
+        self.garden.next_row()
+        self.garden.next_col()
+        self.garden.make_checkbutton('checkmeta')
         self.logButton = ttk.Button(self.garden.curParent, text="Log", command=self.do_log)
         self.garden.grid_widget(self.logButton)
         self.garden.next_row()
@@ -69,10 +72,14 @@ class Sweeper(LogHelper):
         self.garden.write_var('path', self.absPath)
         self.recursive = True
         self.garden.write_var('recursive', self.recursive)
+        self.checkmeta = False
+        self.garden.write_var('checkmeta', self.checkmeta)
         self.foldersToScan = None
         self.curFolder = None
         self.curScan = None
         self.curEnt = None
+        self.metaDict = None
+        self.deleteList = None
         self.dupIdCheck = None
         self.prevSortNum = 0
         self.quit = False
@@ -128,8 +135,11 @@ class Sweeper(LogHelper):
         self.disable_widgets()
         self.absPath = self.garden.read_var('path')
         self.recursive = self.garden.read_var('recursive')
+        self.checkmeta = self.garden.read_var('checkmeta')
         self.foldersToScan = [Folder(DirEntry(self.absPath), None)]
         self.curFolder = None
+        self.metaDict = None
+        self.deleteList = None
         self.curScan = None
         self.curEnt = None
         self.quit = False
@@ -197,6 +207,9 @@ class Sweeper(LogHelper):
     def begin_folder(self):
         self.dupIdCheck = {}
         self.prevSortNum = 0
+        if self.checkmeta:
+            self.metaDict = metacache.get_meta_dict(self.curFolder.ent.path, self.env, False)
+            self.deleteList = []
         pass
 
     # process one picture
@@ -223,13 +236,26 @@ class Sweeper(LogHelper):
                         self.prevSortNum = parts.sortNum
                     else:
                         self.log_error("Out of order: {}".format(self.curEnt.path))
+                # checking metadata?
+                if self.metaDict:
+                    rating = self.metaDict.get_rating(id)
+                    if rating == 1:
+                        self.deleteList.append(self.curEnt.name)
 
             else:
                 self.log_error("Noncanonical: {}".format(self.curEnt.path))
 
     # finish processing a folder
     def finish_folder(self):
-        pass
+        if self.deleteList and len(self.deleteList):
+            items = "\n".join(self.deleteList)
+            msg = "{:d} items marked for deletion, are you sure you want delete them?\n{}".format(
+                len(self.deleteList), items)
+            if messagebox.askyesno("Confirm Delete", msg):
+                pass
+
+        self.metaDict = None
+        self.deleteList = None
 
     # when nothing more to do (or quitting because stop button clicked)
     def do_end(self):
@@ -243,5 +269,6 @@ class Sweeper(LogHelper):
     def disable_widgets(self, disable=True):
         self.garden.set_widget_disable('path', disable)
         self.garden.set_widget_disable('recursive', disable)
+        self.garden.set_widget_disable('checkmeta', disable)
         self.garden.disable_widget(self.startButton, disable)
         self.garden.disable_widget(self.stopButton, not disable)

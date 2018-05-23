@@ -7,7 +7,7 @@ from shoebox import metacache
 metaFileName = "meta.json"
 
 class MetaDict:
-    def __init__(self, folderPath, env=None):
+    def __init__(self, folderPath, env=None, okToCreate=True):
         self.folderPath = folderPath
         self.lastTouch = 0
         self.changed = False
@@ -15,8 +15,11 @@ class MetaDict:
         try:
             with open(path, mode='r', encoding='UTF-8') as f:
                 self.dict = json.load(f)
-        except FileNotFoundError:
-            self.dict = {}
+        except FileNotFoundError as e:
+            if okToCreate:
+                self.dict = {}
+            else:
+                raise e
         except json.JSONDecodeError as e:
             environ.log_error(env, "JSON error in {}: {}".format(path, str(e)))
             self.dict = {}
