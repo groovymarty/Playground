@@ -21,8 +21,8 @@ nextInstNum = 1
 
 tileGap = 14
 
-# return an instance
 def get_instance(instNum=None):
+    """return an instance"""
     try:
         return next(inst for inst in instances if inst.instNum == instNum)
     except StopIteration:
@@ -245,18 +245,20 @@ class Px(LogHelper, WidgetHelper):
         self.set_status_default_or_error()
         instances.append(self)
 
-    # called when my top-level window is closed
-    # this is the easiest and most common way to destroy Px,
-    # and includes the case where the entire shoebox application is shut down
     def on_destroy(self, ev):
+        """called when my top-level window is closed
+        this is the easiest and most common way to destroy Px,
+        and includes the case where the entire shoebox application is shut down
+        """
         self.top = None
         self.destroy()
 
-    # destroy and clean up this Px
-    # in Python you don't really destroy objects, you just remove all references to them
-    # so this function removes all known references then closes the top level window
-    # note this will result in a second call from the on_destroy event handler; that's ok
     def destroy(self):
+        """destroy and clean up this Px
+        in Python you don't really destroy objects, you just remove all references to them
+        so this function removes all known references then closes the top level window
+        note this will result in a second call from the on_destroy event handler; that's ok
+        """
         dnd.remove_target(self.canvas)
         self.close_log_windows()
         if self in instances:
@@ -265,37 +267,38 @@ class Px(LogHelper, WidgetHelper):
             self.top.destroy()
             self.top = None
 
-    # Px destructor
     def __del__(self):
+        """Px destructor"""
         self.destroy() #probably already called
         LogHelper.__del__(self)
 
-    # set status to specified string
     def set_status(self, msg, error=False):
+        """set status to specified string"""
         self.statusLabel.configure(text=msg, style="Error.TLabel" if error else "TLabel")
         self.top.update_idletasks()
 
-    # set status to default message
     def set_status_default(self):
+        """set status to default message"""
         if self.curFolder is None:
             self.set_status("Select a folder")
         else:
             self.set_status("Ready ({:d} pictures)".format(self.nPictures))
 
-    # set status to default message or error
     def set_status_default_or_error(self):
+        """set status to default message or error"""
         if self.lastError:
             self.set_status("Ready / "+self.lastError, True)
         else:
             self.set_status_default()
 
-    # clear last error
     def clear_error(self):
+        """clear last error"""
         self.lastError = ""
 
-    # show error/warning message in status and log it
-    # for info optionally show in status and log it
     def log_error(self, msg):
+        """show error/warning message in status and log it
+        for info optionally show in status and log it
+        """
         self.lastError = msg
         self.set_status(msg, True)
         super().log_error(msg)
@@ -310,15 +313,15 @@ class Px(LogHelper, WidgetHelper):
             self.set_status(msg)
         super().log_info(msg)
 
-    # when Refresh button clicked
     def do_refresh(self):
+        """when Refresh button clicked"""
         selections = self.save_selections()
         self.clear_canvas()
         self.populate_canvas(os.scandir(self.curFolder.path))
         self.apply_selections(selections)
 
-    # when Small/Large button clicked
     def toggle_nail_size(self):
+        """when Small/Large button clicked"""
         i = pic.nailSizes.index(self.nailSz)
         i = (i + 1) % len(pic.nailSizes)
         self.nailSz = pic.nailSizes[i]
@@ -326,8 +329,8 @@ class Px(LogHelper, WidgetHelper):
         self.sizeButton.configure(text=pic.nailSizeNames[i])
         self.do_refresh()
 
-    # when Select All/Deselect button clicked
     def toggle_select_all(self):
+        """when Select All/Deselect button clicked"""
         if self.any_selected(self.curSelectColor):
             self.select_all(False, self.curSelectColor)
             self.lastTileClicked = None
@@ -341,8 +344,8 @@ class Px(LogHelper, WidgetHelper):
         # send focus back to canvas
         self.canvas.focus_set()
 
-    # update Select All/Deselect button
     def update_select_button(self):
+        """update Select All/Deselect button"""
         if self.any_selected(self.curSelectColor):
             self.selectButton.configure(text="Deselect")
         elif self.any_selected():
@@ -352,35 +355,35 @@ class Px(LogHelper, WidgetHelper):
         s = ttk.Style()
         s.configure(self.styleRoot+'.Select.TButton', background=selectColors[self.curSelectColor])
 
-    # update status to say what's selected
     def update_select_status(self):
+        """update status to say what's selected"""
         self.set_status("{:d} items selected {}".format(self.num_selected(self.curSelectColor),
                                                         selectColors[self.curSelectColor]))
 
-    # when Nailer button clicked
     def do_nailer(self):
+        """when Nailer button clicked"""
         if self.curFolder is None:
             Nailer(".")
         else:
             Nailer(self.curFolder.path)
 
-    # when Sweeper button clicked
     def do_sweeper(self):
+        """when Sweeper button clicked"""
         if self.curFolder is None:
             Sweeper(".")
         else:
             Sweeper(self.curFolder.path)
 
-    # when Log button clicked
     def do_log(self):
+        """when Log button clicked"""
         self.open_log_window("Log - {}".format(self.myName))
 
-    # when Options button clicked
     def do_options(self):
+        """when Options button clicked"""
         PxOptionsDialog(self)
 
-    # enable/disable buttons
     def enable_buttons(self, enable=True):
+        """enable/disable buttons"""
         self.enable_widget(self.refreshButton, enable)
         self.enable_widget(self.sizeButton, enable)
         self.enable_widget(self.selectButton, enable)
@@ -390,9 +393,10 @@ class Px(LogHelper, WidgetHelper):
         self.enable_widget(self.nailerButton, enable)
         self.enable_widget(self.sweeperButton, enable)
 
-    # populate tree
     def populate_tree(self, parent):
-        # note i'm not sorting, on my system scandir returns them sorted already
+        """populate tree
+        note i'm not sorting, on my system scandir returns them sorted already
+        """
         for ent in os.scandir(parent.path):
             if ent.is_dir():
                 iid = self.tree.insert(parent.iid, 'end', text=ent.name)
@@ -402,8 +406,8 @@ class Px(LogHelper, WidgetHelper):
                 self.add_folder(folder)
                 self.populate_tree(folder)
 
-    # add a folder, check for errors
     def add_folder(self, folder):
+        """add a folder, check for errors"""
         if folder.noncanon:
             # folder is noncanonical, ID cannot be parsed
             self.tree.item(folder.iid, tags='noncanon')
@@ -424,8 +428,8 @@ class Px(LogHelper, WidgetHelper):
                 self.set_folder_error(folder, pic.OOP)
                 self.log_error("Folder out of place: {}".format(folder.path))
 
-    # set folder error
     def set_folder_error(self, folder, errBit):
+        """set folder error"""
         folder.set_error(errBit)
         self.tree.item(folder.iid, tags='error')
         parent = folder.parent
@@ -433,30 +437,30 @@ class Px(LogHelper, WidgetHelper):
             self.tree.item(parent.iid, tags='childerror')
             parent = parent.parent
 
-    # when user clicks tree item
     def on_tree_select(self, event):
+        """when user clicks tree item"""
         sel = self.tree.selection()
         if sel and sel[0] in self.treeItems:
             self.load_folder(self.treeItems[sel[0]])
 
-    # load specified folder
     def load_folder(self, folder):
-            self.curFolder = folder
-            self.top.title("{} - {}".format(self.myName, self.curFolder.path[2:]))
-            self.clear_canvas()
-            self.update_select_button()
-            self.populate_canvas(os.scandir(self.curFolder.path))
+        """load specified folder"""
+        self.curFolder = folder
+        self.top.title("{} - {}".format(self.myName, self.curFolder.path[2:]))
+        self.clear_canvas()
+        self.update_select_button()
+        self.populate_canvas(os.scandir(self.curFolder.path))
 
-    # when user resizes the window
     def on_canvas_resize(self, event):
+        """when user resizes the window"""
         if self.canvas.winfo_width() != self.canvasWidth:
             self.canvasWidth = self.canvas.winfo_width()
         if not self.loaded:
             self.clear_canvas()
             self.canvas.create_line(0, 0, self.canvasWidth, self.tree.winfo_height())
 
-    # when user clicks in canvas
     def on_canvas_click(self, event):
+        """when user clicks in canvas"""
         # get keyboard focus
         self.canvas.focus_set()
         # find item that was clicked
@@ -538,47 +542,47 @@ class Px(LogHelper, WidgetHelper):
                 else:
                     self.set_status_default()
 
-    # select a tile
     def select_tile(self, tile, color):
+        """select a tile"""
         if not isinstance(tile, PxTileHole):
             if not color or (tile.selected and tile.selected != color):
                 tile.erase_selected(self.canvas)
             if color and not tile.selected:
                 tile.draw_selected(self.canvas, color)
 
-    # any tiles selected?
     def any_selected(self, color=None):
+        """any tiles selected?"""
         if color:
             return any(tile.selected == color for tile in self.tilesOrder)
         else:
             return any(tile.selected for tile in self.tilesOrder)
 
-    # return number of tiles selected with specified color
     def num_selected(self, color):
+        """return number of tiles selected with specified color"""
         return len([tile for tile in self.tilesOrder if tile.selected == color])
 
-    # select/unselect all
     def select_all(self, color, filterColor=None):
+        """select/unselect all"""
         for tile in self.tilesOrder:
             if not filterColor or tile.selected == filterColor:
                 self.select_tile(tile, color)
 
-    # return current selections
     def save_selections(self):
+        """return current selections"""
         selections = {}
         for tile in self.tilesOrder:
             if tile.selected:
                 selections[tile.name] = tile.selected
         return selections
 
-    # apply selections
     def apply_selections(self, selections):
+        """apply selections"""
         for name, color in selections.items():
             if name in self.tilesByName:
                 self.select_tile(self.tilesByName[name], color)
 
-    # on any mouse motion with button down
     def on_canvas_dnd_motion(self, event):
+        """on any mouse motion with button down"""
         if not self.dragging:
             if self.dragStart is None:
                 # get canvas item under mouse
@@ -598,8 +602,8 @@ class Px(LogHelper, WidgetHelper):
                 self.canvas.configure(cursor="cross_reverse" if self.dragCopy else "box_spiral")
                 self.set_status("Dragging {:d} {} items".format(len(self.dragTiles),
                                                                 selectColors[self.dragColor]))
-    # on mouse button release
     def on_canvas_dnd_release(self, event):
+        """on mouse button release"""
         if self.dragging:
             w = self.top.winfo_containing(event.x_root, event.y_root)
             if w != self.canvas:
@@ -662,8 +666,8 @@ class Px(LogHelper, WidgetHelper):
         self.dragCopy = False
         self.canvas.configure(cursor="")
 
-    # called by dnd, return true if drop accepted (or array of true/false)
     def receive_drop(self, items, doCopy, event):
+        """called by dnd, return true if drop accepted (or array of true/false)"""
         if not self.curFolder:
             return False
         entries = []
@@ -702,8 +706,8 @@ class Px(LogHelper, WidgetHelper):
             metacache.write_all_changes(self.env)
         return result
 
-    # return target tile for mouse event or None
     def get_target_tile(self, event):
+        """return target tile for mouse event or None"""
         ex = event.x_root - self.canvas.winfo_rootx()
         ey = event.y_root - self.canvas.winfo_rooty()
         cx = self.canvas.canvasx(ex)
@@ -714,8 +718,8 @@ class Px(LogHelper, WidgetHelper):
         else:
             return None
 
-    # handle keyboard event for canvas
     def on_canvas_key(self, event):
+        """handle keyboard event for canvas"""
         if event.keycode == 46: #delete key
             tilesToDelete = [t for t in self.tilesOrder if t.selected == self.curSelectColor]
             if len(tilesToDelete):
@@ -735,8 +739,8 @@ class Px(LogHelper, WidgetHelper):
             else:
                 self.set_status("No items selected")
 
-    # delete all items in canvas
     def clear_canvas(self):
+        """delete all items in canvas"""
         self.canvas.delete(ALL)
         self.canvasItems = {}
         self.tiles = {}
@@ -751,9 +755,11 @@ class Px(LogHelper, WidgetHelper):
         self.metaDict = None
         self.metaDictRefCnt = 0
 
-    # add specified pictures to canvas
-    # argument is return value from scandir() or equivalent
+
     def populate_canvas(self, entries):
+        """add specified pictures to canvas
+        argument is return value from scandir() or equivalent
+        """
         self.canvas.configure(background="black")
         self.clear_error()
         self.set_status("Loading...")
@@ -809,9 +815,10 @@ class Px(LogHelper, WidgetHelper):
         self.check_out_of_order(prevLen, len(self.tilesOrder))
         self.forget_meta_dict()
 
-    # fill hole(s) with specified files
-    # similarity to populate_canvas noted, but trying to factor the similar parts would be too complicated
     def populate_holes(self, startIndex, entries):
+        """fill hole(s) with specified files
+        similarity to populate_canvas noted, but trying to factor the similar parts would be too complicated
+        """
         self.clear_error()
         self.set_status("Loading...")
         prevLen = len(self.tilesOrder)
@@ -837,13 +844,14 @@ class Px(LogHelper, WidgetHelper):
         self.check_out_of_order(prevLen, len(self.tilesOrder))
         self.forget_meta_dict()
 
-    # reflow starting at specified index, optionally removing holes
-    # similarity to populate_canvas noted, but trying to factor the similar parts would be too complicated
-    # if removeHoles is 'leading', removes holes from start tile to first non-hole
-    # otherwise if removeHoles is truthy, remove all holes
-    # assumes starting tile has valid coordinates; from then on coordinates don't matter
-    # if index < 0 reflow entire canvas; all coordinates will be recomputed
     def reflow(self, index=-1, removeHoles=False):
+        """reflow starting at specified index, optionally removing holes
+        similarity to populate_canvas noted, but trying to factor the similar parts would be too complicated
+        if removeHoles is 'leading', removes holes from start tile to first non-hole
+        otherwise if removeHoles is truthy, remove all holes
+        assumes starting tile has valid coordinates; from then on coordinates don't matter
+        if index < 0 reflow entire canvas; all coordinates will be recomputed
+        """
         # get coordinates of start tile
         if index >= 0 and index < len(self.tilesOrder):
             startTile = self.tilesOrder[index]
@@ -895,15 +903,15 @@ class Px(LogHelper, WidgetHelper):
         self.canvas.configure(scrollregion=(0, 0, 1, y))
         self.hTotal = y
 
-    # make tile based on file extension
     def make_tile(self, ent):
+        """make tile based on file extension"""
         if os.path.splitext(ent.name)[1].lower() in pic.pictureExts:
             return self.make_pic_tile(ent)
         else:
             return self.make_file_tile(ent)
 
-    # make tile for a picture
     def make_pic_tile(self, ent):
+        """make tile for a picture"""
         photo = None
         # try to get thumbnails if we haven't already tried
         if self.nails is None and not self.nailsTried:
@@ -960,8 +968,8 @@ class Px(LogHelper, WidgetHelper):
         else:
             return PxTilePic(ent.name, photo, self.get_meta_dict(0), self.env)
 
-    # make Tkinter photo image from PIL image or PNG data bytes
     def make_tk_photo_image(self, imgOrData, name):
+        """make Tkinter photo image from PIL image or PNG data bytes"""
         try:
             if pic.is_pil_image(imgOrData):
                 # make from PIL image
@@ -973,13 +981,14 @@ class Px(LogHelper, WidgetHelper):
             self.log_error("Can't create Tk photo image for {}".format(name))
             return None
 
-    # make tile for a file
     def make_file_tile(self, ent):
+        """make tile for a file"""
         return PxTileFile(ent.name, self.env)
 
-    # add a tile
-    # since tile may not be on canvas, does not redraw text in case of error
     def add_tile(self, tile, index=-1):
+        """add a tile
+        since tile may not be on canvas, does not redraw text in case of error
+        """
         if index < 0:
             index = len(self.tilesOrder)
         self.tilesOrder.insert(index, tile)
@@ -993,9 +1002,10 @@ class Px(LogHelper, WidgetHelper):
                 nd = pic.get_num_digits(tile.parts)
                 self.numDigits = 4 if nd >= 4 else max(nd, self.numDigits)
 
-    # add tile ID to collection, check for DUP and OOP errors
-    # since tile may not be on canvas, does not redraw text in case of error
     def add_tile_id(self, tile):
+        """add tile ID to collection, check for DUP and OOP errors
+        since tile may not be on canvas, does not redraw text in case of error
+        """
         if tile.id:
             if tile.id in self.tiles:
                 # duplicate groovy ID
@@ -1016,12 +1026,12 @@ class Px(LogHelper, WidgetHelper):
                     tile.set_error(pic.OOP)
                     self.log_error("Picture out of place: {}".format(tile.name))
 
-    # add tile to canvas items for click and drop target
     def add_canvas_item(self, tile):
+        """add tile to canvas items for click and drop target"""
         self.canvasItems[tile.items[0]] = tile
 
-    # remove a tile, erase from canvas and optionally replace with hole
     def remove_tile(self, tile, makeHole=False):
+        """remove a tile, erase from canvas and optionally replace with hole"""
         if tile.name in self.tilesByName:
             del self.tilesByName[tile.name]
         if tile.id:
@@ -1052,8 +1062,8 @@ class Px(LogHelper, WidgetHelper):
         except ValueError:
             self.log_error("Error removing {}, not in tilesOrder".format(tile.name))
 
-    # remove tile ID from collection, recheck DUP errors
     def remove_tile_id(self, tile):
+        """remove tile ID from collection, recheck DUP errors"""
         if tile.id:
             # remove from collection
             if tile.id in self.tiles and self.tiles[tile.id] is tile:
@@ -1071,8 +1081,8 @@ class Px(LogHelper, WidgetHelper):
                 if tile.id not in self.tiles:
                     self.tiles[tile.id] = otherTile
 
-    # rename a tile
     def rename_tile(self, tile, newName):
+        """rename a tile"""
         if tile.name in self.tilesByName:
             del self.tilesByName[tile.name]
         self.tilesByName[newName] = tile
@@ -1084,8 +1094,8 @@ class Px(LogHelper, WidgetHelper):
             self.add_tile_id(tile)
         tile.redraw_text(self.canvas, self.nailSz)
 
-    # count holes
     def count_holes(self, index):
+        """count holes"""
         nHoles = 0
         for tile in self.tilesOrder[index:]:
             if isinstance(tile, PxTileHole):
@@ -1094,8 +1104,8 @@ class Px(LogHelper, WidgetHelper):
                 break
         return nHoles
 
-    # insert hole(s) at index
     def insert_holes(self, index=-1, n=1):
+        """insert hole(s) at index"""
         if index >= 0:
             # insert holes(s) before specified tile
             x, y = self.canvas.coords(self.tilesOrder[index].items[0])[:2]
@@ -1117,8 +1127,8 @@ class Px(LogHelper, WidgetHelper):
             # ok if start index goes to -1, will reflow all tiles
             self.reflow(len(self.tilesOrder) - n - 1)
 
-    # number selected tiles that aren't already numbered
     def do_num(self):
+        """number selected tiles that aren't already numbered"""
         if self.curFolder.noncanon:
             self.log_error("Sorry, current folder is noncanonical")
         else:
@@ -1158,14 +1168,15 @@ class Px(LogHelper, WidgetHelper):
                 else:
                     self.set_status("No files selected")
 
-    # number a group of unnumbered tiles consecutively
-    # lastNumSeen is last numbered tile before group (or zero)
-    # nextNumSeen is next numbered tile after group (or MAXNUM)
-    # stickRight says what to do if there are more numbers available than we need
-    # if true, number the group based on nextNumSeen (so numbering break is before group)
-    # otherwise number the group based on lastNumSeen (so numbering break is after group)
-    # return number of tiles changed
     def number_group_of_tiles(self, tilesInGroup, lastNumSeen, nextNumSeen, stickRight):
+        """number a group of unnumbered tiles consecutively
+        lastNumSeen is last numbered tile before group (or zero)
+        nextNumSeen is next numbered tile after group (or MAXNUM)
+        stickRight says what to do if there are more numbers available than we need
+        if true, number the group based on nextNumSeen (so numbering break is before group)
+        otherwise number the group based on lastNumSeen (so numbering break is after group)
+        return number of tiles changed
+        """
         folderId = pic.get_folder_id(self.curFolder.parts)
         nChanged = 0
         nAvail = nextNumSeen - lastNumSeen - 1
@@ -1241,12 +1252,12 @@ class Px(LogHelper, WidgetHelper):
             self.log_error("{:d} files {} {:d} could not be numbered".format(nCantDo, errMsgSide, errMsgNum))
         return nChanged
 
-    # return true if numbering by tens is desired
     def want_num_by_tens(self):
+        """return true if numbering by tens is desired"""
         return self.numByTens and len(self.tilesOrder) < 500
 
-    # if name is not correctly formatted, fix it and return true
     def reformat_name(self, tile):
+        """if name is not correctly formatted, fix it and return true"""
         if (tile.id):
             if self.numDigits == 3 or (self.numDigits < 3 and not self.want_num_by_tens()):
                 num = "{:03d}".format(tile.parts.num)
@@ -1269,8 +1280,8 @@ class Px(LogHelper, WidgetHelper):
                     self.log_error(str(e))
         return False
 
-    # unnumber selected tiles
     def do_unnum(self):
+        """unnumber selected tiles"""
         self.clear_error()
         nSelected = 0
         nChanged = 0
@@ -1296,8 +1307,8 @@ class Px(LogHelper, WidgetHelper):
             else:
                 self.set_status("No files selected")
 
-    # sort tiles by number
     def do_sort(self):
+        """sort tiles by number"""
         self.clear_error()
         # pull out the numbered tiles into a separate array
         a = [t for t in self.tilesOrder if t.is_numbered()]
@@ -1312,21 +1323,21 @@ class Px(LogHelper, WidgetHelper):
         self.sweep_out_of_order()
         self.set_status_default()
 
-    # set out-of-order error for specified tile and redraw text
     def set_tile_out_of_order(self, tile):
+        """set out-of-order error for specified tile and redraw text"""
         if not tile.is_error(pic.OOO):
             tile.set_error(pic.OOO)
             tile.redraw_text(self.canvas, self.nailSz)
             self.log_error("Out of order: {}".format(tile.name))
 
-    # clear out-of-order bit for specified tile and redraw text
     def clear_tile_out_of_order(self, tile):
+        """clear out-of-order bit for specified tile and redraw text"""
         if tile.is_error(pic.OOO):
             tile.clear_error(pic.OOO)
             tile.redraw_text(self.canvas, self.nailSz)
 
-    # check range of tiles for OOO error
     def check_out_of_order(self, startIndex, endIndex):
+        """check range of tiles for OOO error"""
         startSortNum = 0
         endSortNum = pic.MAXSORTNUM
         # anchor the range to existing numbered tiles by expanding it by one at each end
@@ -1370,11 +1381,12 @@ class Px(LogHelper, WidgetHelper):
                 else:
                     self.set_tile_out_of_order(tile)
 
-    # sweep all tiles and clear OOO errors that are no longer true
-    # do this when tiles have been moved or removed, possibly fixing OOO errors
-    # rely on above function to set OOO errors in the local context of moved or added tiles
-    # this function also clears any stray OOO errors on unnumbered tiles
     def sweep_out_of_order(self):
+        """sweep all tiles and clear OOO errors that are no longer true
+        do this when tiles have been moved or removed, possibly fixing OOO errors
+        rely on above function to set OOO errors in the local context of moved or added tiles
+        this function also clears any stray OOO errors on unnumbered tiles
+        """
         def check_these(tiles, priorSortNum, endSortNum):
             for tile in tiles:
                 if tile.parts.sortNum > priorSortNum and tile.parts.sortNum < endSortNum:
@@ -1399,8 +1411,8 @@ class Px(LogHelper, WidgetHelper):
         if len(tilesToCheck):
             check_these(tilesToCheck, startSortNum, pic.MAXSORTNUM)
 
-    # rename file in current folder, return new path
     def rename_file_in_cur_folder(self, oldName, newName):
+        """rename file in current folder, return new path"""
         oldPath = os.path.join(self.curFolder.path, oldName)
         newPath = os.path.join(self.curFolder.path, newName)
         self.log_info("Renaming {} to {}".format(oldPath, newName))
@@ -1415,8 +1427,8 @@ class Px(LogHelper, WidgetHelper):
         except BaseException as e:
             raise RuntimeError("Rename failed for {}: {}".format(oldPath, str(e)))
 
-    # delete file in current folder
     def delete_file_in_cur_folder(self, name):
+        """delete file in current folder"""
         path = os.path.join(self.curFolder.path, name)
         self.log_info("Deleting {}".format(path))
         try:
@@ -1427,8 +1439,8 @@ class Px(LogHelper, WidgetHelper):
         except BaseException as e:
             raise RuntimeError("Delete failed for {}: {}".format(path, str(e)))
 
-    # move file to current folder, return new path
     def move_file_to_cur_folder(self, oldPath):
+        """move file to current folder, return new path"""
         newPath = os.path.join(self.curFolder.path, os.path.basename(oldPath))
         self.log_info("Moving {} to {}".format(oldPath, self.curFolder.path))
         if os.path.exists(newPath):
@@ -1441,8 +1453,8 @@ class Px(LogHelper, WidgetHelper):
         except BaseException as e:
             raise RuntimeError("Move failed for {}: {}".format(oldPath, str(e)))
 
-    # copy file to current folder, return new path
     def copy_file_to_cur_folder(self, oldPath):
+        """copy file to current folder, return new path"""
         newPath = os.path.join(self.curFolder.path, os.path.basename(oldPath))
         self.log_info("Copying {} to {}".format(oldPath, self.curFolder.path))
         if os.path.exists(newPath):
@@ -1455,11 +1467,12 @@ class Px(LogHelper, WidgetHelper):
         except BaseException as e:
             raise RuntimeError("Copy failed for {}: {}".format(oldPath, str(e)))
 
-    # blow away the nails file for this folder
-    # put the images in the loose file cache so we can keep using them,
-    # and the nailer can use them to build a new nails file
-    # if name specified, nuke only if that name appears in nails file
     def nuke_nails(self, name=None):
+        """blow away the nails file for this folder
+        put the images in the loose file cache so we can keep using them,
+        and the nailer can use them to build a new nails file
+        if name specified, nuke only if that name appears in nails file
+        """
         # preload all sizes
         any = False
         for sz in pic.nailSizes:
@@ -1484,24 +1497,24 @@ class Px(LogHelper, WidgetHelper):
                 if name in self.tilesByName:
                     self.remove_tile(self.tilesByName[name], True)
 
-    # when user right-clicks in canvas
     def on_canvas_rclick(self, event):
+        """when user right-clicks in canvas"""
         # find item that was clicked
         items = self.canvas.find_withtag(CURRENT)
         if len(items) and items[0] in self.canvasItems:
             self.popMenuTile = self.canvasItems[items[0]]
             self.popMenu.post(event.x_root, event.y_root)
 
-    # when user double clicks in canvas
     def on_canvas_doubleclick(self, event):
+        """when user double clicks in canvas"""
         # find item that was clicked
         items = self.canvas.find_withtag(CURRENT)
         if len(items) and items[0] in self.canvasItems:
             tile = self.canvasItems[items[0]]
             print("TODO: double click for {}".format(tile.name))
 
-    # menu delete
     def do_delete(self):
+        """menu delete"""
         msg = "Are you sure you want to delete {}?".format(self.popMenuTile.name)
         if messagebox.askyesno("Confirm Delete", msg):
             try:
@@ -1512,12 +1525,12 @@ class Px(LogHelper, WidgetHelper):
             except RuntimeError as e:
                 self.log_error(str(e))
 
-    # menu rename
     def do_rename(self):
+        """menu rename"""
         PxRenameDialog(self, self.popMenuTile)
 
-    # when ok clicked in rename menu
     def do_rename_apply(self, tile, newName):
+        """when ok clicked in rename menu"""
         try:
             self.rename_file_in_cur_folder(tile.name, newName)
             self.rename_tile(tile, newName)
@@ -1526,16 +1539,16 @@ class Px(LogHelper, WidgetHelper):
         except RuntimeError as e:
             self.log_error(str(e))
 
-    # menu edit metadata
     def do_edit_meta(self):
+        """menu edit metadata"""
         PxMetaDialog(self, self.popMenuTile)
 
-    # menu close
     def do_close_menu(self):
+        """menu close"""
         self.popMenu.unpost()
 
-    # possibly change folder then scroll to specified tile
     def goto(self, ids):
+        """possibly change folder then scroll to specified tile"""
         ids = tkit.make_array(ids)
         id0 = ids[0]
         parts = pic.parse_file(id0, self.env)
@@ -1565,30 +1578,31 @@ class Px(LogHelper, WidgetHelper):
         else:
             self.log_error("Goto failed, can't parse {}".format(id))
 
-    # scroll tile into view
     def scroll_into_view(self, tile):
+        """scroll tile into view"""
         if not self.is_tile_in_view(tile):
             x, y = self.canvas.coords(tile.items[0])[:2]
             self.canvas.yview_moveto(float(max(0, y - tileGap)) / self.hTotal)
 
-    # is tile in view?
     def is_tile_in_view(self, tile):
+        """is tile in view?"""
         x, y = self.canvas.coords(tile.items[0])[:2]
         top = float(max(0, y - tileGap)) / self.hTotal
         bottom = float(y + tile.h) / self.hTotal
         slider = self.canvasScroll.get()
         return top >= slider[0] and bottom <= slider[1]
 
-    # get meta dictionary for current folder
-    # usually bump ref count to hold dictionary for later use
-    # call forget_meta_dict() when you are done with it
-    # this helps ensure we are not stuck with an old copy of the dictionary
-    # for example suppose we get dict from metacache and hold it for a long time
-    # meanwhile metacache decides to clear that dict from cache
-    # then somebody loads it again and makes changes
-    # we would not see the changes because we're pointing to a different dict object
-    # if you just need the dictionary once, pass bump=0 to skip the ref count business
     def get_meta_dict(self, bump=1):
+        """get meta dictionary for current folder
+        usually bump ref count to hold dictionary for later use
+        call forget_meta_dict() when you are done with it
+        this helps ensure we are not stuck with an old copy of the dictionary
+        for example suppose we get dict from metacache and hold it for a long time
+        meanwhile metacache decides to clear that dict from cache
+        then somebody loads it again and makes changes
+        we would not see the changes because we're pointing to a different dict object
+        if you just need the dictionary once, pass bump=0 to skip the ref count business
+        """
         if self.metaDict:
             self.metaDictRefCnt += bump
         else:
@@ -1596,14 +1610,14 @@ class Px(LogHelper, WidgetHelper):
             self.metaDictRefCnt = bump
         return self.metaDict
 
-    # done with meta dictionary
     def forget_meta_dict(self):
+        """done with meta dictionary"""
         self.metaDictRefCnt -= 1
         if self.metaDictRefCnt == 0:
             self.metaDict = None
 
-    # update specified IDs from metadata
     def update_from_meta(self, ids):
+        """update specified IDs from metadata"""
         # prefetch meta dict
         self.get_meta_dict()
         for id in tkit.make_array(ids):
@@ -1611,8 +1625,8 @@ class Px(LogHelper, WidgetHelper):
                 self.update_tile_from_meta(self.tiles[id])
         self.forget_meta_dict()
 
-    # update tile from metadata
     def update_tile_from_meta(self, tile):
+        """update tile from metadata"""
         if tile.id:
             self.get_meta_dict()
             tile.set_rating(self.metaDict.get_rating(tile.id))
