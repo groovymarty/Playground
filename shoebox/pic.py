@@ -33,8 +33,8 @@ ratings = [
     "5 - Love it!"
 ]
 
-# flip ratings order for dropdown
 def flip_rating(r):
+    """flip ratings order for dropdown"""
     if r >= 0 and r < len(ratings):
         return len(ratings) - r - 1
     else:
@@ -67,8 +67,8 @@ filePat = re.compile(r"^([A-Za-z]+\d*)([A-Za-z]*)(\d*(?:\+\d+)*)-([A-Za-z]*)(0*)
 #                            |1         |2  |3        |4
 secondLumpPat = re.compile(r"([A-Za-z]*)(0*)([1-9]\d*)([A-Za-z]{0,2})")
 
-# leading plus unnecessary if parent has suffix (and therefore ends with a letter)
 def trim_child(mr, env):
+    """leading plus unnecessary if parent has suffix (and therefore ends with a letter)"""
     if mr.group(3).startswith("+") and mr.group(2):
         environ.log_warning(env, "Extra plus: {}".format(mr.group()))
         return mr.group(3)[1:]
@@ -129,12 +129,12 @@ def parse_file(name, env=None):
             return Parts._make(parts)
     return None
 
-# given parse results, return folder ID
 def get_folder_id(parts):
+    """given parse results, return folder ID"""
     return parts.parent + parts.child
 
-# given parse results, return ID of parent folder or "" if parent is root
 def get_parent_id(parts):
+    """given parse results, return ID of parent folder or "" if parent is root"""
     if parts.child:
         if "+" in parts.child:
             return parts.parent + parts.child[0:parts.child.rfind("+")]
@@ -143,12 +143,12 @@ def get_parent_id(parts):
     else:
         return ""
 
-# given parse results for a file, return number of digits in which picture number was written
 def get_num_digits(parts):
+    """given parse results for a file, return number of digits in which picture number was written"""
     return len(parts.zeros) + len(str(parts.num))
 
-# parse a noncanonical name, return tuple (junk, version, comment, ext)
 def parse_noncanon(name, commentMode):
+    """parse a noncanonical name, return tuple (junk, version, comment, ext)"""
     basename, ext = os.path.splitext(name)
     if commentMode == TRIM2:
         lumps = basename.split("-")
@@ -166,8 +166,8 @@ def parse_noncanon(name, commentMode):
     else:  # DISCARD
         return basename, "", "", ext
 
-# return PIL image rotated according to EXIF orientation value
 def fix_image_orientation(im):
+    """return PIL image rotated according to EXIF orientation value"""
     if hasattr(im, '_getexif'):
         exif = im._getexif()
         if exif and 274 in exif:  # 274 = Orientation
@@ -180,6 +180,6 @@ def fix_image_orientation(im):
                 return im.rotate(90, expand=True)
     return im
 
-# duck test for PIL image, seems they are not all derived from same base class
 def is_pil_image(im):
+    """duck test for PIL image, seems they are not all derived from same base class"""
     return hasattr(im, 'thumbnail') and hasattr(im, 'rotate')

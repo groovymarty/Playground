@@ -29,8 +29,8 @@ def get_meta_dict(folderPath, env=None, okToCreate=True):
     touchCount += 1
     return metaDict
 
-# clear meta dictionary from cache
 def clear_meta_dict(folderPath, env=None):
+    """clear meta dictionary from cache"""
     global cacheCount
     folderPath = os.path.abspath(folderPath)
     if folderPath in cache:
@@ -38,8 +38,8 @@ def clear_meta_dict(folderPath, env=None):
         cacheCount -= 1
         environ.log_info(env, "Removed '{}' from meta cache, n={}".format(folderPath, cacheCount))
 
-# write all changed dictionaries
 def write_all_changes(env=None):
+    """write all changed dictionaries"""
     for folderPath, metaDict in cache.items():
         metaDict.write(env)
 
@@ -75,16 +75,16 @@ def change_loose_meta(oldPath, newPath):
         looseCache[newPath] = looseCache[oldPath]
         del looseCache[oldPath]
 
-# clear loose meta from cache
 def clear_loose_meta(path):
+    """clear loose meta from cache"""
     global looseCount
     path = os.path.abspath(path)
     if path in looseCache:
         del looseCache[path]
         looseCount -= 1
 
-# find metadata for specified file, remove from its dictionary and add to loose cache
 def remove_meta_to_loose_cache(path, env=None):
+    """find metadata for specified file, remove from its dictionary and add to loose cache"""
     dirname, name = os.path.split(path)
     parts = pic.parse_file(name, env)
     if parts:

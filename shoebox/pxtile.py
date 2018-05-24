@@ -72,8 +72,8 @@ class PxTile:
     def is_error(self, errBit):
         return self.errors & errBit
 
-    # return true if tile is numbered and has no errors besides OOO
     def is_numbered(self):
+        """return true if tile is numbered and has no errors besides OOO"""
         return self.id and not (self.errors & ~pic.OOO)
 
     def draw_selected(self, canvas, color):

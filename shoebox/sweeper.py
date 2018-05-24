@@ -87,18 +87,20 @@ class Sweeper(LogHelper):
         self.nPictures = 0
         self.nErrors = 0
 
-    # called when my top-level window is closed
-    # this is the easiest and most common way to destroy Sweeper,
-    # and includes the case where the entire shoebox application is shut down
     def on_destroy(self, ev):
+        """called when my top-level window is closed
+        this is the easiest and most common way to destroy Sweeper,
+        and includes the case where the entire shoebox application is shut down
+        """
         self.top = None
         self.destroy()
 
-    # destroy and clean up this Sweeper
-    # in Python you don't really destroy objects, you just remove all references to them
-    # so this function removes all known references then closes the top level window
-    # note this will result in a second call from the on_destroy event handler; that's ok
     def destroy(self):
+        """destroy and clean up this Sweeper
+        in Python you don't really destroy objects, you just remove all references to them
+        so this function removes all known references then closes the top level window
+        note this will result in a second call from the on_destroy event handler; that's ok
+        """
         self.close_log_windows()
         if self in instances:
             instances.remove(self)
@@ -106,32 +108,32 @@ class Sweeper(LogHelper):
             self.top.destroy()
             self.top = None
 
-    # Sweeper destructor
     def __del__(self):
+        """Sweeper destructor"""
         self.destroy() #probably already called
 
-    # when browse button is clicked
     def do_browse_path(self):
+        """when browse button is clicked"""
         newDir = filedialog.askdirectory(title="Sweeper {} - Select Starting Path".format(self.instNum),
                                          initialdir=self.absPath)
         if newDir:
             self.absPath = newDir
             self.garden.write_var('path', self.absPath)
 
-    # when Log button clicked
     def do_log(self):
+        """when Log button clicked"""
         self.open_log_window("Log - Sweeper {:d}".format(self.instNum))
 
     def log_error(self, msg):
         self.nErrors += 1
         super().log_error(msg)
 
-    # return delay in milliseconds
     def get_delay_ms(self):
+        """return delay in milliseconds"""
         return delayMs
 
-    # when start button is clicked
     def do_start(self):
+        """when start button is clicked"""
         self.disable_widgets()
         self.absPath = self.garden.read_var('path')
         self.recursive = self.garden.read_var('recursive')
@@ -149,12 +151,12 @@ class Sweeper(LogHelper):
         self.update_totals()
         self.top.after(self.get_delay_ms(), self.do_next)
 
-    # when stop button clicked
     def do_stop(self):
+        """when stop button clicked"""
         self.quit = True
 
-    # do the next thing to do
     def do_next(self):
+        """do the next thing to do"""
         # possibly quit
         if self.quit:
             self.do_end()
@@ -198,13 +200,13 @@ class Sweeper(LogHelper):
         # that's all for now, come back soon
         self.top.after(self.get_delay_ms(), self.do_next)
 
-    # update totals
     def update_totals(self):
+        """update totals"""
         self.totalLabel.configure(text="{:d} folders, {:d} pictures, {:d} errors".format(
             self.nFolders, self.nPictures, self.nErrors))
 
-    # begin processing a folder
     def begin_folder(self):
+        """begin processing a folder"""
         self.dupIdCheck = {}
         self.prevSortNum = 0
         if self.checkmeta:
@@ -212,8 +214,8 @@ class Sweeper(LogHelper):
             self.deleteList = []
         pass
 
-    # process one picture
     def do_picture(self):
+        """process one picture"""
         if not self.curFolder.noncanon:
             parts = pic.parse_file(self.curEnt.name, self.env)
             if parts and parts.id:
@@ -245,8 +247,8 @@ class Sweeper(LogHelper):
             else:
                 self.log_error("Noncanonical: {}".format(self.curEnt.path))
 
-    # finish processing a folder
     def finish_folder(self):
+        """finish processing a folder"""
         if self.deleteList and len(self.deleteList):
             items = "\n".join(self.deleteList)
             msg = "{:d} items marked for deletion, are you sure you want delete them?\n{}".format(
@@ -257,16 +259,16 @@ class Sweeper(LogHelper):
         self.metaDict = None
         self.deleteList = None
 
-    # when nothing more to do (or quitting because stop button clicked)
     def do_end(self):
+        """when nothing more to do (or quitting because stop button clicked)"""
         self.curScan = None
         self.foldersToScan = None
         msg = "Stopped" if self.quit else "Complete"
         self.curFolderLabel.configure(text=msg)
         self.disable_widgets(False)
 
-    # disable most widgets during scan (or enable them afterward)
     def disable_widgets(self, disable=True):
+        """disable most widgets during scan (or enable them afterward)"""
         self.garden.set_widget_disable('path', disable)
         self.garden.set_widget_disable('recursive', disable)
         self.garden.set_widget_disable('checkmeta', disable)

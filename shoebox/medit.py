@@ -161,18 +161,20 @@ class Medit(LogHelper, WidgetHelper):
         self.update_buttons()
         instances.append(self)
 
-    # called when my top-level window is closed
-    # this is the easiest and most common way to destroy Medit,
-    # and includes the case where the entire shoebox application is shut down
     def on_destroy(self, ev):
+        """called when my top-level window is closed
+        this is the easiest and most common way to destroy Medit,
+        and includes the case where the entire shoebox application is shut down
+        """
         self.top = None
         self.destroy()
 
-    # destroy and clean up this Medit
-    # in Python you don't really destroy objects, you just remove all references to them
-    # so this function removes all known references then closes the top level window
-    # note this will result in a second call from the on_destroy event handler; that's ok
     def destroy(self):
+        """destroy and clean up this Medit
+        in Python you don't really destroy objects, you just remove all references to them
+        so this function removes all known references then closes the top level window
+        note this will result in a second call from the on_destroy event handler; that's ok
+        """
         self.close_log_windows()
         if self in instances:
             instances.remove(self)
@@ -180,18 +182,18 @@ class Medit(LogHelper, WidgetHelper):
             self.top.destroy()
             self.top = None
 
-    # Medit destructor
     def __del__(self):
+        """Medit destructor"""
         self.destroy() #probably already called
         LogHelper.__del__(self)
 
-    # set status to specified string
     def set_status(self, msg, error=False):
+        """set status to specified string"""
         self.statusLabel.configure(text=msg, style="Error.TLabel" if error else "TLabel")
         self.top.update_idletasks()
 
-    # set status to default message
     def set_status_default(self):
+        """set status to default message"""
         if not self.loaded:
             self.set_status("Load a journal file")
         elif self.pxInstNum is not None:
@@ -199,20 +201,21 @@ class Medit(LogHelper, WidgetHelper):
         else:
             self.set_status("Ready ({:d} meta changes)".format(len(self.treeItems)))
 
-    # set status to default message or error
     def set_status_default_or_error(self):
+        """set status to default message or error"""
         if self.lastError:
             self.set_status("Ready / "+self.lastError, True)
         else:
             self.set_status_default()
 
-    # clear last error
     def clear_error(self):
+        """clear last error"""
         self.lastError = ""
 
-    # show error/warning message in status and log it
-    # for info optionally show in status and log it
     def log_error(self, msg):
+        """show error/warning message in status and log it
+        for info optionally show in status and log it
+        """
         self.lastError = msg
         self.set_status(msg, True)
         super().log_error(msg)
@@ -227,20 +230,20 @@ class Medit(LogHelper, WidgetHelper):
             self.set_status(msg)
         super().log_info(msg)
 
-    # enable/disable buttons
     def update_buttons(self):
+        """enable/disable buttons"""
         anySel = len(self.get_selected_items())
         self.enable_widget(self.loadButton, not self.loaded)
         self.enable_widget(self.applyButton, self.loaded and anySel)
         self.enable_widget(self.rejectButton, self.loaded and anySel)
         self.enable_widget(self.undoButton, self.loaded and anySel)
 
-    # when Log button clicked
     def do_log(self):
+        """when Log button clicked"""
         self.open_log_window("Log - {}".format(self.myName))
 
-   # when load button is clicked
     def do_load(self):
+        """when load button is clicked"""
         self.journalFile = filedialog.askopenfilename(title="{} - Load Journal".format(self.myName))
         if self.journalFile:
             try:
@@ -278,15 +281,15 @@ class Medit(LogHelper, WidgetHelper):
         self.set_status_default_or_error()
         self.update_buttons()
 
-    # clear all tree entries
     def clear_tree(self):
+        """clear all tree entries"""
         for i in self.tree.get_children():
             self.tree.delete(i)
         self.treeItems = {}
         self.loaded = False
 
-    # populate tree
     def populate_tree(self, metaChgs):
+        """populate tree"""
         for mc in metaChgs:
             iid = self.tree.insert('', 'end',
                                    text=mc.id,
@@ -297,8 +300,8 @@ class Medit(LogHelper, WidgetHelper):
             self.treeItems[iid] = mc
             mc.iid = iid
 
-    # annotate value
     def annotate_value(self, prop, val):
+        """annotate value"""
         if prop == 'rating':
             try:
                 return pic.ratings[val]
@@ -307,8 +310,8 @@ class Medit(LogHelper, WidgetHelper):
         else:
             return val
 
-    # update status for all meta changes
     def update_status_all(self):
+        """update status for all meta changes"""
         prevMc = None
         for mc in self.mcOrder:
             status = "Pending"
@@ -327,13 +330,13 @@ class Medit(LogHelper, WidgetHelper):
             mc.status = status
             prevMc = mc
 
-    # update all tree items
     def update_tree_all(self):
+        """update all tree items"""
         for iid in self.treeItems:
             self.update_tree_item(iid)
 
-    # update tree item
     def update_tree_item(self, iid):
+        """update tree item"""
         mc = self.treeItems[iid]
         tags = []
         if mc.shadowed:
@@ -349,8 +352,8 @@ class Medit(LogHelper, WidgetHelper):
         self.tree.set(iid, 'was', self.annotate_value(mc.prop, mc.oldval))
         self.tree.item(iid, tags=tags)
 
-    # when user clicks tree item
     def on_tree_select(self, event):
+        """when user clicks tree item"""
         self.deselect_shadowed_items()
         self.update_buttons()
         sel = self.tree.selection()
@@ -371,29 +374,29 @@ class Medit(LogHelper, WidgetHelper):
                 self.set_status("No Px found, please create one")
                 self.pxInstNum = None
 
-    # clear shadowed items from selection
     def deselect_shadowed_items(self):
+        """clear shadowed items from selection"""
         for iid in self.tree.selection():
             if self.treeItems[iid].shadowed:
                 self.tree.selection_remove(iid)
 
-    # get selected items
     def get_selected_items(self):
+        """get selected items"""
         sel = self.tree.selection()
         if len(sel):
             return [self.treeItems[iid] for iid in sel]
         else:
             return [mc for mc in self.mcOrder if mc.softSelected]
 
-    # clear soft selections
     def soft_deselect_all(self):
+        """clear soft selections"""
         for iid, mc in self.treeItems.items():
             if mc.softSelected:
                 mc.softSelected = False
                 self.update_tree_item(iid)
 
-    # when apply clicked
     def do_apply(self):
+        """when apply clicked"""
         ids = []
         for mc in self.get_selected_items():
             self.tree.selection_remove(mc.iid)
@@ -407,8 +410,8 @@ class Medit(LogHelper, WidgetHelper):
         self.update_px_from_meta(ids)
         metacache.write_all_changes(self.env)
 
-    # when reject clicked
     def do_reject(self):
+        """when reject clicked"""
         ids = []
         for mc in self.get_selected_items():
             self.tree.selection_remove(mc.iid)
@@ -422,8 +425,8 @@ class Medit(LogHelper, WidgetHelper):
         self.update_px_from_meta(ids)
         metacache.write_all_changes(self.env)
 
-    # when undo clicked
     def do_undo(self):
+        """when undo clicked"""
         ids = []
         for mc in self.get_selected_items():
             self.tree.selection_remove(mc.iid)
@@ -437,14 +440,14 @@ class Medit(LogHelper, WidgetHelper):
         self.update_px_from_meta(ids)
         metacache.write_all_changes(self.env)
 
-    # update px instance from metadata
     def update_px_from_meta(self, ids):
+        """update px instance from metadata"""
         pxInst = px.get_instance(self.pxInstNum)
         if pxInst:
             pxInst.update_from_meta(ids)
 
-    # handle keyboard events for tree
     def on_tree_key(self, event):
+        """handle keyboard events for tree"""
         if (event.keycode == ord('A')):
             self.do_apply()
         elif (event.keycode == ord('R')):
