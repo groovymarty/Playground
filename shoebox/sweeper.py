@@ -5,7 +5,7 @@ from tkinter import *
 from tkinter import ttk, filedialog, messagebox
 from tkit.widgetgarden import WidgetGarden
 from tkit.direntry import DirEntry
-from shoebox import pic, nails, nailcache, metacache
+from shoebox import pic, nailcache, metacache
 from tkit.loghelper import LogHelper
 
 instances = []
@@ -242,7 +242,7 @@ class Sweeper(LogHelper):
                 if self.metaDict:
                     rating = self.metaDict.get_rating(id)
                     if rating == 1:
-                        self.deleteList.append(self.curEnt.name)
+                        self.deleteList.append((self.curEnt.name, id))
 
             else:
                 self.log_error("Noncanonical: {}".format(self.curEnt.path))
@@ -250,14 +250,50 @@ class Sweeper(LogHelper):
     def finish_folder(self):
         """finish processing a folder"""
         if self.deleteList and len(self.deleteList):
-            items = "\n".join(self.deleteList)
+            items = "\n".join(name for name, id in self.deleteList)
             msg = "{:d} items marked for deletion, are you sure you want delete them?\n{}".format(
                 len(self.deleteList), items)
             if messagebox.askyesno("Confirm Delete", msg):
-                pass
+                # delete files
+                for name, id in self.deleteList:
+                    self.delete_file(self.curFolder.ent.path, name, id)
+                # write thumbnail files
+                for nailSz in pic.nailSizes:
+                    try:
+                        nails = nailcache.get_nails(self.curFolder.ent.path, nailSz, self.env)
+                        nails.write(self.curFolder.ent.path, nailSz)
+                        self.log_info("Updated thumbnail file size {:d} in {}".format(nailSz, self.curFolder.ent.path))
+                    except FileNotFoundError:
+                        self.log_info("No thumbnail file size {:d} in {}".format(nailSz, self.curFolder.ent.path))
+                # write metadata files
+                metacache.write_all_changes(self.env)
 
         self.metaDict = None
         self.deleteList = None
+
+    def delete_file(self, folderPath, name, id):
+        """delete file and remove from caches"""
+        path = os.path.join(folderPath, name)
+        self.log_info("Deleting {}".format(path))
+        try:
+            os.remove(path)
+        except BaseException as e:
+            self.log_error("Delete failed for {}: {}".format(path, str(e)))
+            return
+
+        nailcache.clear_loose_file(path)
+        metacache.clear_loose_meta(path)
+        # remove thumbnails for deleted file
+        for nailSz in pic.nailSizes:
+            try:
+                nails = nailcache.get_nails(folderPath, nailSz, self.env)
+                nails.remove(name)
+            except FileNotFoundError:
+                pass
+        # remove metadata for deleted file
+        md = metacache.get_meta_dict(folderPath, self.env, False)
+        if md:
+            md.remove_meta(id)
 
     def do_end(self):
         """when nothing more to do (or quitting because stop button clicked)"""

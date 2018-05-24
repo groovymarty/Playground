@@ -89,5 +89,20 @@ class Nails:
         """generates tuples (name, data)"""
         return ((name, self.get_by_name(name)) for name in self.indx)
 
+    def remove(self, name):
+        if name in self.indx:
+            roffset, rlength = self.indx[name]
+            b = bytearray(self.buf[:roffset]) + self.buf[roffset + rlength:]
+            self.buf = bytes(b)
+            del self.indx[name]
+            for name, val in self.indx.items():
+                offset, length = val
+                if offset > roffset:
+                    offset -= rlength
+                    self.indx[name] = (offset, length)
+
     def touch(self, value):
         self.lastTouch = value
+
+    def write(self, folderPath, sz):
+        write_nails(folderPath, sz, self.indx, self.buf)
