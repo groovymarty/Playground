@@ -26,8 +26,8 @@ def get_nails(folderPath, sz, env=None):
     touchCount += 1
     return nails
 
-# clear nails from cache, all sizes
 def clear_nails(folderPath, env=None):
+    """clear nails from cache, all sizes"""
     global cacheCount
     folderPath = os.path.abspath(folderPath)
     for sz in cache:
@@ -39,8 +39,8 @@ def clear_nails(folderPath, env=None):
 looseCache = {}
 looseCount = 0
 
-# loose file cache can take PIL image or PNG data bytes
 def add_loose_file(path, sz, imgOrData):
+    """loose file cache can take PIL image or PNG data bytes"""
     global looseCount
     path = os.path.abspath(path)
     if sz not in looseCache:
@@ -67,8 +67,8 @@ def change_loose_file(oldPath, newPath):
             looseCache[sz][newPath] = looseCache[sz][oldPath]
             del looseCache[sz][oldPath]
 
-# clear loose file from cache
 def clear_loose_file(path, sz=None):
+    """clear loose file from cache"""
     if sz is None:
         for sz in looseCache:
             clear_loose_file(path, sz)
@@ -80,8 +80,8 @@ def clear_loose_file(path, sz=None):
                 del looseCache[sz][path]
                 looseCount -= 1
 
-# add thumbnails to loose file cache, all sizes
 def explode_nails(folderPath):
+    """add thumbnails to loose file cache, all sizes"""
     folderPath = os.path.abspath(folderPath)
     for sz in cache:
         if folderPath in cache[sz]:

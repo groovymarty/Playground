@@ -3,13 +3,14 @@
 import os
 from tkit import environ
 
-# build thumbnail file name for specified size
 def build_file_name(sz):
+    """build thumbnail file name for specified size"""
     return "nails-{:d}.xpng".format(sz)
 
-# index keys are file names, values are (offset, length) of thumbnail for that file in pngBytes
-# pngBytes is concatenation of PNG files
 def write_nails(folderPath, sz, indx, pngBytes):
+    """index keys are file names, values are (offset, length) of thumbnail for that file in pngBytes
+    pngBytes is concatenation of PNG files
+    """
     arr = ["{}\t{:d}\t{:d}".format(name, value[0], value[1]) for name, value in indx.items()]
     indexBytes = "\n".join(arr).encode()
     headerBytes = "XPNG0100{:08d}".format(len(indexBytes)).encode()
@@ -21,8 +22,8 @@ def write_nails(folderPath, sz, indx, pngBytes):
         f.write(indexBytes)
         f.write(pngBytes)
 
-# returns (index, pngByes) or raises exception
 def read_nails(folderPath, sz):
+    """returns (index, pngByes) or raises exception"""
     path = os.path.join(folderPath, build_file_name(sz))
     with open(path, 'rb') as f:
         headerBytes = f.read(16)
@@ -84,8 +85,8 @@ class Nails:
         else:
             raise KeyError("No thumbnail for {}".format(name))
 
-    # generates tuples (name, data)
     def get_all(self):
+        """generates tuples (name, data)"""
         return ((name, self.get_by_name(name)) for name in self.indx)
 
     def touch(self, value):
