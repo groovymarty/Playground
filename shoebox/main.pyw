@@ -44,6 +44,8 @@ def close_all():
         nailer.destroy()
     for sweeper in list(shoebox.sweeper.instances):
         sweeper.destroy()
+    for viewer in list(shoebox.viewer.instances):
+        viewer.destroy()
 closeAllButton = ttk.Button(root, text="Close All", command=close_all)
 closeAllButton.pack(side=LEFT, fill=X, expand=True)
 

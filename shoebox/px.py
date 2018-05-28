@@ -11,6 +11,7 @@ from shoebox.nailer import Nailer
 from shoebox.sweeper import Sweeper
 from shoebox.pxfolder import PxFolder
 from shoebox.pxtile import PxTilePic, PxTileFile, PxTileHole, selectColors
+from shoebox.viewer import Viewer
 from tkit.direntry import DirEntryFile
 from tkit.loghelper import LogHelper
 from tkit.widgethelper import WidgetHelper
@@ -239,6 +240,7 @@ class Px(LogHelper, WidgetHelper):
         self.numByTens = True
         self.reformatEnab = False
         self.commentMode = pic.TRIM2
+        self.viewer = None
         self.rootFolder = PxFolder(None, "", ".", "")
         self.folders = {"": self.rootFolder} #folder id to folder object
         self.populate_tree(self.rootFolder)
@@ -261,6 +263,8 @@ class Px(LogHelper, WidgetHelper):
         """
         dnd.remove_target(self.canvas)
         self.close_log_windows()
+        if self.viewer:
+            self.viewer.destroy()
         if self in instances:
             instances.remove(self)
         if self.top is not None:
@@ -352,8 +356,6 @@ class Px(LogHelper, WidgetHelper):
             self.selectButton.configure(text="Deselect All")
         else:
             self.selectButton.configure(text="Select All")
-        s = ttk.Style()
-        s.configure(self.styleRoot+'.Select.TButton', background=selectColors[self.curSelectColor])
 
     def update_select_status(self):
         """update status to say what's selected"""
@@ -490,14 +492,12 @@ class Px(LogHelper, WidgetHelper):
                     self.select_tile(tile, self.curSelectColor)
                 else:
                     # absorb color of clicked tile before unselecting it
-                    self.curSelectColor = tile.selected
+                    self.set_select_color(tile.selected)
                     self.select_tile(tile, False)
             elif event.state & 0x20000: #alt
                 # possibly bump color (first alt-click sets current color, next one bumps color)
                 if tile.selected == self.curSelectColor:
-                    self.curSelectColor += 1
-                    if self.curSelectColor not in selectColors:
-                        self.curSelectColor = 1
+                    self.set_select_color(self.curSelectColor + 1)
                 self.select_tile(tile, self.curSelectColor)
             else:
                 # plain click
@@ -508,7 +508,7 @@ class Px(LogHelper, WidgetHelper):
                     self.select_tile(tile, self.curSelectColor)
                 else:
                     # already selected, absorb color
-                    self.curSelectColor = tile.selected
+                    self.set_select_color(tile.selected)
 
             # remember last tile clicked (for shift-click extension)
             self.lastTileClicked = tile
@@ -541,6 +541,15 @@ class Px(LogHelper, WidgetHelper):
                     self.set_status("Hole added")
                 else:
                     self.set_status_default()
+
+    def set_select_color(self, color):
+        """set select color"""
+        if color not in selectColors:
+            color = 1
+        if color != self.curSelectColor:
+            self.curSelectColor = color
+            s = ttk.Style()
+            s.configure(self.styleRoot+'.Select.TButton', background=selectColors[color])
 
     def select_tile(self, tile, color):
         """select a tile"""
@@ -1511,7 +1520,9 @@ class Px(LogHelper, WidgetHelper):
         items = self.canvas.find_withtag(CURRENT)
         if len(items) and items[0] in self.canvasItems:
             tile = self.canvasItems[items[0]]
-            print("TODO: double click for {}".format(tile.name))
+            if self.viewer is None:
+                self.viewer = Viewer(self)
+            self.viewer.set_picture(tile)
 
     def do_delete(self):
         """menu delete"""
