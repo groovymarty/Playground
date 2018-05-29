@@ -265,6 +265,7 @@ class Px(LogHelper, WidgetHelper):
         self.close_log_windows()
         if self.viewer:
             self.viewer.destroy()
+            self.viewer = None
         if self in instances:
             instances.remove(self)
         if self.top is not None:
@@ -1522,7 +1523,7 @@ class Px(LogHelper, WidgetHelper):
             tile = self.canvasItems[items[0]]
             if self.viewer is None:
                 self.viewer = Viewer(self)
-            self.viewer.set_picture(tile)
+            self.viewer.set_picture(self, self.tilesOrder.index(tile))
 
     def do_delete(self):
         """menu delete"""

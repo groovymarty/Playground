@@ -57,21 +57,27 @@ class Viewer(LogHelper, WidgetHelper):
 
         # create canvas
         self.canvasFrame = Frame(self.panedWin)
-        self.canvasScroll = Scrollbar(self.canvasFrame)
-        self.canvasScroll.pack(side=RIGHT, fill=Y)
+        self.canvasXScroll = Scrollbar(self.canvasFrame, orient=HORIZONTAL)
+        self.canvasXScroll.pack(side=BOTTOM, fill=X)
+        self.canvasYScroll = Scrollbar(self.canvasFrame)
+        self.canvasYScroll.pack(side=RIGHT, fill=Y)
         self.canvas = Canvas(self.canvasFrame, scrollregion=(0, 0, 1, 1))
         self.canvas.pack(side=RIGHT, fill=BOTH, expand=True)
-        self.canvas.configure(yscrollcommand=self.canvasScroll.set)
-        self.canvasScroll.configure(command=self.canvas.yview)
-        self.setup_canvas_mousewheel(self.canvas)
+        self.canvas.configure(xscrollcommand=self.canvasXScroll.set)
+        self.canvasXScroll.configure(command=self.canvas.xview)
+        self.canvas.configure(yscrollcommand=self.canvasYScroll.set)
+        self.canvasYScroll.configure(command=self.canvas.yview)
         self.panedWin.add(self.canvasFrame)
 
         # canvas stuff
-        self.canvasWidth = 0
         self.canvas.bind('<Configure>', self.on_canvas_resize)
 
         self.lastError = ""
-        self.curFolder = None
+        self.index = 0
+        self.fullImg = None
+        self.cropImg = None
+        self.tkPhoto = None
+        self.imgItem = None
         self.set_status_default_or_error()
         instances.append(self)
 
@@ -89,6 +95,9 @@ class Viewer(LogHelper, WidgetHelper):
         so this function removes all known references then closes the top level window
         note this will result in a second call from the on_destroy event handler; that's ok
         """
+        if self.px:
+            self.px.viewer = None
+            self.px = None
         self.close_log_windows()
         if self in instances:
             instances.remove(self)
@@ -153,8 +162,31 @@ class Viewer(LogHelper, WidgetHelper):
 
     def on_canvas_resize(self, event):
         """when user resizes the window"""
-        if self.canvas.winfo_width() != self.canvasWidth:
-            self.canvasWidth = self.canvas.winfo_width()
+        self.draw_image()
 
-    def set_picture(self, tile):
-        print("setting {}".format(tile.name))
+    def set_picture(self, tile, index):
+        self.index = index
+        tile = self.px.tilesOrder[index]
+        path = os.path.join(self.px.curFolder.path, tile.name)
+        f = open(path, "rb")
+        self.fullImg = Image.open(f)
+        self.fullImg.load()
+        f.close()
+        self.fullImg = pic.fix_image_orientation(self.fullImg)
+        self.draw_image()
+
+    def draw_image(self):
+        fw, fh = self.fullImg.size
+        cw = self.canvas.winfo_width()
+        ch = self.canvas.winfo_height()
+        if cw > 1 and ch > 1:
+            w = cw
+            h = fh * (cw / fw)
+            if h > ch:
+                h = ch
+                w = fw * (ch / fh)
+            self.cropImg = self.fullImg.resize((int(w), int(h)))
+            self.tkPhoto = ImageTk.PhotoImage(self.cropImg)
+            if self.imgItem is not None:
+                self.canvas.delete(self.imgItem)
+            self.imgItem = self.canvas.create_image(0, 0, image=self.tkPhoto, anchor=NW)
