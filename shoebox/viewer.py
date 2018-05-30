@@ -63,7 +63,7 @@ class Viewer(LogHelper, WidgetHelper):
         # canvas stuff
         self.canvas.bind('<Configure>', self.on_canvas_resize)
         self.canvas.bind('<MouseWheel>', self.on_canvas_wheel)
-        self.canvas.bind('<Button-1>', self.on_canvas_click)
+        self.canvas.bind('<Double-Button-1>', self.on_canvas_doubleclick)
 
         self.lastError = ""
         self.index = 0
@@ -72,6 +72,8 @@ class Viewer(LogHelper, WidgetHelper):
         self.tkPhoto = None
         self.imgItem = None
         self.zoom = 1.0
+        self.panx = 0
+        self.pany = 0
         self.set_status_default_or_error()
         instances.append(self)
 
@@ -182,7 +184,14 @@ class Viewer(LogHelper, WidgetHelper):
                 w = fw * (ch / fh)
             zw = w * self.zoom
             zh = h * self.zoom
-            self.cropImg = self.fullImg.resize((int(zw), int(zh))).crop((0, 0, int(cw), int(ch)))
+            mx = zw / 2.0
+            my = zh / 2.0
+            mw = cw / 2.0
+            mh = ch / 2.0
+            x0 = max(mx-mw, 0)
+            y0 = max(my-mh, 0)
+            bb = (int(x0), int(y0), int(x0+cw), int(y0+ch))
+            self.cropImg = self.fullImg.resize((int(zw), int(zh))).crop(bb)
             self.tkPhoto = ImageTk.PhotoImage(self.cropImg)
             if self.imgItem is not None:
                 self.canvas.delete(self.imgItem)
@@ -192,6 +201,8 @@ class Viewer(LogHelper, WidgetHelper):
         self.zoom += event.delta / 3000.0
         self.draw_image()
 
-    def on_canvas_click(self, event):
+    def on_canvas_doubleclick(self, event):
         self.zoom = 1.0
+        self.panx = 0
+        self.pany = 0
         self.draw_image()
