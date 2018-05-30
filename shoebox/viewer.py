@@ -56,18 +56,9 @@ class Viewer(LogHelper, WidgetHelper):
         s.configure('Error.TLabel', foreground='red')
 
         # create canvas
-        self.canvasFrame = Frame(self.panedWin)
-        self.canvasXScroll = Scrollbar(self.canvasFrame, orient=HORIZONTAL)
-        self.canvasXScroll.pack(side=BOTTOM, fill=X)
-        self.canvasYScroll = Scrollbar(self.canvasFrame)
-        self.canvasYScroll.pack(side=RIGHT, fill=Y)
-        self.canvas = Canvas(self.canvasFrame, scrollregion=(0, 0, 1, 1))
+        self.canvas = Canvas(self.panedWin, background="black")
         self.canvas.pack(side=RIGHT, fill=BOTH, expand=True)
-        self.canvas.configure(xscrollcommand=self.canvasXScroll.set)
-        self.canvasXScroll.configure(command=self.canvas.xview)
-        self.canvas.configure(yscrollcommand=self.canvasYScroll.set)
-        self.canvasYScroll.configure(command=self.canvas.yview)
-        self.panedWin.add(self.canvasFrame)
+        self.panedWin.add(self.canvas)
 
         # canvas stuff
         self.canvas.bind('<Configure>', self.on_canvas_resize)

@@ -8,10 +8,10 @@ fileBoxSz = 128
 
 selectColors = {
     1:  "yellow",
-    2:  "fuchsia",
-    3:  "lime",
-    4:  "red",
-    5:  "cyan",
+    2:  "lime",
+    3:  "red",
+    4:  "cyan",
+    5:  "fuchsia",
     6:  "dodgerblue"
 }
 
