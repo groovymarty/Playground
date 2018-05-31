@@ -44,26 +44,23 @@ class Viewer(LogHelper, WidgetHelper):
         self.logButton = ttk.Button(self.statusBar, text="Log", command=self.do_log)
         self.logButton.pack(side=RIGHT)
 
-        # created paned window for split view
-        self.panedWin = PanedWindow(self.top, orient=HORIZONTAL, width=800, height=800, sashwidth=5, sashrelief=GROOVE)
-        self.panedWin.grid(column=0, row=2, sticky=(N,W,E,S))
-        self.top.grid_columnconfigure(0, weight=1)
-        self.top.grid_rowconfigure(2, weight=1)
-
         # styles
         s = ttk.Style()
         # style for error messages (status bar)
         s.configure('Error.TLabel', foreground='red')
 
         # create canvas
-        self.canvas = Canvas(self.panedWin, background="black")
-        self.canvas.pack(side=RIGHT, fill=BOTH, expand=True)
-        self.panedWin.add(self.canvas)
+        self.canvas = Canvas(self.top, background="black", width=800, height=800)
+        self.canvas.grid(column=0, row=2, sticky=(N,W,E,S))
+        self.top.grid_columnconfigure(0, weight=1)
+        self.top.grid_rowconfigure(2, weight=1)
 
         # canvas stuff
         self.canvas.bind('<Configure>', self.on_canvas_resize)
         self.canvas.bind('<MouseWheel>', self.on_canvas_wheel)
         self.canvas.bind('<Double-Button-1>', self.on_canvas_doubleclick)
+        self.canvas.bind('<B1-Motion>', self.on_canvas_motion)
+        self.canvas.bind('<ButtonRelease>', self.on_canvas_release)
 
         self.lastError = ""
         self.index = 0
@@ -74,6 +71,8 @@ class Viewer(LogHelper, WidgetHelper):
         self.zoom = 1.0
         self.panx = 0
         self.pany = 0
+        self.dragging = False
+        self.dragStart = None
         self.set_status_default_or_error()
         instances.append(self)
 
@@ -188,8 +187,8 @@ class Viewer(LogHelper, WidgetHelper):
             my = zh / 2.0
             mw = cw / 2.0
             mh = ch / 2.0
-            x0 = max(mx-mw, 0)
-            y0 = max(my-mh, 0)
+            x0 = min(max(mx - mw + self.panx, 0), max(zw-cw, 0))
+            y0 = min(max(my - mh + self.pany, 0), max(zh-ch, 0))
             bb = (int(x0), int(y0), int(x0+cw), int(y0+ch))
             self.cropImg = self.fullImg.resize((int(zw), int(zh))).crop(bb)
             self.tkPhoto = ImageTk.PhotoImage(self.cropImg)
@@ -198,11 +197,33 @@ class Viewer(LogHelper, WidgetHelper):
             self.imgItem = self.canvas.create_image(0, 0, image=self.tkPhoto, anchor=NW)
 
     def on_canvas_wheel(self, event):
-        self.zoom += event.delta / 3000.0
-        self.draw_image()
+        zbefore = self.zoom
+        self.zoom += event.delta / 2000.0
+        if self.zoom <= 0:
+            self.zoom = zbefore
+        else:
+            self.panx *= self.zoom / zbefore
+            self.pany *= self.zoom / zbefore
+            self.draw_image()
 
     def on_canvas_doubleclick(self, event):
         self.zoom = 1.0
         self.panx = 0
         self.pany = 0
         self.draw_image()
+
+    def on_canvas_motion(self, event):
+        """when mouse moved with button down"""
+        if not self.dragging:
+            self.dragging = True
+            self.dragStart = (self.panx + event.x, self.pany + event.y)
+            self.canvas.configure(cursor="fleur")
+        else:
+            self.panx = self.dragStart[0] - event.x
+            self.pany = self.dragStart[1] - event.y
+            self.draw_image()
+
+    def on_canvas_release(self, event):
+        """when mouse button released"""
+        self.dragging = False
+        self.canvas.configure(cursor="")
