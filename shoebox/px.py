@@ -1521,15 +1521,16 @@ class Px(LogHelper, WidgetHelper):
         items = self.canvas.find_withtag(CURRENT)
         if len(items) and items[0] in self.canvasItems:
             tile = self.canvasItems[items[0]]
-            # double-click color is last color
-            dcColor = len(selectColors)
-            # select clicked tile with that color, unselect all others
-            self.select_all(None, dcColor)
-            self.select_tile(tile, dcColor)
-            # tell viewer to display the clicked picture
-            if self.viewer is None:
-                self.viewer = Viewer(self)
-            self.viewer.set_picture(self, self.tilesOrder.index(tile))
+            if isinstance(tile, PxTilePic):
+                # double-click color is last color
+                dcColor = len(selectColors)
+                # select clicked tile with that color, unselect all others
+                self.select_all(None, dcColor)
+                self.select_tile(tile, dcColor)
+                # tell viewer to display the clicked picture
+                if self.viewer is None:
+                    self.viewer = Viewer(self)
+                self.viewer.set_picture(self.tilesOrder.index(tile))
 
     def do_delete(self):
         """menu delete"""
@@ -1565,8 +1566,10 @@ class Px(LogHelper, WidgetHelper):
         """menu close"""
         self.popMenu.unpost()
 
-    def goto(self, ids):
-        """possibly change folder then scroll to specified tile"""
+    def goto(self, ids, selectColor=None):
+        """possibly change folder then select and scroll to specified tile(s)"""
+        if selectColor is None:
+            selectColor = self.curSelectColor
         ids = tkit.make_array(ids)
         id0 = ids[0]
         parts = pic.parse_file(id0, self.env)
@@ -1580,21 +1583,34 @@ class Px(LogHelper, WidgetHelper):
                 if id0 in self.tiles:
                     # select first tile
                     tile0 = self.tiles[id0]
-                    self.select_all(None, self.curSelectColor)
-                    self.select_tile(tile0, self.curSelectColor)
+                    self.select_all(None, selectColor)
+                    self.select_tile(tile0, selectColor)
                     self.scroll_into_view(tile0)
                     self.set_status_default()
                     # select additional tiles
                     for id in ids[1:]:
                         if id in self.tiles:
                             tile = self.tiles[id]
-                            self.select_tile(tile, self.curSelectColor)
+                            self.select_tile(tile, self.selectColor)
                 else:
                     self.log_error("Goto failed, {} not found".format(id0))
             else:
                 self.log_error("Goto failed, folder {} not found".format(folderId))
         else:
             self.log_error("Goto failed, can't parse {}".format(id))
+
+    def goto_index(self, index, selectColor=None):
+        """select and scroll to specified tile"""
+        if selectColor is None:
+            selectColor = self.curSelectColor
+        try:
+            tile = self.tilesOrder[index]
+            self.select_all(None, selectColor)
+            self.select_tile(tile, selectColor)
+            self.scroll_into_view(tile)
+            self.set_status_default()
+        except IndexError:
+                self.log_error("Goto failed, index {:d} not found".format(index))
 
     def scroll_into_view(self, tile):
         """scroll tile into view"""

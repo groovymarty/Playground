@@ -6,9 +6,9 @@ from tkinter import ttk
 from PIL import Image
 import ImageTk
 from shoebox import pic
+from shoebox.pxtile import PxTilePic, selectColors
 from tkit.loghelper import LogHelper
 from tkit.widgethelper import WidgetHelper
-from tkit import tkit
 
 instances = []
 nextInstNum = 1
@@ -32,8 +32,12 @@ class Viewer(LogHelper, WidgetHelper):
         # create top button bar
         self.topBar = Frame(self.top)
         self.topBar.grid(column=0, row=0, sticky=(N,W,E))
+        self.prevButton = ttk.Button(self.topBar, text="<<", command=self.do_prev)
+        self.prevButton.pack(side=LEFT)
+        self.nextButton = ttk.Button(self.topBar, text=">>", command=self.do_next)
+        self.nextButton.pack(side=LEFT)
         self.splitButton = ttk.Button(self.topBar, text="Split", command=self.do_split)
-        self.splitButton.pack(side=LEFT)
+        self.splitButton.pack(side=RIGHT)
         self.enable_buttons(True)
 
         # create status bar
@@ -48,6 +52,8 @@ class Viewer(LogHelper, WidgetHelper):
         s = ttk.Style()
         # style for error messages (status bar)
         s.configure('Error.TLabel', foreground='red')
+        # style for prev/next button hitting limit
+        s.configure('Stop.TButton', background='red')
 
         # create canvas
         self.canvas = Canvas(self.top, background="black", width=800, height=800)
@@ -150,6 +156,8 @@ class Viewer(LogHelper, WidgetHelper):
     def enable_buttons(self, enable=True):
         """enable/disable buttons"""
         self.enable_widget(self.splitButton, enable)
+        self.enable_widget(self.prevButton, enable)
+        self.enable_widget(self.nextButton, enable)
 
     def do_split(self):
         """when Split button is pressed"""
@@ -159,7 +167,7 @@ class Viewer(LogHelper, WidgetHelper):
         """when user resizes the window"""
         self.draw_image()
 
-    def set_picture(self, tile, index):
+    def set_picture(self, index):
         self.index = index
         tile = self.px.tilesOrder[index]
         path = os.path.join(self.px.curFolder.path, tile.name)
@@ -170,6 +178,8 @@ class Viewer(LogHelper, WidgetHelper):
         self.fullImg = pic.fix_image_orientation(self.fullImg)
         self.zoom = 1.0
         self.draw_image()
+        self.set_prev_next_stop()
+        self.set_status(tile.name)
 
     def draw_image(self):
         fw, fh = self.fullImg.size
@@ -227,3 +237,27 @@ class Viewer(LogHelper, WidgetHelper):
         """when mouse button released"""
         self.dragging = False
         self.canvas.configure(cursor="")
+
+    def do_prev(self):
+        """when Prev button clicked"""
+        if self.index > 0:
+            for i in range(self.index-1, -1, -1):
+                if isinstance(self.px.tilesOrder[i], PxTilePic):
+                    self.set_picture(i)
+                    self.px.goto_index(i, len(selectColors))
+                    return
+        self.set_prev_next_stop(prev=True)
+
+    def do_next(self):
+        """when Next button clickec"""
+        if self.index < len(self.px.tilesOrder) - 1:
+            for i in range(self.index+1, len(self.px.tilesOrder), 1):
+                if isinstance(self.px.tilesOrder[i], PxTilePic):
+                    self.set_picture(i)
+                    self.px.goto_index(i, len(selectColors))
+                    return
+        self.set_prev_next_stop(next=True)
+
+    def set_prev_next_stop(self, prev=False, next=False):
+        self.prevButton.configure(style="Stop.TButton" if prev else "TButton")
+        self.nextButton.configure(style="Stop.TButton" if next else "TButton")
