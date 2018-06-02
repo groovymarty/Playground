@@ -33,7 +33,7 @@ class Pane:
 
         # create canvas
         self.canvas = Canvas(self.viewer.canvasFrame, background="black",
-                             highlightthickness=1, highlightbackground="black",
+                             highlightthickness=3, highlightbackground="black",
                              highlightcolor=selectColors[self.selectColor])
         self.canvas.pack(side=side, fill=BOTH, expand=True)
 
@@ -47,6 +47,8 @@ class Pane:
 
         self.index = 0
         self.fullImg = None
+        self.resizeImg = None
+        self.lastResize = (0, 0)
         self.cropImg = None
         self.tkPhoto = None
         self.imgItem = None
@@ -72,6 +74,7 @@ class Pane:
 
     def on_canvas_click(self, event):
         self.canvas.focus_set()
+        self.px.goto_index(self.index, self.selectColor)
 
     def on_canvas_doubleclick(self, event):
         self.zoom = 1.0
@@ -104,7 +107,11 @@ class Pane:
         self.fullImg.load()
         f.close()
         self.fullImg = pic.fix_image_orientation(self.fullImg)
+        self.resizeImg = None
+        self.lastResize = (0, 0)
         self.zoom = 1.0
+        self.panx = 0
+        self.pany = 0
         self.draw_image()
         self.set_prev_next_stop()
         self.viewer.set_status(tile.name)
@@ -125,10 +132,16 @@ class Pane:
             my = zh / 2.0
             mw = cw / 2.0
             mh = ch / 2.0
-            x0 = min(max(mx - mw + self.panx, 0), max(zw-cw, 0))
-            y0 = min(max(my - mh + self.pany, 0), max(zh-ch, 0))
+            self.panx = min(max(self.panx, -mx-mw), mx+mw)
+            self.pany = min(max(self.pany, -my-mh), my+mh)
+            x0 = mx - mw + self.panx
+            y0 = my - mh + self.pany
             bb = (int(x0), int(y0), int(x0+cw), int(y0+ch))
-            self.cropImg = self.fullImg.resize((int(zw), int(zh))).crop(bb)
+            size = ((int(zw), int(zh)))
+            if self.resizeImg is None or size != self.lastResize:
+                self.resizeImg = self.fullImg.resize(size)
+                self.lastResize = size
+            self.cropImg = self.resizeImg.crop(bb)
             self.tkPhoto = ImageTk.PhotoImage(self.cropImg)
             if self.imgItem is not None:
                 self.canvas.delete(self.imgItem)
