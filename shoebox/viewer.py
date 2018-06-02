@@ -73,7 +73,7 @@ class Pane:
             self.draw_image()
 
     def on_canvas_click(self, event):
-        self.canvas.focus_set()
+        self.set_focus()
         self.px.goto_index(self.index, self.selectColor)
 
     def on_canvas_doubleclick(self, event):
@@ -115,6 +115,7 @@ class Pane:
         self.draw_image()
         self.set_prev_next_stop()
         self.viewer.set_status(tile.name)
+        self.set_focus()
 
     def draw_image(self):
         cw = self.canvas.winfo_width()
@@ -149,7 +150,7 @@ class Pane:
 
     def do_prev(self):
         """when Prev button clicked"""
-        self.canvas.focus_set()
+        self.set_focus()
         if self.index > 0:
             for i in range(self.index-1, -1, -1):
                 if isinstance(self.px.tilesOrder[i], PxTilePic):
@@ -160,7 +161,7 @@ class Pane:
 
     def do_next(self):
         """when Next button clickec"""
-        self.canvas.focus_set()
+        self.set_focus()
         if self.index < len(self.px.tilesOrder) - 1:
             for i in range(self.index+1, len(self.px.tilesOrder), 1):
                 if isinstance(self.px.tilesOrder[i], PxTilePic):
@@ -172,6 +173,10 @@ class Pane:
     def set_prev_next_stop(self, prev=False, next=False):
         self.prevButton.configure(style="Stop.TButton" if prev else "TButton")
         self.nextButton.configure(style="Stop.TButton" if next else "TButton")
+
+    def set_focus(self):
+        self.canvas.focus_set()
+        self.viewer.focusSide = self.side
 
 class Viewer(LogHelper, WidgetHelper):
     def __init__(self, px):
@@ -218,7 +223,8 @@ class Viewer(LogHelper, WidgetHelper):
         self.canvasFrame.grid(column=0, row=2, sticky=(N,W,E,S))
         self.lpane = Pane(self, LEFT)
         self.rpane = None
-        self.vsplit = False
+        self.hsplit = False
+        self.focusSide = LEFT
 
         self.lastError = ""
         self.set_status_default_or_error()
@@ -301,15 +307,18 @@ class Viewer(LogHelper, WidgetHelper):
             self.rpane = Pane(self, RIGHT)
             self.rpane.set_picture(self.lpane.index)
         else:
-            self.vsplit = not self.vsplit
-        if self.vsplit:
+            self.hsplit = not self.hsplit
+        if self.hsplit:
             self.lpane.canvas.pack(side=TOP, fill=BOTH, expand=True)
             self.rpane.canvas.pack(side=TOP, fill=BOTH, expand=True)
-            self.splitButton.configure(text="Horizontal")
+            self.splitButton.configure(text="Vertical")
         else:
             self.lpane.canvas.pack(side=LEFT, fill=BOTH, expand=True)
             self.rpane.canvas.pack(side=LEFT, fill=BOTH, expand=True)
-            self.splitButton.configure(text="Vertical")
+            self.splitButton.configure(text="Horizontal")
 
     def set_picture(self, index):
-        self.lpane.set_picture(index)
+        if self.rpane is not None and self.focusSide == RIGHT:
+            self.rpane.set_picture(index)
+        else:
+            self.lpane.set_picture(index)
