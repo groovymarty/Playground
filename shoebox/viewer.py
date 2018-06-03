@@ -31,6 +31,11 @@ class Pane:
             self.nextButton.pack(side=side)
             self.prevButton.pack(side=side)
 
+        self.statusLabel = ttk.Label(self.viewer.statusBar, text="")
+        self.statusLabel.pack(side=side)
+        if side == LEFT:
+            self.statusLabel.pack(expand=True, fill=X)
+
         # create canvas
         self.canvas = Canvas(self.viewer.canvasFrame, background="black",
                              highlightthickness=3, highlightbackground="black",
@@ -114,7 +119,7 @@ class Pane:
         self.pany = 0
         self.draw_image()
         self.set_prev_next_stop()
-        self.viewer.set_status(tile.name)
+        self.statusLabel.configure(text=tile.name)
         self.set_focus()
 
     def draw_image(self):
@@ -206,8 +211,6 @@ class Viewer(LogHelper, WidgetHelper):
         # create status bar
         self.statusBar = Frame(self.top)
         self.statusBar.grid(column=0, row=1, sticky=(N,W,E))
-        self.statusLabel = ttk.Label(self.statusBar, text="")
-        self.statusLabel.pack(side=LEFT, fill=X, expand=True)
         self.logButton = ttk.Button(self.statusBar, text="Log", command=self.do_log)
         self.logButton.pack(side=RIGHT)
 
@@ -225,9 +228,6 @@ class Viewer(LogHelper, WidgetHelper):
         self.rpane = None
         self.hsplit = False
         self.focusSide = LEFT
-
-        self.lastError = ""
-        self.set_status_default_or_error()
         instances.append(self)
 
     def on_destroy(self, ev):
@@ -258,44 +258,6 @@ class Viewer(LogHelper, WidgetHelper):
         """Viewer destructor"""
         self.destroy() #probably already called
         LogHelper.__del__(self)
-
-    def set_status(self, msg, error=False):
-        """set status to specified string"""
-        self.statusLabel.configure(text=msg, style="Error.TLabel" if error else "TLabel")
-        self.top.update_idletasks()
-
-    def set_status_default(self):
-        """set status to default message"""
-        self.set_status("Connected to {}".format(self.px.myName))
-
-    def set_status_default_or_error(self):
-        """set status to default message or error"""
-        if self.lastError:
-            self.set_status(self.lastError, True)
-        else:
-            self.set_status_default()
-
-    def clear_error(self):
-        """clear last error"""
-        self.lastError = ""
-
-    def log_error(self, msg):
-        """show error/warning message in status and log it
-        for info optionally show in status and log it
-        """
-        self.lastError = msg
-        self.set_status(msg, True)
-        super().log_error(msg)
-
-    def log_warning(self, msg):
-        self.lastError = msg
-        self.set_status(msg, True)
-        super().log_warning(msg)
-
-    def log_info(self, msg, showInStatus=False):
-        if showInStatus:
-            self.set_status(msg)
-        super().log_info(msg)
 
     def do_log(self):
         """when Log button clicked"""

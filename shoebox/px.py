@@ -1531,6 +1531,7 @@ class Px(LogHelper, WidgetHelper):
                 if self.viewer is None:
                     self.viewer = Viewer(self)
                 self.viewer.set_picture(self.tilesOrder.index(tile))
+                self.update_select_button()
 
     def do_delete(self):
         """menu delete"""
@@ -1587,6 +1588,7 @@ class Px(LogHelper, WidgetHelper):
                     self.select_tile(tile0, selectColor)
                     self.scroll_into_view(tile0)
                     self.set_status_default()
+                    self.update_select_button()
                     # select additional tiles
                     for id in ids[1:]:
                         if id in self.tiles:
@@ -1609,6 +1611,7 @@ class Px(LogHelper, WidgetHelper):
             self.select_tile(tile, selectColor)
             self.scroll_into_view(tile)
             self.set_status_default()
+            self.update_select_button()
         except IndexError:
                 self.log_error("Goto failed, index {:d} not found".format(index))
 
