@@ -51,15 +51,14 @@ class Pane:
         self.canvas.bind('<ButtonRelease>', self.on_canvas_release)
 
         self.index = 0
+        self.path = None
         self.fullImg = None
         self.resizeImg = None
         self.lastResize = (0, 0)
         self.cropImg = None
         self.tkPhoto = None
         self.imgItem = None
-        self.zoom = 1.0
-        self.panx = 0
-        self.pany = 0
+        self.zoomAndPan = {}
         self.dragging = False
         self.dragStart = None
 
@@ -68,13 +67,13 @@ class Pane:
         self.draw_image()
 
     def on_canvas_wheel(self, event):
-        zbefore = self.zoom
-        self.zoom += event.delta / 2000.0
-        if self.zoom <= 0:
-            self.zoom = zbefore
-        else:
-            self.panx *= self.zoom / zbefore
-            self.pany *= self.zoom / zbefore
+        zoom, panx, pany = self.get_zoom_and_pan()
+        zbefore = zoom
+        zoom += event.delta / 2000.0
+        if zoom > 0:
+            panx *= zoom / zbefore
+            pany *= zoom / zbefore
+            self.zoomAndPan[self.path] = (zoom, panx, pany)
             self.draw_image()
 
     def on_canvas_click(self, event):
@@ -82,20 +81,20 @@ class Pane:
         self.px.goto_index(self.index, self.selectColor)
 
     def on_canvas_doubleclick(self, event):
-        self.zoom = 1.0
-        self.panx = 0
-        self.pany = 0
+        self.zoomAndPan[self.path] = (1.0, 0, 0)
         self.draw_image()
 
     def on_canvas_motion(self, event):
         """when mouse moved with button down"""
+        zoom, panx, pany = self.get_zoom_and_pan()
         if not self.dragging:
             self.dragging = True
-            self.dragStart = (self.panx + event.x, self.pany + event.y)
+            self.dragStart = (panx + event.x, pany + event.y)
             self.canvas.configure(cursor="fleur")
         else:
-            self.panx = self.dragStart[0] - event.x
-            self.pany = self.dragStart[1] - event.y
+            panx = self.dragStart[0] - event.x
+            pany = self.dragStart[1] - event.y
+            self.zoomAndPan[self.path] = (zoom, panx, pany)
             self.draw_image()
 
     def on_canvas_release(self, event):
@@ -106,17 +105,14 @@ class Pane:
     def set_picture(self, index):
         self.index = index
         tile = self.px.tilesOrder[index]
-        path = os.path.join(self.px.curFolder.path, tile.name)
-        f = open(path, "rb")
+        self.path = os.path.join(self.px.curFolder.path, tile.name)
+        f = open(self.path, "rb")
         self.fullImg = Image.open(f)
         self.fullImg.load()
         f.close()
         self.fullImg = pic.fix_image_orientation(self.fullImg)
         self.resizeImg = None
         self.lastResize = (0, 0)
-        self.zoom = 1.0
-        self.panx = 0
-        self.pany = 0
         self.draw_image()
         self.set_prev_next_stop()
         self.statusLabel.configure(text=tile.name)
@@ -132,16 +128,18 @@ class Pane:
             if h > ch:
                 h = ch
                 w = fw * (ch / fh)
-            zw = w * self.zoom
-            zh = h * self.zoom
+            zoom, panx, pany = self.get_zoom_and_pan()
+            zw = w * zoom
+            zh = h * zoom
             mx = zw / 2.0
             my = zh / 2.0
             mw = cw / 2.0
             mh = ch / 2.0
-            self.panx = min(max(self.panx, -mx-mw), mx+mw)
-            self.pany = min(max(self.pany, -my-mh), my+mh)
-            x0 = mx - mw + self.panx
-            y0 = my - mh + self.pany
+            panx = min(max(panx, -mx-mw), mx+mw)
+            pany = min(max(pany, -my-mh), my+mh)
+            self.zoomAndPan[self.path] = (zoom, panx, pany)
+            x0 = mx - mw + panx
+            y0 = my - mh + pany
             bb = (int(x0), int(y0), int(x0+cw), int(y0+ch))
             size = ((int(zw), int(zh)))
             if self.resizeImg is None or size != self.lastResize:
@@ -182,6 +180,12 @@ class Pane:
     def set_focus(self):
         self.canvas.focus_set()
         self.viewer.focusSide = self.side
+
+    def get_zoom_and_pan(self):
+        try:
+            return self.zoomAndPan[self.path]
+        except KeyError:
+            return (1.0, 0, 0)
 
 class Viewer(LogHelper, WidgetHelper):
     def __init__(self, px):
