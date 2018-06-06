@@ -6,6 +6,7 @@ from tkinter import ttk
 from shoebox import services
 from shoebox.medit import Medit
 from shoebox.px import Px
+from shoebox.cx import Cx
 from shoebox.nailer import Nailer
 from shoebox.sweeper import Sweeper
 import shoebox
@@ -19,6 +20,11 @@ def launch_px():
     Px()
 pxButton = ttk.Button(root, text="Px", command=launch_px)
 pxButton.pack(side=LEFT, fill=X, expand=True)
+
+def launch_cx():
+    Cx()
+cxButton = ttk.Button(root, text="Cx", command=launch_cx)
+cxButton.pack(side=LEFT, fill=X, expand=True)
 
 def launch_medit():
     Medit()
@@ -38,6 +44,8 @@ sweeperButton.pack(side=LEFT, fill=X, expand=True)
 def close_all():
     for px in list(shoebox.px.instances):
         px.destroy()
+    for cx in list(shoebox.cx.instances):
+        cx.destroy()
     for medit in list(shoebox.medit.instances):
         medit.destroy()
     for nailer in list(shoebox.nailer.instances):

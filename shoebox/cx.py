@@ -1,4 +1,4 @@
-# shoebox.px
+# shoebox.cx
 
 import os, shutil
 from tkinter import *
@@ -7,10 +7,8 @@ from PIL import Image
 import ImageTk
 from shoebox import pic, nails, nailcache, dnd, metacache
 from shoebox.dnd import DndItemEnt
-from shoebox.nailer import Nailer
-from shoebox.sweeper import Sweeper
 from shoebox.pxfolder import PxFolder
-from shoebox.pxtile import PxTilePic, PxTileFile, PxTileContent, PxTileHole, selectColors
+from shoebox.pxtile import PxTilePic, PxTileFile, PxTileHole, selectColors
 from shoebox.viewer import Viewer
 from tkit.direntry import DirEntryFile
 from tkit.loghelper import LogHelper
@@ -29,84 +27,7 @@ def get_instance(instNum=None):
     except StopIteration:
         return instances[0] if len(instances) else None
 
-class PxOptionsDialog(simpledialog.Dialog):
-    def __init__(self, px):
-        self.px = px
-        simpledialog.Dialog.__init__(self, px.top, title="Options - {}".format(px.myName))
-
-    def body(self, master):
-        master.columnconfigure(1, weight=1)
-        Label(master, text="Comment Mode").grid(row=0, sticky=W)
-        self.commentMode = ttk.Combobox(master, values=("Discard", "Trim 2", "Keep All"))
-        self.commentMode.current(self.px.commentMode)
-        self.commentMode.state(['readonly'])
-        self.commentMode.grid(row=0, column=1, sticky=W)
-        self.numByTensVar = BooleanVar()
-        self.numByTensVar.set(self.px.numByTens)
-        self.numByTens = ttk.Checkbutton(master, variable=self.numByTensVar, text="Number by tens")
-        self.numByTens.grid(row=1, column=1, sticky=W)
-        self.reformatEnabVar = BooleanVar()
-        self.reformatEnabVar.set(self.px.reformatEnab)
-        self.reformatEnab = ttk.Checkbutton(master, variable=self.reformatEnabVar, text="Reformat existing numbers")
-        self.reformatEnab.grid(row=2, column=1, sticky=W)
-
-    def apply(self):
-        self.px.commentMode = self.commentMode.current()
-        self.px.numByTens = self.numByTensVar.get()
-        self.px.reformatEnab = self.reformatEnabVar.get()
-
-class PxRenameDialog(simpledialog.Dialog):
-    def __init__(self, px, tile):
-        self.px = px
-        self.tile = tile
-        simpledialog.Dialog.__init__(self, px.top, title="Rename - {}".format(px.myName))
-
-    def body(self, master):
-        master.columnconfigure(1, weight=1, minsize=500)
-        Label(master, text="Old Name:").grid(row=0, sticky=W)
-        Label(master, text=self.tile.name).grid(row=0, column=1, sticky=W)
-        Label(master, text="New Name:").grid(row=1, sticky=W)
-        self.newName = ttk.Entry(master)
-        self.newName.grid(row=1, column=1, sticky=(W,E))
-        self.newName.insert(0, self.tile.name)
-
-    def apply(self):
-        self.px.do_rename_apply(self.tile, self.newName.get())
-
-class PxMetaDialog(simpledialog.Dialog):
-    def __init__(self, px, tile):
-        self.px = px
-        self.tile = tile
-        simpledialog.Dialog.__init__(self, px.top, title="Edit Metadata - {}".format(px.myName))
-
-    def body(self, master):
-        master.columnconfigure(1, weight=1, minsize=500)
-        Label(master, text="Picture ID:").grid(row=0, sticky=W)
-        Label(master, text=self.tile.id).grid(row=0, column=1, sticky=W)
-        Label(master, text="Rating").grid(row=1, sticky=W)
-        self.rating = ttk.Combobox(master, values=list(reversed(pic.ratings)))
-        self.rating.current(pic.flip_rating(self.tile.rating))
-        self.rating.state(['readonly'])
-        self.rating.grid(row=1, column=1, sticky=W)
-        Label(master, text="Caption").grid(row=2, sticky=W)
-        self.caption = ttk.Entry(master)
-        self.caption.grid(row=2, column=1, sticky=(W,E))
-        self.caption.insert(0, self.tile.caption)
-
-    def apply(self):
-        self.px.get_meta_dict()
-        rating = pic.flip_rating(self.rating.current())
-        self.tile.set_rating(rating)
-        self.px.metaDict.set_rating(self.tile.id, rating)
-        caption = self.caption.get()
-        self.tile.set_caption(caption)
-        self.px.metaDict.set_caption(self.tile.id, caption)
-        self.tile.redraw_text(self.px.canvas, self.px.nailSz)
-        self.tile.redraw_icon(self.px.canvas)
-        self.px.metaDict.write(self.px.env)
-        self.px.forget_meta_dict()
-
-class Px(LogHelper, WidgetHelper):
+class Cx(LogHelper, WidgetHelper):
     def __init__(self):
         self.env = {}
         LogHelper.__init__(self, self.env)
@@ -116,8 +37,8 @@ class Px(LogHelper, WidgetHelper):
 
         # create top level window
         self.top = Toplevel()
-        self.myName = "Px {:d}".format(self.instNum)
-        self.styleRoot = "Px{:d}".format(self.instNum)
+        self.myName = "Cx {:d}".format(self.instNum)
+        self.styleRoot = "Cx{:d}".format(self.instNum)
         self.top.title(self.myName)
         self.top.bind('<Destroy>', self.on_destroy)
 
@@ -131,16 +52,6 @@ class Px(LogHelper, WidgetHelper):
         self.selectButton = ttk.Button(self.topBar, text="Select All", style=self.styleRoot+".Select.TButton",
                                        command=self.toggle_select_all)
         self.selectButton.pack(side=LEFT)
-        self.numButton = ttk.Button(self.topBar, text="Num", command=self.do_num)
-        self.numButton.pack(side=LEFT)
-        self.unnumButton = ttk.Button(self.topBar, text="Unnum", command=self.do_unnum)
-        self.unnumButton.pack(side=LEFT)
-        self.sortButton = ttk.Button(self.topBar, text="Sort", command=self.do_sort)
-        self.sortButton.pack(side=LEFT)
-        self.sweeperButton = ttk.Button(self.topBar, text="Sweeper", command=self.do_sweeper)
-        self.sweeperButton.pack(side=RIGHT)
-        self.nailerButton = ttk.Button(self.topBar, text="Nailer", command=self.do_nailer)
-        self.nailerButton.pack(side=RIGHT)
         self.enable_buttons(False)
 
         # create status bar
@@ -150,8 +61,6 @@ class Px(LogHelper, WidgetHelper):
         self.statusLabel.pack(side=LEFT, fill=X, expand=True)
         self.logButton = ttk.Button(self.statusBar, text="Log", command=self.do_log)
         self.logButton.pack(side=RIGHT)
-        self.optionsButton = ttk.Button(self.statusBar, text="Options", command=self.do_options)
-        self.optionsButton.pack(side=RIGHT)
 
         # created paned window for tree and canvas
         self.panedWin = PanedWindow(self.top, orient=HORIZONTAL, width=800, height=800, sashwidth=5, sashrelief=GROOVE)
@@ -179,9 +88,6 @@ class Px(LogHelper, WidgetHelper):
         self.panedWin.add(self.treeFrame)
 
         # tree stuff
-        self.tree.tag_configure('noncanon', background='cyan')
-        self.tree.tag_configure('error', background='orange')
-        self.tree.tag_configure('childerror', background='tan')
         self.treeItems = {} #tree iid to file object
 
         # create canvas for tiles
@@ -197,8 +103,8 @@ class Px(LogHelper, WidgetHelper):
 
         # canvas stuff
         self.nailSz = pic.nailSizes[-1]
-        self.tiles = {} #groovy id to tile object (note only canonical names have ids)
-        self.tilesOrder = [] #array of tiles in display order (all tiles whether canononical or not)
+        self.tiles = {} #groovy id to tile object
+        self.tilesOrder = [] #array of tiles in display order
         self.tilesByName = {} #name to tile object
         self.lastTileClicked = None
         self.curSelectColor = 1
@@ -219,15 +125,6 @@ class Px(LogHelper, WidgetHelper):
         self.canvas.bind('<Key>', self.on_canvas_key)
         dnd.add_target(self.canvas, self, self.myName)
 
-        # popup menu
-        self.popMenu = Menu(self.top, tearoff=0)
-        self.popMenu.add_command(label="Rename", command=self.do_rename)
-        self.popMenu.add_command(label="Edit Metadata", command=self.do_edit_meta)
-        self.popMenu.add_command(label="Delete", command=self.do_delete)
-        self.popMenu.add_separator()
-        self.popMenu.add_command(label="[X] Close Menu", command=self.do_close_menu)
-        self.popMenuTile = None
-
         self.lastError = ""
         self.curFolder = None
         self.nails = None
@@ -236,10 +133,6 @@ class Px(LogHelper, WidgetHelper):
         self.metaDictRefCnt = 0
         self.loaded = False
         self.nPictures = 0
-        self.numDigits = 0
-        self.numByTens = True
-        self.reformatEnab = False
-        self.commentMode = pic.TRIM2
         self.viewer = None
         self.rootFolder = PxFolder(None, "", ".", "")
         self.folders = {"": self.rootFolder} #folder id to folder object
@@ -249,14 +142,14 @@ class Px(LogHelper, WidgetHelper):
 
     def on_destroy(self, ev):
         """called when my top-level window is closed
-        this is the easiest and most common way to destroy Px,
+        this is the easiest and most common way to destroy Cx,
         and includes the case where the entire shoebox application is shut down
         """
         self.top = None
         self.destroy()
 
     def destroy(self):
-        """destroy and clean up this Px
+        """destroy and clean up this Cx
         in Python you don't really destroy objects, you just remove all references to them
         so this function removes all known references then closes the top level window
         note this will result in a second call from the on_destroy event handler; that's ok
@@ -273,7 +166,7 @@ class Px(LogHelper, WidgetHelper):
             self.top = None
 
     def __del__(self):
-        """Px destructor"""
+        """Cx destructor"""
         self.destroy() #probably already called
         LogHelper.__del__(self)
 
@@ -363,38 +256,15 @@ class Px(LogHelper, WidgetHelper):
         self.set_status("{:d} items selected {}".format(self.num_selected(self.curSelectColor),
                                                         selectColors[self.curSelectColor]))
 
-    def do_nailer(self):
-        """when Nailer button clicked"""
-        if self.curFolder is None:
-            Nailer(".")
-        else:
-            Nailer(self.curFolder.path)
-
-    def do_sweeper(self):
-        """when Sweeper button clicked"""
-        if self.curFolder is None:
-            Sweeper(".")
-        else:
-            Sweeper(self.curFolder.path)
-
     def do_log(self):
         """when Log button clicked"""
         self.open_log_window("Log - {}".format(self.myName))
-
-    def do_options(self):
-        """when Options button clicked"""
-        PxOptionsDialog(self)
 
     def enable_buttons(self, enable=True):
         """enable/disable buttons"""
         self.enable_widget(self.refreshButton, enable)
         self.enable_widget(self.sizeButton, enable)
         self.enable_widget(self.selectButton, enable)
-        self.enable_widget(self.numButton, enable)
-        self.enable_widget(self.unnumButton, enable)
-        self.enable_widget(self.sortButton, enable)
-        self.enable_widget(self.nailerButton, enable)
-        self.enable_widget(self.sweeperButton, enable)
 
     def populate_tree(self, parent):
         """populate tree
@@ -412,33 +282,18 @@ class Px(LogHelper, WidgetHelper):
     def add_folder(self, folder):
         """add a folder, check for errors"""
         if folder.noncanon:
-            # folder is noncanonical, ID cannot be parsed
-            self.tree.item(folder.iid, tags='noncanon')
-        elif folder.id in self.folders:
-            # duplicate folder ID
-            self.set_folder_error(folder, pic.DUP)
-            self.log_error("Duplicate folder ID: {}".format(folder.path))
-            otherFolder = self.folders[folder.id]
-            if not otherFolder.is_error(pic.DUP):
-                self.set_folder_error(otherFolder, pic.DUP)
-                self.log_error("Duplicate folder ID: {}".format(otherFolder.path))
-        else:
-            # folder ID is good, add to collection
-            self.folders[folder.id] = folder
-            # verify folder ID correctly predicts the folder's place in the tree
-            parentId = pic.get_parent_id(folder.parts)
-            if parentId not in self.folders or folder.parent is not self.folders[parentId]:
-                self.set_folder_error(folder, pic.OOP)
-                self.log_error("Folder out of place: {}".format(folder.path))
-
-    def set_folder_error(self, folder, errBit):
-        """set folder error"""
-        folder.set_error(errBit)
-        self.tree.item(folder.iid, tags='error')
-        parent = folder.parent
-        while parent and parent.iid and not parent.errors:
-            self.tree.item(parent.iid, tags='childerror')
-            parent = parent.parent
+            # folder is noncanonical, ignore
+            return
+        if folder.id in self.folders:
+            # duplicate folder ID, ignore
+            return
+        # verify folder ID correctly predicts the folder's place in the tree
+        parentId = pic.get_parent_id(folder.parts)
+        if parentId not in self.folders or folder.parent is not self.folders[parentId]:
+            # folder is out of place, ignore
+            return
+        # folder ID is good, add to collection
+        self.folders[folder.id] = folder
 
     def on_tree_select(self, event):
         """when user clicks tree item"""
@@ -663,9 +518,6 @@ class Px(LogHelper, WidgetHelper):
                     # deselect after drag and drop
                     self.select_all(None, self.curSelectColor)
                     self.update_select_button()
-                    # check tiles just moved for OOO errors
-                    self.check_out_of_order(toIndexStart, toIndex)
-                    self.sweep_out_of_order()
                 else:
                     self.set_status("No drop target")
 
@@ -802,12 +654,13 @@ class Px(LogHelper, WidgetHelper):
         for ent in entries:
             if ent.is_file() and ent.name != "Thumbs.db":
                 tile = self.make_tile(ent)
-                self.add_tile(tile)
-                tile.add_to_canvas(self.canvas, x, y, self.nailSz)
-                self.add_canvas_item(tile)
-                if tile.h > hmax:
-                    hmax = tile.h
-                bump_position()
+                if tile is not None:
+                    self.add_tile(tile)
+                    tile.add_to_canvas(self.canvas, x, y, self.nailSz)
+                    self.add_canvas_item(tile)
+                    if tile.h > hmax:
+                        hmax = tile.h
+                    bump_position()
 
         # bump to next row if partial row
         if x > tileGap:
@@ -821,8 +674,6 @@ class Px(LogHelper, WidgetHelper):
         self.set_status_default_or_error()
         self.loaded = True
         self.enable_buttons()
-        # check tiles just added for OOO errors
-        self.check_out_of_order(prevLen, len(self.tilesOrder))
         self.forget_meta_dict()
 
     def populate_holes(self, startIndex, entries):
@@ -842,16 +693,15 @@ class Px(LogHelper, WidgetHelper):
         for ent in entries:
             hole = self.tilesOrder[index]
             x, y = self.canvas.coords(hole.items[0])[:2]
-            self.remove_tile(hole)
             tile = self.make_tile(ent)
-            self.add_tile(tile, index)
-            tile.add_to_canvas(self.canvas, x, y, self.nailSz)
-            self.add_canvas_item(tile)
-            index += 1
+            if tile is not None:
+                self.remove_tile(hole)
+                self.add_tile(tile, index)
+                tile.add_to_canvas(self.canvas, x, y, self.nailSz)
+                self.add_canvas_item(tile)
+                index += 1
         self.reflow(startIndex)
         self.set_status_default_or_error()
-        # check tiles just added for OOO errors
-        self.check_out_of_order(prevLen, len(self.tilesOrder))
         self.forget_meta_dict()
 
     def reflow(self, index=-1, removeHoles=False):
@@ -918,7 +768,8 @@ class Px(LogHelper, WidgetHelper):
         if os.path.splitext(ent.name)[1].lower() in pic.pictureExts:
             return self.make_pic_tile(ent)
         else:
-            return self.make_file_tile(ent)
+            # ignore other files
+            return None
 
     def make_pic_tile(self, ent):
         """make tile for a picture"""
@@ -991,13 +842,6 @@ class Px(LogHelper, WidgetHelper):
             self.log_error("Can't create Tk photo image for {}".format(name))
             return None
 
-    def make_file_tile(self, ent):
-        """make tile for a file"""
-        if ent.name == "contents.json":
-            return PxTileContent(ent.name, self.env)
-        else:
-            return PxTileFile(ent.name, self.env)
-
     def add_tile(self, tile, index=-1):
         """add a tile
         since tile may not be on canvas, does not redraw text in case of error
@@ -1010,34 +854,13 @@ class Px(LogHelper, WidgetHelper):
             self.add_tile_id(tile)
         if isinstance(tile, PxTilePic):
             self.nPictures += 1
-            # update number of digits, lock in 4 once that number is seen
-            if tile.id and self.numDigits != 4:
-                nd = pic.get_num_digits(tile.parts)
-                self.numDigits = 4 if nd >= 4 else max(nd, self.numDigits)
 
     def add_tile_id(self, tile):
-        """add tile ID to collection, check for DUP and OOP errors
-        since tile may not be on canvas, does not redraw text in case of error
+        """add tile ID to collection, no error check
         """
         if tile.id:
-            if tile.id in self.tiles:
-                # duplicate groovy ID
-                tile.set_error(pic.DUP)
-                self.log_error("Duplicate ID: {}".format(tile.name))
-                otherTile = self.tiles[tile.id]
-                if not otherTile.is_error(pic.DUP):
-                    otherTile.set_error(pic.DUP)
-                    # ok to assume other tile is on canvas
-                    otherTile.redraw_text(self.canvas, self.nailSz)
-                    self.log_error("Duplicate ID: {}".format(otherTile.name))
-            else:
-                # groovy ID is good, add to collection
-                self.tiles[tile.id] = tile
-                # verify ID correctly predicts the folder where item can be found
-                folderId = pic.get_folder_id(tile.parts)
-                if folderId not in self.folders or self.curFolder is not self.folders[folderId]:
-                    tile.set_error(pic.OOP)
-                    self.log_error("Picture out of place: {}".format(tile.name))
+            # add to collection
+            self.tiles[tile.id] = tile
 
     def add_canvas_item(self, tile):
         """add tile to canvas items for click and drop target"""
@@ -1076,23 +899,11 @@ class Px(LogHelper, WidgetHelper):
             self.log_error("Error removing {}, not in tilesOrder".format(tile.name))
 
     def remove_tile_id(self, tile):
-        """remove tile ID from collection, recheck DUP errors"""
+        """remove tile ID from collection"""
         if tile.id:
             # remove from collection
             if tile.id in self.tiles and self.tiles[tile.id] is tile:
                 del self.tiles[tile.id]
-            # find all other tiles with same ID
-            otherTiles = [t for t in self.tilesOrder if t is not tile and t.id == tile.id]
-            if len(otherTiles):
-                otherTile = otherTiles[0]
-                # if exactly one found, clear DUP error
-                if len(otherTiles) == 1:
-                    otherTile.clear_error(pic.DUP)
-                    # ok to assume other tile is on canvas
-                    otherTile.redraw_text(self.canvas, self.nailSz)
-                # if collection is vacant for this ID, add one of them
-                if tile.id not in self.tiles:
-                    self.tiles[tile.id] = otherTile
 
     def rename_tile(self, tile, newName):
         """rename a tile"""
@@ -1139,290 +950,6 @@ class Px(LogHelper, WidgetHelper):
             # reflow starting at predecessor of added holes
             # ok if start index goes to -1, will reflow all tiles
             self.reflow(len(self.tilesOrder) - n - 1)
-
-    def do_num(self):
-        """number selected tiles that aren't already numbered"""
-        if self.curFolder.noncanon:
-            self.log_error("Sorry, current folder is noncanonical")
-        else:
-            self.clear_error()
-            nSelected = 0
-            nChanged = 0
-            lastNumSeen = 0
-            tilesInGroup = []
-            # find subranges of tiles to be numbered
-            for tile in self.tilesOrder:
-                if tile.selected == self.curSelectColor:
-                    nSelected += 1
-                    if isinstance(tile, PxTilePic):
-                        if not tile.id:
-                            # found unnumbered picture tile, add to current group
-                            tilesInGroup.append(tile)
-                        elif self.reformatEnab:
-                            # tile is already numbered, check format
-                            if self.reformat_name(tile):
-                                nChanged += 1
-                if tile.id and not tile.errors:
-                    # found numbered tile, end current group
-                    if len(tilesInGroup):
-                        # stick right if next numbered tile is selected, else stick left
-                        nChanged += self.number_group_of_tiles(tilesInGroup,
-                                                               lastNumSeen, tile.parts.num, tile.selected)
-                        tilesInGroup = []
-                    # keep track of last number seen
-                    lastNumSeen = tile.parts.num
-            # do the last group, if any
-            if len(tilesInGroup):
-                nChanged += self.number_group_of_tiles(tilesInGroup, lastNumSeen, pic.MAXNUM, False)
-            metacache.write_all_changes(self.env)
-            if not self.lastError:
-                if nSelected:
-                    self.set_status("{:d} files changed".format(nChanged))
-                else:
-                    self.set_status("No files selected")
-
-    def number_group_of_tiles(self, tilesInGroup, lastNumSeen, nextNumSeen, stickRight):
-        """number a group of unnumbered tiles consecutively
-        lastNumSeen is last numbered tile before group (or zero)
-        nextNumSeen is next numbered tile after group (or MAXNUM)
-        stickRight says what to do if there are more numbers available than we need
-        if true, number the group based on nextNumSeen (so numbering break is before group)
-        otherwise number the group based on lastNumSeen (so numbering break is after group)
-        return number of tiles changed
-        """
-        folderId = pic.get_folder_id(self.curFolder.parts)
-        nChanged = 0
-        nAvail = nextNumSeen - lastNumSeen - 1
-        nCanDo = 0
-
-        # make a quick pass to see how many we can do, taking into account versions sharing same number
-        prevParts = "", "", "", ""
-        for tile in tilesInGroup:
-            junk, ver, comment, ext = parts = pic.parse_noncanon(tile.name, self.commentMode)
-            # if same name as previous but different version, use same number
-            if junk == prevParts[0] and ver != prevParts[1]:
-                nCanDo += 1
-            elif nAvail:
-                nCanDo += 1
-                nAvail -= 1
-            prevParts = parts
-
-        nCantDo = len(tilesInGroup) - nCanDo
-
-        # number by tens if possible, otherwise by ones
-        lastNumSeen10 = int(lastNumSeen / 10) * 10
-        if lastNumSeen10 + (nCanDo * 10) < nextNumSeen and self.want_num_by_tens():
-            step = 10
-            firstAvailNum = lastNumSeen10 + step
-            endAvailNum = int(nextNumSeen / 10) * 10
-        else:
-            step = 1
-            firstAvailNum = lastNumSeen + step
-            endAvailNum = nextNumSeen
-
-        # pick first number according to stickiness
-        if stickRight:
-            firstNum = endAvailNum - (nCanDo * 10)
-            tilesToDo = tilesInGroup[nCantDo:]
-            errMsgNum = nextNumSeen
-            errMsgSide = "before"
-        else:
-            firstNum = firstAvailNum
-            tilesToDo = tilesInGroup[:nCanDo]
-            errMsgNum = lastNumSeen
-            errMsgSide = "after"
-
-        num = firstNum
-        prevParts = "", "", "", ""
-        for tile in tilesToDo:
-            junk, ver, comment, ext = parts = pic.parse_noncanon(tile.name, self.commentMode)
-            # if same name as previous but different version, use same number
-            if junk == prevParts[0] and ver != prevParts[1]:
-                num -= step
-            prevParts = parts
-
-            lumps = [folderId]
-            if self.numDigits == 3 or (self.numDigits < 3 and step == 1):
-                lumps.append("{:03d}{}".format(num, ver))
-            else:
-                lumps.append("{:04d}{}".format(num, ver))
-            if comment:
-                lumps.append(comment)
-            newName = "-".join(lumps) + ext
-            try:
-                self.rename_file_in_cur_folder(tile.name, newName)
-                self.rename_tile(tile, newName)
-                # apply metadata from loose cache, if any
-                # use newName because above rename changed name in loose cache
-                self.get_meta_dict(0).restore_meta_from_loose_cache(tile.id, newName)
-                nChanged += 1
-                errMsgNum = num
-                num += step
-            except RuntimeError as e:
-                self.log_error(str(e))
-
-        if nCantDo:
-            self.log_error("{:d} files {} {:d} could not be numbered".format(nCantDo, errMsgSide, errMsgNum))
-        return nChanged
-
-    def want_num_by_tens(self):
-        """return true if numbering by tens is desired"""
-        return self.numByTens and len(self.tilesOrder) < 500
-
-    def reformat_name(self, tile):
-        """if name is not correctly formatted, fix it and return true"""
-        if (tile.id):
-            if self.numDigits == 3 or (self.numDigits < 3 and not self.want_num_by_tens()):
-                num = "{:03d}".format(tile.parts.num)
-            else:
-                num = "{:04d}".format(tile.parts.num)
-
-            newName = "{}{}-{}{}{}".format(tile.parts.parent, tile.parts.child,
-                                           tile.parts.type, num, tile.parts.ver)
-            if tile.parts.comment:
-                newName = "{}-{}{}".format(newName, tile.parts.comment, tile.parts.ext)
-            else:
-                newName = "{}{}".format(newName, tile.parts.ext)
-
-            if newName != tile.name:
-                try:
-                    self.rename_file_in_cur_folder(tile.name, newName)
-                    self.rename_tile(tile, newName)
-                    return True
-                except RuntimeError as e:
-                    self.log_error(str(e))
-        return False
-
-    def do_unnum(self):
-        """unnumber selected tiles"""
-        self.clear_error()
-        nSelected = 0
-        nChanged = 0
-        for tile in self.tilesOrder:
-            if tile.selected == self.curSelectColor:
-                nSelected += 1
-                if tile.id:
-                    newName = "_{}".format(tile.name)
-                    try:
-                        oldId = tile.id
-                        newPath = self.rename_file_in_cur_folder(tile.name, newName)
-                        self.rename_tile(tile, newName)
-                        # save any metadata in loose cache for later use
-                        self.get_meta_dict(0).remove_meta(oldId, newPath)
-                        nChanged += 1
-                    except RuntimeError as e:
-                        self.log_error(str(e))
-        self.sweep_out_of_order()
-        metacache.write_all_changes(self.env)
-        if not self.lastError:
-            if nSelected:
-                self.set_status("{:d} files changed".format(nChanged))
-            else:
-                self.set_status("No files selected")
-
-    def do_sort(self):
-        """sort tiles by number"""
-        self.clear_error()
-        # pull out the numbered tiles into a separate array
-        a = [t for t in self.tilesOrder if t.is_numbered()]
-        # sort them by number
-        a.sort(key=lambda t: t.parts.sortNum)
-        # weave in the sorted tiles with the unnumbered ones in their original order
-        it = iter(a)
-        self.tilesOrder = [next(it) if t.is_numbered() else t for t in self.tilesOrder]
-        # repaint canvas with the new order
-        self.reflow()
-        # clear OOO error flags
-        self.sweep_out_of_order()
-        self.set_status_default()
-
-    def set_tile_out_of_order(self, tile):
-        """set out-of-order error for specified tile and redraw text"""
-        if not tile.is_error(pic.OOO):
-            tile.set_error(pic.OOO)
-            tile.redraw_text(self.canvas, self.nailSz)
-            self.log_error("Out of order: {}".format(tile.name))
-
-    def clear_tile_out_of_order(self, tile):
-        """clear out-of-order bit for specified tile and redraw text"""
-        if tile.is_error(pic.OOO):
-            tile.clear_error(pic.OOO)
-            tile.redraw_text(self.canvas, self.nailSz)
-
-    def check_out_of_order(self, startIndex, endIndex):
-        """check range of tiles for OOO error"""
-        startSortNum = 0
-        endSortNum = pic.MAXSORTNUM
-        # anchor the range to existing numbered tiles by expanding it by one at each end
-        while startIndex > 0:
-            startIndex -= 1
-            if self.tilesOrder[startIndex].is_numbered():
-                break
-        while endIndex < len(self.tilesOrder):
-            endIndex += 1
-            if self.tilesOrder[endIndex-1].is_numbered():
-                break
-        # find first numbered tile at start of range
-        # it is deemed correct by definition
-        while startIndex < endIndex:
-            startTile = self.tilesOrder[startIndex]
-            startIndex += 1
-            if startTile.is_numbered():
-                self.clear_tile_out_of_order(startTile)
-                startSortNum = startTile.parts.sortNum
-                break
-        # find last numbered tile at end of range that's greater than startSortNum
-        # it is deemed correct also (other numbered tiles we pass on the way are OOO)
-        while startIndex < endIndex:
-            endTile = self.tilesOrder[endIndex-1]
-            endIndex -= 1
-            if endTile.is_numbered():
-                if endTile.parts.sortNum > startSortNum:
-                    self.clear_tile_out_of_order(endTile)
-                    endSortNum = endTile.parts.sortNum
-                    break
-                else:
-                    self.set_tile_out_of_order(endTile)
-        # now test the remaining tiles
-        # they must ascend from startSortNum but cannot exceed endSortNum
-        priorSortNum = startSortNum
-        for tile in self.tilesOrder[startIndex:endIndex]:
-            if tile.is_numbered():
-                if tile.parts.sortNum > priorSortNum and tile.parts.sortNum < endSortNum:
-                    self.clear_tile_out_of_order(tile)
-                    priorSortNum = tile.parts.sortNum
-                else:
-                    self.set_tile_out_of_order(tile)
-
-    def sweep_out_of_order(self):
-        """sweep all tiles and clear OOO errors that are no longer true
-        do this when tiles have been moved or removed, possibly fixing OOO errors
-        rely on above function to set OOO errors in the local context of moved or added tiles
-        this function also clears any stray OOO errors on unnumbered tiles
-        """
-        def check_these(tiles, priorSortNum, endSortNum):
-            for tile in tiles:
-                if tile.parts.sortNum > priorSortNum and tile.parts.sortNum < endSortNum:
-                    self.clear_tile_out_of_order(tile)
-                    priorSortNum = tile.parts.sortNum
-
-        # find ranges of numbered tiles with OOO errors
-        # check each range using adjacent numbered tiles to define the correct numbering for that range
-        startSortNum = 0
-        tilesToCheck = []
-        for tile in self.tilesOrder:
-            if tile.is_numbered():
-                if tile.is_error(pic.OOO):
-                    tilesToCheck.append(tile)
-                else:
-                    if len(tilesToCheck):
-                        check_these(tilesToCheck, startSortNum, tile.parts.sortNum)
-                        tilesToCheck = []
-                    startSortNum = tile.parts.sortNum
-            else:
-                self.clear_tile_out_of_order(tile)
-        if len(tilesToCheck):
-            check_these(tilesToCheck, startSortNum, pic.MAXSORTNUM)
 
     def rename_file_in_cur_folder(self, oldName, newName):
         """rename file in current folder, return new path"""
@@ -1515,8 +1042,7 @@ class Px(LogHelper, WidgetHelper):
         # find item that was clicked
         items = self.canvas.find_withtag(CURRENT)
         if len(items) and items[0] in self.canvasItems:
-            self.popMenuTile = self.canvasItems[items[0]]
-            self.popMenu.post(event.x_root, event.y_root)
+            pass
 
     def on_canvas_doubleclick(self, event):
         """when user double clicks in canvas"""
@@ -1535,40 +1061,6 @@ class Px(LogHelper, WidgetHelper):
                     self.viewer = Viewer(self)
                 self.viewer.set_picture(self.tilesOrder.index(tile))
                 self.update_select_button()
-
-    def do_delete(self):
-        """menu delete"""
-        msg = "Are you sure you want to delete {}?".format(self.popMenuTile.name)
-        if messagebox.askyesno("Confirm Delete", msg):
-            try:
-                self.delete_file_in_cur_folder(self.popMenuTile.name)
-                self.remove_tile(self.popMenuTile, True)
-                self.set_status("1 item deleted")
-                self.sweep_out_of_order()
-            except RuntimeError as e:
-                self.log_error(str(e))
-
-    def do_rename(self):
-        """menu rename"""
-        PxRenameDialog(self, self.popMenuTile)
-
-    def do_rename_apply(self, tile, newName):
-        """when ok clicked in rename menu"""
-        try:
-            self.rename_file_in_cur_folder(tile.name, newName)
-            self.rename_tile(tile, newName)
-            self.set_status("1 item renamed")
-            self.sweep_out_of_order()
-        except RuntimeError as e:
-            self.log_error(str(e))
-
-    def do_edit_meta(self):
-        """menu edit metadata"""
-        PxMetaDialog(self, self.popMenuTile)
-
-    def do_close_menu(self):
-        """menu close"""
-        self.popMenu.unpost()
 
     def goto(self, ids, selectColor=None):
         """possibly change folder then select and scroll to specified tile(s)"""

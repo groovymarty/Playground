@@ -193,6 +193,20 @@ class PxTileFile(PxTile):
         self.h = self.h0 + bb[3] - bb[1]
         self.items = (rect, txt, line)
 
+class PxTileContent(PxTile):
+    def __init__(self, name, env=None):
+        super().__init__(name, env)
+
+    def add_to_canvas(self, canvas, x, y, w):
+        rect = canvas.create_rectangle(x, y, x+fileBoxSz, y+fileBoxSz, fill="gray")
+        # disable circle so mouse click event will occur in rect
+        line = canvas.create_oval(x+20, y+20, x+fileBoxSz-20, y+fileBoxSz-20, fill="orange", state=DISABLED)
+        self.h0 = fileBoxSz
+        txt = canvas.create_text(x, y + self.h0, text=self.text, anchor=NW, width=w, fill=self.pick_text_color())
+        bb = canvas.bbox(txt)
+        self.h = self.h0 + bb[3] - bb[1]
+        self.items = (rect, txt, line)
+
 class PxTileHole(PxTile):
     def __init__(self, env=None):
         super().__init__("(hole)", env)
