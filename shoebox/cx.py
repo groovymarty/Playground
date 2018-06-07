@@ -7,10 +7,10 @@ from PIL import Image
 import ImageTk
 from shoebox import pic, nails, nailcache, dnd, metacache
 from shoebox.dnd import DndItemEnt
-from shoebox.pxfolder import PxFolder
+from shoebox.cxfolder import CxFolder
 from shoebox.pxtile import PxTilePic, PxTileFile, PxTileHole, selectColors
 from shoebox.viewer import Viewer
-from tkit.direntry import DirEntryFile
+from tkit.direntry import DirEntryFile, DirEntryDir
 from tkit.loghelper import LogHelper
 from tkit.widgethelper import WidgetHelper
 from tkit import tkit
@@ -134,8 +134,8 @@ class Cx(LogHelper, WidgetHelper):
         self.loaded = False
         self.nPictures = 0
         self.viewer = None
-        self.rootFolder = PxFolder(None, "", ".", "")
-        self.folders = {"": self.rootFolder} #folder id to folder object
+        self.rootFolder = self.scan_for_contents(DirEntryDir("."), True)
+        self.rootFolder.iid = ""
         self.populate_tree(self.rootFolder)
         self.set_status_default_or_error()
         instances.append(self)
@@ -266,34 +266,39 @@ class Cx(LogHelper, WidgetHelper):
         self.enable_widget(self.sizeButton, enable)
         self.enable_widget(self.selectButton, enable)
 
-    def populate_tree(self, parent):
-        """populate tree
-        note i'm not sorting, on my system scandir returns them sorted already
+    def scan_for_contents(self, dirEnt, isRoot=False):
+        """scan directory tree for contents
+        if directory has contents.json, or any child directory does, return folder object
+        otherwise return None
         """
-        for ent in os.scandir(parent.path):
-            if ent.is_dir():
-                iid = self.tree.insert(parent.iid, 'end', text=ent.name)
-                folder = PxFolder(parent, ent.name, ent.path, iid, env=self.env)
-                parent.add_child(folder)
-                self.treeItems[iid] = folder
-                self.add_folder(folder)
-                self.populate_tree(folder)
+        # make sure directory name is canonical before scanning
+        parts = pic.parse_folder(dirEnt.name, self.env)
+        if parts or isRoot:
+            children = []
+            contFound = False
+            for ent in os.scandir(dirEnt.path):
+                if ent.is_dir():
+                    child = self.scan_for_contents(ent)
+                    if child:
+                        children.append(child)
+                else:
+                    if ent.name == "contents.json":
+                        contFound = True
+            # contents found in this directory or any child?
+            if contFound or len(children):
+                id = "" if isRoot else parts.id
+                return CxFolder(children, id, dirEnt.name, dirEnt.path)
 
-    def add_folder(self, folder):
-        """add a folder, check for errors"""
-        if folder.noncanon:
-            # folder is noncanonical, ignore
-            return
-        if folder.id in self.folders:
-            # duplicate folder ID, ignore
-            return
-        # verify folder ID correctly predicts the folder's place in the tree
-        parentId = pic.get_parent_id(folder.parts)
-        if parentId not in self.folders or folder.parent is not self.folders[parentId]:
-            # folder is out of place, ignore
-            return
-        # folder ID is good, add to collection
-        self.folders[folder.id] = folder
+        # no contents or noncanonical, forget this one
+        return None
+
+    def populate_tree(self, parent):
+        """populate tree with children of specified folder"""
+        for child in parent.children:
+            iid = self.tree.insert(parent.iid, 'end', text=child.name)
+            self.treeItems[iid] = child
+            child.iid = iid
+            self.populate_tree(child)
 
     def on_tree_select(self, event):
         """when user clicks tree item"""
