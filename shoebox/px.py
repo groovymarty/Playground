@@ -5,7 +5,7 @@ from tkinter import *
 from tkinter import ttk, messagebox, simpledialog
 from PIL import Image
 import ImageTk
-from shoebox import pic, nails, nailcache, dnd, metacache
+from shoebox import pic, nails, nailcache, dnd, metacache, contents
 from shoebox.dnd import DndItemEnt
 from shoebox.nailer import Nailer
 from shoebox.sweeper import Sweeper
@@ -993,7 +993,7 @@ class Px(LogHelper, WidgetHelper):
 
     def make_file_tile(self, ent):
         """make tile for a file"""
-        if ent.name == "contents.json":
+        if ent.name == contents.contentsFileName:
             return PxTileContent(ent.name, self.env)
         else:
             return PxTileFile(ent.name, self.env)

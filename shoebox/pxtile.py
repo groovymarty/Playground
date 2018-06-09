@@ -20,7 +20,7 @@ fontWingdings2 = None
 ratingIcons = []
 
 def make_fonts():
-    global fontSymbol, fontWingDings2, ratingIcons
+    global fontSymbol, fontWingdings2, ratingIcons
     fontSymbol = font.Font(family="Symbol")
     fontWingdings2 = font.Font(family="Wingdings 2")
     ratingIcons = [
@@ -77,6 +77,7 @@ class PxTile:
         return self.id and not (self.errors & ~pic.OOO)
 
     def draw_selected(self, canvas, color):
+        """note this method cannot be used to change the selection color, must erase_selection first"""
         if not self.selected:
             self.selected = color
             bb = canvas.bbox(self.items[0])
@@ -164,6 +165,7 @@ class PxTilePic(PxTile):
         self.rating = rating
 
     def make_text(self):
+        # leave space at the beginning for the icon
         lines = ["     {}".format(self.name)]
         if self.caption:
             lines.append(self.caption)

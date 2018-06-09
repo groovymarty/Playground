@@ -5,11 +5,12 @@ from tkinter import *
 from tkinter import ttk, messagebox, simpledialog
 from PIL import Image
 import ImageTk
-from shoebox import pic, nails, nailcache, dnd, metacache
+from shoebox import pic, nails, nailcache, dnd, metacache, contents
 from shoebox.dnd import DndItemEnt
 from shoebox.cxfolder import CxFolder
 from shoebox.pxtile import PxTilePic, PxTileFile, PxTileHole, selectColors
 from shoebox.viewer import Viewer
+from shoebox.contents import Contents
 from tkit.direntry import DirEntryFile, DirEntryDir
 from tkit.loghelper import LogHelper
 from tkit.widgethelper import WidgetHelper
@@ -127,6 +128,7 @@ class Cx(LogHelper, WidgetHelper):
 
         self.lastError = ""
         self.curFolder = None
+        self.cont = None
         self.nails = None
         self.nailsTried = False
         self.metaDict = None
@@ -282,7 +284,7 @@ class Cx(LogHelper, WidgetHelper):
                     if child:
                         children.append(child)
                 else:
-                    if ent.name == "contents.json":
+                    if ent.name == contents.contentsFileName:
                         contFound = True
             # contents found in this directory or any child?
             if contFound or len(children):
@@ -312,6 +314,8 @@ class Cx(LogHelper, WidgetHelper):
         self.top.title("{} - {}".format(self.myName, self.curFolder.path[2:]))
         self.clear_canvas()
         self.update_select_button()
+        self.cont = Contents(self.curFolder.path, self.env)
+        #todo: look up cont.pictures to find path of each...
         self.populate_canvas(os.scandir(self.curFolder.path))
 
     def on_canvas_resize(self, event):
