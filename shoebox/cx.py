@@ -5,7 +5,7 @@ from tkinter import *
 from tkinter import ttk, messagebox, simpledialog
 from PIL import Image
 import ImageTk
-from shoebox import pic, nails, nailcache, dnd, metacache, contents
+from shoebox import pic, nails, nailcache, dnd, metacache, contents, finder
 from shoebox.dnd import DndItemEnt
 from shoebox.cxfolder import CxFolder
 from shoebox.pxtile import PxTilePic, PxTileFile, PxTileHole, selectColors
@@ -315,8 +315,14 @@ class Cx(LogHelper, WidgetHelper):
         self.clear_canvas()
         self.update_select_button()
         self.cont = Contents(self.curFolder.path, self.env)
-        #todo: look up cont.pictures to find path of each...
-        self.populate_canvas(os.scandir(self.curFolder.path))
+        finder.clear_cache()
+        # parse each picture ID
+        partss = (pic.parse_file(id) for id in self.cont.pictures)
+        # given parse results, find path to picture
+        paths = (finder.find_file(parts.id, parts) for parts in partss if parts is not None)
+        # wrap each path in DirEntry because that's what populate_canvas wants
+        ents = (DirEntryFile(path) for path in paths if path is not None)
+        self.populate_canvas(ents)
 
     def on_canvas_resize(self, event):
         """when user resizes the window"""
