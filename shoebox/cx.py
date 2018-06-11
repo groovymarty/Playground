@@ -129,8 +129,6 @@ class Cx(LogHelper, WidgetHelper):
         self.lastError = ""
         self.curFolder = None
         self.cont = None
-        self.nails = None
-        self.nailsTried = False
         self.metaDict = None
         self.metaDictRefCnt = 0
         self.loaded = False
@@ -215,10 +213,10 @@ class Cx(LogHelper, WidgetHelper):
 
     def do_refresh(self):
         """when Refresh button clicked"""
-        selections = self.save_selections()
-        self.clear_canvas()
-        self.populate_canvas(os.scandir(self.curFolder.path))
-        self.apply_selections(selections)
+        if self.curFolder:
+            selections = self.save_selections()
+            self.load_folder(self.curFolder)
+            self.apply_selections(selections)
 
     def toggle_nail_size(self):
         """when Small/Large button clicked"""
@@ -627,8 +625,6 @@ class Cx(LogHelper, WidgetHelper):
         self.curSelectColor = 1
         self.nPictures = 0
         self.hTotal = tileGap / 2
-        self.nails = None
-        self.nailsTried = False
         self.metaDict = None
         self.metaDictRefCnt = 0
 
@@ -789,20 +785,19 @@ class Cx(LogHelper, WidgetHelper):
     def make_pic_tile(self, ent):
         """make tile for a picture"""
         photo = None
-        # try to get thumbnails if we haven't already tried
-        if self.nails is None and not self.nailsTried:
-            self.nailsTried = True
-            try:
-                folderPath = os.path.split(ent.path)[0]
-                self.nails = nailcache.get_nails(folderPath, self.nailSz, self.env)
-            except FileNotFoundError:
-                self.log_error("No thumbnail file size {:d} in {}".format(self.nailSz, self.curFolder.path))
-            except RuntimeError as e:
-                self.log_error(str(e))
+        nails = None
+        # try to get thumbnails
+        try:
+            folderPath = os.path.split(ent.path)[0]
+            nails = nailcache.get_nails(folderPath, self.nailSz, self.env)
+        except FileNotFoundError:
+            self.log_error("No thumbnail file size {:d} in {}".format(self.nailSz, self.curFolder.path))
+        except RuntimeError as e:
+            self.log_error(str(e))
         # try to get image from thumbnails
-        if self.nails is not None:
+        if nails is not None:
             try:
-                data = self.nails.get_by_name(ent.name)
+                data = nails.get_by_name(ent.name)
                 try:
                     photo = PhotoImage(format="png", data=data)
                 except:
@@ -1042,8 +1037,6 @@ class Cx(LogHelper, WidgetHelper):
             self.log_info("{} loose files after exploding".format(nailcache.looseCount))
             # clear them from the cache
             nailcache.clear_nails(self.curFolder.path, self.env)
-            self.nails = None
-            self.nailsTried = True
             # delete the actual files
             for sz in pic.nailSizes:
                 nails.delete_nails(self.curFolder.path, sz, self.env)
