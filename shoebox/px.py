@@ -1688,3 +1688,6 @@ class Px(LogHelper, WidgetHelper):
             tile.redraw_text(self.canvas, self.nailSz)
             tile.redraw_icon(self.canvas)
             self.forget_meta_dict()
+
+    def get_tile_path(self, tile):
+        return os.path.join(self.curFolder.path, tile.name)

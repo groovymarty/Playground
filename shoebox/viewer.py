@@ -16,7 +16,7 @@ nextInstNum = 1
 class Pane:
     def __init__(self, viewer, side):
         self.viewer = viewer
-        self.px = viewer.px
+        self.owner = viewer.owner
         self.side = side
         self.selectColor = len(selectColors)
         if side == RIGHT:
@@ -78,7 +78,7 @@ class Pane:
 
     def on_canvas_click(self, event):
         self.set_focus()
-        self.px.goto_index(self.index, self.selectColor)
+        self.owner.goto_index(self.index, self.selectColor)
 
     def on_canvas_doubleclick(self, event):
         self.zoomAndPan[self.path] = (1.0, 0, 0)
@@ -104,19 +104,20 @@ class Pane:
 
     def set_picture(self, index):
         self.index = index
-        tile = self.px.tilesOrder[index]
-        self.path = os.path.join(self.px.curFolder.path, tile.name)
+        tile = self.owner.tilesOrder[index]
+        self.path = self.owner.get_tile_path(tile)
         try:
-            f = open(self.path, "rb")
-            self.fullImg = Image.open(f)
-            self.fullImg.load()
-            f.close()
-        except FileNotFoundError:
-            errMsg = "File not found: {}".format(self.path)
-            self.statusLabel.configure(text=errMsg)
-            self.viewer.log_error(errMsg)
-            self.fullImg = None
-        if self.fullImg is not None:
+            if self.path:
+                try:
+                    f = open(self.path, "rb")
+                    self.fullImg = Image.open(f)
+                    self.fullImg.load()
+                    f.close()
+                except FileNotFoundError:
+                    raise RuntimeError("File not found: {}".format(self.path))
+            else:
+                raise RuntimeError("Path not found: {}".format(tile.id if 'id' in tile else "None"))
+
             self.fullImg = pic.fix_image_orientation(self.fullImg)
             self.resizeImg = None
             self.lastResize = (0, 0)
@@ -124,6 +125,10 @@ class Pane:
             self.set_prev_next_stop()
             self.statusLabel.configure(text=tile.name)
             self.set_focus()
+        except RuntimeError as e:
+            self.statusLabel.configure(text=str(e))
+            self.viewer.log_error(str(e))
+            self.fullImg = None
 
     def draw_image(self):
         cw = self.canvas.winfo_width()
@@ -163,20 +168,20 @@ class Pane:
         self.set_focus()
         if self.index > 0:
             for i in range(self.index-1, -1, -1):
-                if isinstance(self.px.tilesOrder[i], PxTilePic):
+                if isinstance(self.owner.tilesOrder[i], PxTilePic):
                     self.set_picture(i)
-                    self.px.goto_index(i, self.selectColor)
+                    self.owner.goto_index(i, self.selectColor)
                     return
         self.set_prev_next_stop(prev=True)
 
     def do_next(self):
         """when Next button clickec"""
         self.set_focus()
-        if self.index < len(self.px.tilesOrder) - 1:
-            for i in range(self.index+1, len(self.px.tilesOrder), 1):
-                if isinstance(self.px.tilesOrder[i], PxTilePic):
+        if self.index < len(self.owner.tilesOrder) - 1:
+            for i in range(self.index+1, len(self.owner.tilesOrder), 1):
+                if isinstance(self.owner.tilesOrder[i], PxTilePic):
                     self.set_picture(i)
-                    self.px.goto_index(i, self.selectColor)
+                    self.owner.goto_index(i, self.selectColor)
                     return
         self.set_prev_next_stop(next=True)
 
@@ -195,14 +200,15 @@ class Pane:
             return (1.0, 0, 0)
 
 class Viewer(LogHelper, WidgetHelper):
-    def __init__(self, px):
+    def __init__(self, owner):
+        # owner is px or cx
         self.env = {}
         LogHelper.__init__(self, self.env)
         global nextInstNum
         self.instNum = nextInstNum
         nextInstNum += 1
 
-        self.px = px
+        self.owner = owner
 
         # create top level window
         self.top = Toplevel()
@@ -255,9 +261,9 @@ class Viewer(LogHelper, WidgetHelper):
         so this function removes all known references then closes the top level window
         note this will result in a second call from the on_destroy event handler; that's ok
         """
-        if self.px:
-            self.px.viewer = None
-            self.px = None
+        if self.owner:
+            self.owner.viewer = None
+            self.owner = None
         self.close_log_windows()
         if self in instances:
             instances.remove(self)

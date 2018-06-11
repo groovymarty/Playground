@@ -1093,7 +1093,7 @@ class Cx(LogHelper, WidgetHelper):
             self.set_status_default()
             self.update_select_button()
         except IndexError:
-                self.log_error("Goto failed, index {:d} not found".format(index))
+            self.log_error("Goto failed, index {:d} not found".format(index))
 
     def scroll_into_view(self, tile):
         """scroll tile into view"""
@@ -1151,3 +1151,10 @@ class Cx(LogHelper, WidgetHelper):
             tile.redraw_text(self.canvas, self.nailSz)
             tile.redraw_icon(self.canvas)
             self.forget_meta_dict()
+
+    def get_tile_path(self, tile):
+        if tile.id:
+            parts = pic.parse_file(tile.id)
+            if parts:
+                return finder.find_file(parts.id, parts)
+        return None
