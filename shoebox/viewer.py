@@ -106,17 +106,24 @@ class Pane:
         self.index = index
         tile = self.px.tilesOrder[index]
         self.path = os.path.join(self.px.curFolder.path, tile.name)
-        f = open(self.path, "rb")
-        self.fullImg = Image.open(f)
-        self.fullImg.load()
-        f.close()
-        self.fullImg = pic.fix_image_orientation(self.fullImg)
-        self.resizeImg = None
-        self.lastResize = (0, 0)
-        self.draw_image()
-        self.set_prev_next_stop()
-        self.statusLabel.configure(text=tile.name)
-        self.set_focus()
+        try:
+            f = open(self.path, "rb")
+            self.fullImg = Image.open(f)
+            self.fullImg.load()
+            f.close()
+        except FileNotFoundError:
+            errMsg = "File not found: {}".format(self.path)
+            self.statusLabel.configure(text=errMsg)
+            self.viewer.log_error(errMsg)
+            self.fullImg = None
+        if self.fullImg is not None:
+            self.fullImg = pic.fix_image_orientation(self.fullImg)
+            self.resizeImg = None
+            self.lastResize = (0, 0)
+            self.draw_image()
+            self.set_prev_next_stop()
+            self.statusLabel.configure(text=tile.name)
+            self.set_focus()
 
     def draw_image(self):
         cw = self.canvas.winfo_width()
