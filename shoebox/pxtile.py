@@ -200,7 +200,7 @@ class PxTileContent(PxTile):
         super().__init__(name, env)
 
     def add_to_canvas(self, canvas, x, y, w):
-        rect = canvas.create_rectangle(x, y, x+fileBoxSz, y+fileBoxSz, fill="gray")
+        rect = canvas.create_rectangle(x, y, x+fileBoxSz, y+fileBoxSz, fill="black")
         # disable circle so mouse click event will occur in rect
         line = canvas.create_oval(x+20, y+20, x+fileBoxSz-20, y+fileBoxSz-20, fill="orange", state=DISABLED)
         self.h0 = fileBoxSz

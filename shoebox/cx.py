@@ -134,8 +134,10 @@ class Cx(LogHelper, WidgetHelper):
         self.loaded = False
         self.nPictures = 0
         self.viewer = None
+        self.folders = {}  # folder id to folder
         self.rootFolder = self.scan_for_contents(DirEntryDir("."), True)
         self.rootFolder.iid = ""
+        self.folders[""] = self.rootFolder
         self.populate_tree(self.rootFolder)
         self.set_status_default_or_error()
         instances.append(self)
@@ -298,6 +300,7 @@ class Cx(LogHelper, WidgetHelper):
             iid = self.tree.insert(parent.iid, 'end', text=child.name)
             self.treeItems[iid] = child
             child.iid = iid
+            self.folders[child.id] = child
             self.populate_tree(child)
 
     def on_tree_select(self, event):
@@ -1070,39 +1073,13 @@ class Cx(LogHelper, WidgetHelper):
                 self.viewer.set_picture(self.tilesOrder.index(tile))
                 self.update_select_button()
 
-    def goto(self, ids, selectColor=None):
-        """possibly change folder then select and scroll to specified tile(s)"""
-        if selectColor is None:
-            selectColor = self.curSelectColor
-        ids = tkit.make_array(ids)
-        id0 = ids[0]
-        parts = pic.parse_file(id0, self.env)
-        if (parts):
-            folderId = pic.get_folder_id(parts)
-            if folderId in self.folders:
-                folder = self.folders[folderId]
-                if (folder is not self.curFolder):
-                    self.log_info("Switching folder for goto {}".format(id0))
-                    self.load_folder(folder)
-                if id0 in self.tiles:
-                    # select first tile
-                    tile0 = self.tiles[id0]
-                    self.select_all(None, selectColor)
-                    self.select_tile(tile0, selectColor)
-                    self.scroll_into_view(tile0)
-                    self.set_status_default()
-                    self.update_select_button()
-                    # select additional tiles
-                    for id in ids[1:]:
-                        if id in self.tiles:
-                            tile = self.tiles[id]
-                            self.select_tile(tile, self.selectColor)
-                else:
-                    self.log_error("Goto failed, {} not found".format(id0))
-            else:
-                self.log_error("Goto failed, folder {} not found".format(folderId))
+    def goto(self, folderId):
+        """change to specified folder"""
+        if folderId in self.folders:
+            if self.folders[folderId] != self.curFolder:
+                self.load_folder(self.folders[folderId])
         else:
-            self.log_error("Goto failed, can't parse {}".format(id))
+            self.log_error("Goto failed, folder {} not found".format(folderId))
 
     def goto_index(self, index, selectColor=None):
         """select and scroll to specified tile"""

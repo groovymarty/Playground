@@ -5,7 +5,7 @@ from tkinter import *
 from tkinter import ttk, messagebox, simpledialog
 from PIL import Image
 import ImageTk
-from shoebox import pic, nails, nailcache, dnd, metacache, contents
+from shoebox import pic, nails, nailcache, dnd, metacache, contents, cx
 from shoebox.dnd import DndItemEnt
 from shoebox.nailer import Nailer
 from shoebox.sweeper import Sweeper
@@ -245,6 +245,7 @@ class Px(LogHelper, WidgetHelper):
         self.folders = {"": self.rootFolder} #folder id to folder object
         self.populate_tree(self.rootFolder)
         self.set_status_default_or_error()
+        self.cxInstNum = None
         instances.append(self)
 
     def on_destroy(self, ev):
@@ -1535,6 +1536,19 @@ class Px(LogHelper, WidgetHelper):
                     self.viewer = Viewer(self)
                 self.viewer.set_picture(self.tilesOrder.index(tile))
                 self.update_select_button()
+            elif isinstance(tile, PxTileContent):
+                cxInst = cx.get_instance(self.cxInstNum)
+                if cxInst:
+                    oldInstNum = self.cxInstNum
+                    self.cxInstNum = cxInst.instNum
+                    if cxInst.instNum != oldInstNum and oldInstNum is not None:
+                        self.set_status("Can't find Cx {:d}, switching to Cx {:d}".format(oldInstNum, cxInst.instNum))
+                    else:
+                        self.set_status_default()
+                    cxInst.goto(self.curFolder.id)
+                else:
+                    self.set_status("No Cx found, please create one")
+                    self.cxInstNum = None
 
     def do_delete(self):
         """menu delete"""
