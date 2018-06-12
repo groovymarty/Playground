@@ -59,6 +59,7 @@ class PxTile:
         self.h0 = 0 #height of item[0]
         self.h = 0 #total height of tile
         self.text = name
+        self.ent = None #for Cx
 
     def set_name(self, name, env=None):
         self.text = self.name = name

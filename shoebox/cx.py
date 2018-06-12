@@ -129,8 +129,6 @@ class Cx(LogHelper, WidgetHelper):
         self.lastError = ""
         self.curFolder = None
         self.cont = None
-        self.metaDict = None
-        self.metaDictRefCnt = 0
         self.loaded = False
         self.nPictures = 0
         self.viewer = None
@@ -497,14 +495,12 @@ class Cx(LogHelper, WidgetHelper):
                     for i, tile in enumerate(self.dragTiles):
                         if accepted is True or i < len(accepted) and accepted[i]:
                             if not self.dragCopy:
-                                self.nuke_nails(tile.name)
                                 self.remove_tile(tile, True)
                             nAccepted += 1
                     self.set_status("{:d} of {:d} items accepted by {}".format(nAccepted, len(items),
                                                                                dnd.get_target_name(w)))
                     self.update_select_button()
-                    if nAccepted and not self.dragCopy:
-                        self.sweep_out_of_order()
+                    self.write_contents()
                 else:
                     self.set_status("No items accepted")
             else:
@@ -512,7 +508,6 @@ class Cx(LogHelper, WidgetHelper):
                 targ = self.get_target_tile(event)
                 if isinstance(targ, PxTileHole) and not self.dragCopy:
                     toIndex = self.tilesOrder.index(targ)
-                    toIndexStart = toIndex
                     minIndex = toIndex
                     # make sure there are enough holes
                     nHoles = self.count_holes(toIndex)
@@ -534,6 +529,7 @@ class Cx(LogHelper, WidgetHelper):
                     # deselect after drag and drop
                     self.select_all(None, self.curSelectColor)
                     self.update_select_button()
+                    self.write_contents()
                 else:
                     self.set_status("No drop target")
 
@@ -556,6 +552,7 @@ class Cx(LogHelper, WidgetHelper):
                 ent = item.thing
                 try:
                     if doCopy:
+                        ###################TODO
                         newPath = self.copy_file_to_cur_folder(ent.path)
                     else:
                         newPath = self.move_file_to_cur_folder(ent.path)
@@ -607,15 +604,18 @@ class Cx(LogHelper, WidgetHelper):
                     nDeleted = 0
                     for tile in tilesToDelete:
                         try:
-                            self.delete_file_in_cur_folder(tile.name)
                             self.remove_tile(tile, True)
                             nDeleted += 1
                         except RuntimeError as e:
                             self.log_error(str(e))
                     self.set_status("{:d} items deleted".format(nDeleted))
-                    self.sweep_out_of_order()
+                    self.write_contents()
             else:
                 self.set_status("No items selected")
+
+    def write_contents(self):
+        self.cont.pictures = [t.id for t in self.tilesOrder if isinstance(t, PxTilePic)]
+        self.cont.write()
 
     def clear_canvas(self):
         """delete all items in canvas"""
@@ -631,7 +631,6 @@ class Cx(LogHelper, WidgetHelper):
         self.metaDict = None
         self.metaDictRefCnt = 0
 
-
     def populate_canvas(self, entries):
         """add specified pictures to canvas
         argument is return value from scandir() or equivalent
@@ -639,8 +638,6 @@ class Cx(LogHelper, WidgetHelper):
         self.canvas.configure(background="black")
         self.clear_error()
         self.set_status("Loading...")
-        prevLen = len(self.tilesOrder)
-        self.get_meta_dict()
 
         # bump start position for next tile,
         # possibly bump to next row
@@ -688,7 +685,6 @@ class Cx(LogHelper, WidgetHelper):
         self.set_status_default_or_error()
         self.loaded = True
         self.enable_buttons()
-        self.forget_meta_dict()
 
     def populate_holes(self, startIndex, entries):
         """fill hole(s) with specified files
@@ -696,8 +692,6 @@ class Cx(LogHelper, WidgetHelper):
         """
         self.clear_error()
         self.set_status("Loading...")
-        prevLen = len(self.tilesOrder)
-        self.get_meta_dict()
 
         # make sure there are enough holes
         nHoles = self.count_holes(startIndex)
@@ -716,7 +710,6 @@ class Cx(LogHelper, WidgetHelper):
                 index += 1
         self.reflow(startIndex)
         self.set_status_default_or_error()
-        self.forget_meta_dict()
 
     def reflow(self, index=-1, removeHoles=False):
         """reflow starting at specified index, optionally removing holes
@@ -789,9 +782,9 @@ class Cx(LogHelper, WidgetHelper):
         """make tile for a picture"""
         photo = None
         nails = None
+        folderPath = os.path.split(ent.path)[0]
         # try to get thumbnails
         try:
-            folderPath = os.path.split(ent.path)[0]
             nails = nailcache.get_nails(folderPath, self.nailSz, self.env)
         except FileNotFoundError:
             self.log_error("No thumbnail file size {:d} in {}".format(self.nailSz, self.curFolder.path))
@@ -838,9 +831,13 @@ class Cx(LogHelper, WidgetHelper):
                 self.log_error("Can't create thumbnail size {:d} for {}".format(self.nailSz, ent.name))
         # if still no image, give up and display as a file
         if photo is None:
+            ############################TODO ??????????
             return self.make_file_tile(ent)
         else:
-            return PxTilePic(ent.name, photo, self.get_meta_dict(0), self.env)
+            metaDict = metacache.get_meta_dict(folderPath, self.env)
+            tile = PxTilePic(ent.name, photo, metaDict, self.env)
+            tile.ent = ent
+            return tile
 
     def make_tk_photo_image(self, imgOrData, name):
         """make Tkinter photo image from PIL image or PNG data bytes"""
@@ -964,90 +961,6 @@ class Cx(LogHelper, WidgetHelper):
             # ok if start index goes to -1, will reflow all tiles
             self.reflow(len(self.tilesOrder) - n - 1)
 
-    def rename_file_in_cur_folder(self, oldName, newName):
-        """rename file in current folder, return new path"""
-        oldPath = os.path.join(self.curFolder.path, oldName)
-        newPath = os.path.join(self.curFolder.path, newName)
-        self.log_info("Renaming {} to {}".format(oldPath, newName))
-        if os.path.exists(newPath):
-            raise RuntimeError("Rename failed for {}: File already exists".format(oldPath))
-        try:
-            shutil.move(oldPath, newPath)
-            self.nuke_nails(oldName)
-            nailcache.change_loose_file(oldPath, newPath)
-            metacache.change_loose_meta(oldPath, newPath)
-            return newPath
-        except BaseException as e:
-            raise RuntimeError("Rename failed for {}: {}".format(oldPath, str(e)))
-
-    def delete_file_in_cur_folder(self, name):
-        """delete file in current folder"""
-        path = os.path.join(self.curFolder.path, name)
-        self.log_info("Deleting {}".format(path))
-        try:
-            os.remove(path)
-            self.nuke_nails(name)
-            nailcache.clear_loose_file(path)
-            metacache.clear_loose_meta(path)
-        except BaseException as e:
-            raise RuntimeError("Delete failed for {}: {}".format(path, str(e)))
-
-    def move_file_to_cur_folder(self, oldPath):
-        """move file to current folder, return new path"""
-        newPath = os.path.join(self.curFolder.path, os.path.basename(oldPath))
-        self.log_info("Moving {} to {}".format(oldPath, self.curFolder.path))
-        if os.path.exists(newPath):
-            raise RuntimeError("Move failed for {}: File already exists".format(oldPath))
-        try:
-            shutil.move(oldPath, newPath)
-            nailcache.change_loose_file(oldPath, newPath)
-            metacache.change_loose_meta(oldPath, newPath)
-            return newPath
-        except BaseException as e:
-            raise RuntimeError("Move failed for {}: {}".format(oldPath, str(e)))
-
-    def copy_file_to_cur_folder(self, oldPath):
-        """copy file to current folder, return new path"""
-        newPath = os.path.join(self.curFolder.path, os.path.basename(oldPath))
-        self.log_info("Copying {} to {}".format(oldPath, self.curFolder.path))
-        if os.path.exists(newPath):
-            raise RuntimeError("Copy failed for {}: File already exists".format(oldPath))
-        try:
-            shutil.copy(oldPath, newPath)
-            nailcache.change_loose_file(oldPath, newPath)
-            metacache.change_loose_meta(oldPath, newPath)
-            return newPath
-        except BaseException as e:
-            raise RuntimeError("Copy failed for {}: {}".format(oldPath, str(e)))
-
-    def nuke_nails(self, name=None):
-        """blow away the nails file for this folder
-        put the images in the loose file cache so we can keep using them,
-        and the nailer can use them to build a new nails file
-        if name specified, nuke only if that name appears in nails file
-        """
-        # preload all sizes
-        any = False
-        for sz in pic.nailSizes:
-            try:
-                tmpNails = nailcache.get_nails(self.curFolder.path, sz, self.env)
-                any = name is None or tmpNails.has_name(name)
-            except:
-                pass
-        if any:
-            # explode any nails files we have in cache for this folder to the loose file cache
-            nailcache.explode_nails(self.curFolder.path)
-            self.log_info("{} loose files after exploding".format(nailcache.looseCount))
-            # clear them from the cache
-            nailcache.clear_nails(self.curFolder.path, self.env)
-            # delete the actual files
-            for sz in pic.nailSizes:
-                nails.delete_nails(self.curFolder.path, sz, self.env)
-                # turn file tile into a hole
-                name = nails.build_file_name(sz)
-                if name in self.tilesByName:
-                    self.remove_tile(self.tilesByName[name], True)
-
     def on_canvas_rclick(self, event):
         """when user right-clicks in canvas"""
         # find item that was clicked
@@ -1063,6 +976,7 @@ class Cx(LogHelper, WidgetHelper):
             tile = self.canvasItems[items[0]]
             if isinstance(tile, PxTilePic):
                 # double-click color is last color
+                ##################Not necessarily, depends on which pane it's going to
                 dcColor = len(selectColors)
                 # select clicked tile with that color, unselect all others
                 self.select_all(None, dcColor)
@@ -1109,52 +1023,18 @@ class Cx(LogHelper, WidgetHelper):
         slider = self.canvasScroll.get()
         return top >= slider[0] and bottom <= slider[1]
 
-    def get_meta_dict(self, bump=1):
-        """get meta dictionary for current folder
-        usually bump ref count to hold dictionary for later use
-        call forget_meta_dict() when you are done with it
-        this helps ensure we are not stuck with an old copy of the dictionary
-        for example suppose we get dict from metacache and hold it for a long time
-        meanwhile metacache decides to clear that dict from cache
-        then somebody loads it again and makes changes
-        we would not see the changes because we're pointing to a different dict object
-        if you just need the dictionary once, pass bump=0 to skip the ref count business
-        """
-        if self.metaDict:
-            self.metaDictRefCnt += bump
-        else:
-            self.metaDict = metacache.get_meta_dict(self.curFolder.path, self.env)
-            self.metaDictRefCnt = bump
-        return self.metaDict
-
-    def forget_meta_dict(self):
-        """done with meta dictionary"""
-        self.metaDictRefCnt -= 1
-        if self.metaDictRefCnt == 0:
-            self.metaDict = None
-
-    def update_from_meta(self, ids):
-        """update specified IDs from metadata"""
-        # prefetch meta dict
-        self.get_meta_dict()
-        for id in tkit.make_array(ids):
-            if id in self.tiles:
-                self.update_tile_from_meta(self.tiles[id])
-        self.forget_meta_dict()
-
     def update_tile_from_meta(self, tile):
         """update tile from metadata"""
         if tile.id:
-            self.get_meta_dict()
-            tile.set_rating(self.metaDict.get_rating(tile.id))
-            tile.set_caption(self.metaDict.get_caption(tile.id))
+            metaDict = self.get_tile_meta_dict(tile)
+            tile.set_rating(metaDict.get_rating(tile.id))
+            tile.set_caption(metaDict.get_caption(tile.id))
             tile.redraw_text(self.canvas, self.nailSz)
             tile.redraw_icon(self.canvas)
-            self.forget_meta_dict()
 
     def get_tile_path(self, tile):
-        if tile.id:
-            parts = pic.parse_file(tile.id)
-            if parts:
-                return finder.find_file(parts.id, parts)
-        return None
+        return tile.ent.path
+
+    def get_tile_meta_dict(self, tile):
+        folderPath = os.path.split(tile.ent.path)[0]
+        return metacache.get_meta_dict(folderPath, self.env)
