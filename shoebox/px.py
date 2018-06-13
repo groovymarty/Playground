@@ -1526,11 +1526,6 @@ class Px(LogHelper, WidgetHelper):
         if len(items) and items[0] in self.canvasItems:
             tile = self.canvasItems[items[0]]
             if isinstance(tile, PxTilePic):
-                # double-click color is last color
-                dcColor = len(selectColors)
-                # select clicked tile with that color, unselect all others
-                self.select_all(None, dcColor)
-                self.select_tile(tile, dcColor)
                 # tell viewer to display the clicked picture
                 if self.viewer is None:
                     self.viewer = Viewer(self)

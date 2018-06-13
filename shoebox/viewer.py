@@ -78,7 +78,6 @@ class Pane:
 
     def on_canvas_click(self, event):
         self.set_focus()
-        self.owner.goto_index(self.index, self.selectColor)
 
     def on_canvas_doubleclick(self, event):
         self.zoomAndPan[self.path] = (1.0, 0, 0)
@@ -125,6 +124,7 @@ class Pane:
             self.set_prev_next_stop()
             self.statusLabel.configure(text=tile.name)
             self.set_focus()
+            self.owner.goto_index(index, self.selectColor)
         except RuntimeError as e:
             self.statusLabel.configure(text=str(e))
             self.viewer.log_error(str(e))
@@ -170,7 +170,6 @@ class Pane:
             for i in range(self.index-1, -1, -1):
                 if isinstance(self.owner.tilesOrder[i], PxTilePic):
                     self.set_picture(i)
-                    self.owner.goto_index(i, self.selectColor)
                     return
         self.set_prev_next_stop(prev=True)
 
@@ -181,7 +180,6 @@ class Pane:
             for i in range(self.index+1, len(self.owner.tilesOrder), 1):
                 if isinstance(self.owner.tilesOrder[i], PxTilePic):
                     self.set_picture(i)
-                    self.owner.goto_index(i, self.selectColor)
                     return
         self.set_prev_next_stop(next=True)
 
