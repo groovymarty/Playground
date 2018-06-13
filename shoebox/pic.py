@@ -13,6 +13,7 @@ nailSizeNames = ["Small", "Large"]
 DUP = 0x01  # duplicate
 OOP = 0x02  # out of place
 OOO = 0x04  # out of order
+NF = 0x08   # not found
 
 # max picture number, for sorting
 MAXNUM = 999999

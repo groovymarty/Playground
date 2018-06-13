@@ -309,19 +309,34 @@ class Cx(LogHelper, WidgetHelper):
 
     def load_folder(self, folder):
         """load specified folder"""
+        self.clear_error()
         self.curFolder = folder
         self.top.title("{} - {}".format(self.myName, self.curFolder.path[2:]))
         self.clear_canvas()
         self.update_select_button()
         self.cont = Contents(self.curFolder.path, self.env)
         finder.clear_cache()
-        # parse each picture ID
-        partss = (pic.parse_file(id) for id in self.cont.pictures)
-        # given parse results, find path to picture
-        paths = (finder.find_file(parts.id, parts) for parts in partss if parts is not None)
-        # wrap each path in DirEntry because that's what populate_canvas wants
-        ents = (DirEntryFile(path) for path in paths if path is not None)
-        self.populate_canvas(ents)
+        entries = []
+        for id in self.cont.pictures:
+            parts = pic.parse_file(id)
+            if parts:
+                path = finder.find_file(parts.id, parts)
+                if path:
+                    ent = DirEntryFile(path)
+                else:
+                    # ID not found, make special entry so it will have a tile on the canvas
+                    self.log_error("{} not found".format(id))
+                    ent = self.make_not_found_entry(id)
+                entries.append(ent)
+            else:
+                self.log_error("Can't parse {}".format(id))
+        self.populate_canvas(entries)
+
+    def make_not_found_entry(self, id):
+        """make a special dir entry representing a not found ID
+        make_tile() will see this and make a file tile with NF error bit set
+        """
+        return DirEntryFile("{}.not_found".format(id))
 
     def on_canvas_resize(self, event):
         """when user resizes the window"""
@@ -553,14 +568,19 @@ class Cx(LogHelper, WidgetHelper):
                     entries.append(ent)
                     accepted = True
             elif isinstance(item, DndItemId):
+                # accept all IDs even if not found
                 id = item.thing
+                accepted = True
                 newPath = finder.find_file(id)
                 if newPath:
                     entries.append(DirEntryFile(newPath))
-                    accepted = True
+                else:
+                    # make special entry for not found ID
+                    entries.append(self.make_not_found_entry(id))
             result.append(accepted)
 
         if len(entries):
+            self.clear_error()
             targ = self.get_target_tile(event)
             if isinstance(targ, PxTileHole):
                 self.populate_holes(self.tilesOrder.index(targ), entries)
@@ -608,7 +628,17 @@ class Cx(LogHelper, WidgetHelper):
                 self.set_status("No items selected")
 
     def write_contents(self):
-        self.cont.pictures = [t.id for t in self.tilesOrder if isinstance(t, PxTilePic)]
+        """update contents object and write to contents.meta file"""
+        # collect pictures in our current order
+        # be sure to include "not found" IDs which are represented as file tiles
+        pictures = []
+        for tile in self.tilesOrder:
+            if isinstance(tile, PxTilePic):
+                pictures.append(tile.id)
+            elif isinstance(tile, PxTileFile) and tile.is_error(pic.NF):
+                # later, reparse ID to check for video here..
+                pictures.append(tile.id)
+        self.cont.pictures = pictures
         self.cont.write()
 
     def clear_canvas(self):
@@ -630,7 +660,6 @@ class Cx(LogHelper, WidgetHelper):
         argument is return value from scandir() or equivalent
         """
         self.canvas.configure(background="black")
-        self.clear_error()
         self.set_status("Loading...")
 
         # bump start position for next tile,
@@ -684,7 +713,6 @@ class Cx(LogHelper, WidgetHelper):
         """fill hole(s) with specified files
         similarity to populate_canvas noted, but trying to factor the similar parts would be too complicated
         """
-        self.clear_error()
         self.set_status("Loading...")
 
         # make sure there are enough holes
@@ -770,11 +798,19 @@ class Cx(LogHelper, WidgetHelper):
 
     def make_tile(self, ent):
         """make tile based on file extension"""
-        if os.path.splitext(ent.name)[1].lower() in pic.pictureExts:
+        ext = os.path.splitext(ent.name)[1].lower()
+        if ext in pic.pictureExts:
             return self.make_pic_tile(ent)
+        elif ext == ".not_found":
+            # special entry representing ID not found
+            # strip extension to recover ID from file name
+            # make file tile and set "not found" error bit
+            tile = self.make_file_tile(DirEntryFile(os.path.splitext(ent.name)[0]))
+            tile.set_error(pic.NF)
+            tile.id = tile.name
+            return tile
         else:
-            # ignore other files
-            return None
+            return self.make_file_tile(ent)
 
     def make_pic_tile(self, ent):
         """make tile for a picture"""
@@ -829,7 +865,6 @@ class Cx(LogHelper, WidgetHelper):
                 self.log_error("Can't create thumbnail size {:d} for {}".format(self.nailSz, ent.name))
         # if still no image, give up and display as a file
         if photo is None:
-            ############################TODO ??????????
             return self.make_file_tile(ent)
         else:
             metaDict = metacache.get_meta_dict(folderPath, self.env)
@@ -849,6 +884,10 @@ class Cx(LogHelper, WidgetHelper):
         except:
             self.log_error("Can't create Tk photo image for {}".format(name))
             return None
+
+    def make_file_tile(self, ent):
+        """make tile for a file"""
+        return PxTileFile(ent.name, self.env)
 
     def add_tile(self, tile, index=-1):
         """add a tile
@@ -912,19 +951,6 @@ class Cx(LogHelper, WidgetHelper):
             # remove from collection
             if tile.id in self.tiles and self.tiles[tile.id] is tile:
                 del self.tiles[tile.id]
-
-    def rename_tile(self, tile, newName):
-        """rename a tile"""
-        if tile.name in self.tilesByName:
-            del self.tilesByName[tile.name]
-        self.tilesByName[newName] = tile
-        if tile.id:
-            self.remove_tile_id(tile)
-        tile.errors = 0
-        tile.set_name(newName, self.env)
-        if tile.id:
-            self.add_tile_id(tile)
-        tile.redraw_text(self.canvas, self.nailSz)
 
     def count_holes(self, index):
         """count holes"""
