@@ -6,7 +6,7 @@ from tkinter import ttk, messagebox, simpledialog
 from PIL import Image
 import ImageTk
 from shoebox import pic, nails, nailcache, dnd, metacache, contents, finder
-from shoebox.dnd import DndItemEnt
+from shoebox.dnd import DndItemEnt, DndItemId
 from shoebox.cxfolder import CxFolder
 from shoebox.pxtile import PxTilePic, PxTileFile, PxTileHole, selectColors
 from shoebox.viewer import Viewer
@@ -487,8 +487,7 @@ class Cx(LogHelper, WidgetHelper):
             w = self.top.winfo_containing(event.x_root, event.y_root)
             if w != self.canvas:
                 # dnd to a different window
-                items = [DndItemEnt(DirEntryFile(os.path.join(self.curFolder.path, t.name)))
-                         for t in self.dragTiles]
+                items = [DndItemId(t.id) for t in self.dragTiles if t.id]
                 accepted = dnd.try_drop(w, items, self.dragCopy, event)
                 nAccepted = 0
                 if accepted:
@@ -548,21 +547,17 @@ class Cx(LogHelper, WidgetHelper):
         result = []
         for item in items:
             accepted = False
-            if isinstance(item, DndItemEnt):
+            if isinstance(item, DndItemEnt) and doCopy:
                 ent = item.thing
-                try:
-                    if doCopy:
-                        ###################TODO
-                        newPath = self.copy_file_to_cur_folder(ent.path)
-                    else:
-                        newPath = self.move_file_to_cur_folder(ent.path)
-                        # stash metadata in loose cache for later use
-                        metacache.remove_meta_to_loose_cache(ent.path, self.env)
-
+                if self.is_valid_ext(ent):
+                    entries.append(ent)
+                    accepted = True
+            elif isinstance(item, DndItemId):
+                id = item.thing
+                newPath = finder.find_file(id)
+                if newPath:
                     entries.append(DirEntryFile(newPath))
                     accepted = True
-                except RuntimeError as e:
-                    self.log_error(str(e))
             result.append(accepted)
 
         if len(entries):
@@ -577,8 +572,7 @@ class Cx(LogHelper, WidgetHelper):
                 if ent.name in self.tilesByName:
                     self.select_tile(self.tilesByName[ent.name], self.curSelectColor)
             self.update_select_button()
-            # save meta changes
-            metacache.write_all_changes(self.env)
+            self.write_contents()
         return result
 
     def get_target_tile(self, event):
@@ -769,6 +763,10 @@ class Cx(LogHelper, WidgetHelper):
         # set scroll region to final height
         self.canvas.configure(scrollregion=(0, 0, 1, y))
         self.hTotal = y
+
+    def is_valid_ext(self, ent):
+        """is file extension recognized as valid?"""
+        return os.path.splitext(ent.name)[1].lower() in pic.pictureExts
 
     def make_tile(self, ent):
         """make tile based on file extension"""
