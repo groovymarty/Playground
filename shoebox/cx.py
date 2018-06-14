@@ -11,6 +11,7 @@ from shoebox.cxfolder import CxFolder
 from shoebox.pxtile import PxTilePic, PxTileFile, PxTileHole, selectColors
 from shoebox.viewer import Viewer
 from shoebox.contents import Contents
+from shoebox.metadict import MetaDictLayer
 from tkit.direntry import DirEntryFile, DirEntryDir
 from tkit.loghelper import LogHelper
 from tkit.widgethelper import WidgetHelper
@@ -867,8 +868,12 @@ class Cx(LogHelper, WidgetHelper):
         if photo is None:
             return self.make_file_tile(ent)
         else:
-            metaDict = metacache.get_meta_dict(folderPath, self.env)
-            tile = PxTilePic(ent.name, photo, metaDict, self.env)
+            # get metadata dictionary for the picture
+            baseMd = metacache.get_meta_dict(folderPath, self.env)
+            # contents metadata, if any, overrides values from the picture metadata
+            # so for example contents meta can specify a different caption for a picture
+            layerMd = MetaDictLayer(baseMd, self.cont.meta)
+            tile = PxTilePic(ent.name, photo, layerMd, self.env)
             tile.ent = ent
             return tile
 

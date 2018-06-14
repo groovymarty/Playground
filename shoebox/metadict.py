@@ -103,3 +103,25 @@ class MetaDict:
         meta = metacache.get_loose_meta(path, remove=True)
         if meta:
             self.apply_meta(id, meta)
+
+class MetaDictLayer(MetaDict):
+    """subclass of MetaDict that's a layer on top of another MetaDict
+    the layer has its own dictionary; any values in the layer override the other MetaDict
+    this class is intended to be used only in places where MetaDict is being read,
+    so a lot of methods are omitted
+    """
+    def __init__(self, other, dict):
+        self.other = other
+        self.folderPath = None
+        self.lastTouch = 0
+        self.changed = False
+        self.dict = dict
+
+    def get_value(self, id, prop, default=None):
+        try:
+            return self.dict[id][prop]
+        except KeyError:
+            return self.other.get_value(id, prop, default)
+
+    def restore_meta_from_loose_cache(self, id, name):
+        self.other.restore_meta_from_loose_cache(id, name)
