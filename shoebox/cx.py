@@ -8,7 +8,7 @@ import ImageTk
 from shoebox import pic, nails, nailcache, dnd, metacache, contents, finder
 from shoebox.dnd import DndItemEnt, DndItemId
 from shoebox.cxfolder import CxFolder
-from shoebox.pxtile import PxTilePic, PxTileFile, PxTileHole, selectColors
+from shoebox.pxtile import PxTilePic, PxTileFile, PxTileFolder, PxTileHole, selectColors
 from shoebox.viewer import Viewer
 from shoebox.contents import Contents
 from shoebox.metadict import MetaDictLayer, get_meta_default
@@ -363,6 +363,19 @@ class Cx(LogHelper, WidgetHelper):
                 entries.append(ent)
             else:
                 self.log_error("Can't parse {}".format(id))
+        for id in self.cont.folders:
+            parts = pic.parse_folder(id)
+            if parts:
+                path = finder.find_folder(parts.id, parts)
+                if path:
+                    ent = DirEntryDir(path)
+                else:
+                    # ID not found, make special entry so it will have a tile on the canvas
+                    self.log_error("{} not found".format(id))
+                    ent = self.make_not_found_entry(id)
+                entries.append(ent)
+            else:
+                self.log_error("Can't parse {}".format(id))
         self.populate_canvas(entries)
 
     def make_not_found_entry(self, id):
@@ -529,6 +542,7 @@ class Cx(LogHelper, WidgetHelper):
                 self.canvas.configure(cursor="cross_reverse" if self.dragCopy else "box_spiral")
                 self.set_status("Dragging {:d} {} items".format(len(self.dragTiles),
                                                                 selectColors[self.dragColor]))
+
     def on_canvas_dnd_release(self, event):
         """on mouse button release"""
         if self.dragging:
@@ -604,12 +618,16 @@ class Cx(LogHelper, WidgetHelper):
                 # accept all IDs even if not found
                 id = item.thing
                 accepted = True
-                newPath = finder.find_file(id)
-                if newPath:
-                    entries.append(DirEntryFile(newPath))
+                filePath = finder.find_file(id)
+                if filePath:
+                    entries.append(DirEntryFile(filePath))
                 else:
-                    # make special entry for not found ID
-                    entries.append(self.make_not_found_entry(id))
+                    folderPath = finder.find_folder(id)
+                    if folderPath:
+                        entries.append(DirEntryDir(folderPath))
+                    else:
+                        # make special entry for not found ID
+                        entries.append(self.make_not_found_entry(id))
             result.append(accepted)
 
         if len(entries):
@@ -662,13 +680,32 @@ class Cx(LogHelper, WidgetHelper):
         # collect pictures in our current order
         # be sure to include "not found" IDs which are represented as file tiles
         pictures = []
+        videos = []
+        folders = []
         for tile in self.tilesOrder:
             if isinstance(tile, PxTilePic):
                 pictures.append(tile.id)
+            elif isinstance(tile, PxTileFolder):
+                folders.append(tile.id)
             elif isinstance(tile, PxTileFile) and tile.is_error(pic.NF):
-                # later, reparse ID to check for video here..
-                pictures.append(tile.id)
+                # all not-found items turn into file tiles, so we have to reverse-engineer
+                # what container array they came from, based on the ID
+                # this is a little clumsy but it works well enough
+                parts = pic.parse_file(tile.id)
+                if parts:
+                    if parts.type == 'V':
+                        videos.append(tile.id)
+                    else:
+                        pictures.append(tile.id)
+                else:
+                    parts = pic.parse_folder(tile.id)
+                    if parts:
+                        folders.append(tile.id)
+                    else:
+                        self.log_error("Can't parse not-found item ID: {}".format(tile.id))
         self.cont.pictures = pictures
+        self.cont.videos = videos
+        self.cont.folders = folders
         self.cont.write()
 
     def clear_canvas(self):
@@ -716,15 +753,14 @@ class Cx(LogHelper, WidgetHelper):
 
         # note i'm not sorting, on my system scandir returns them sorted already
         for ent in entries:
-            if ent.is_file() and ent.name != "Thumbs.db":
-                tile = self.make_tile(ent)
-                if tile is not None:
-                    self.add_tile(tile)
-                    tile.add_to_canvas(self.canvas, x, y, self.nailSz)
-                    self.add_canvas_item(tile)
-                    if tile.h > hmax:
-                        hmax = tile.h
-                    bump_position()
+            tile = self.make_tile(ent)
+            if tile is not None:
+                self.add_tile(tile)
+                tile.add_to_canvas(self.canvas, x, y, self.nailSz)
+                self.add_canvas_item(tile)
+                if tile.h > hmax:
+                    hmax = tile.h
+                bump_position()
 
         # bump to next row if partial row
         if x > tileGap:
@@ -828,19 +864,22 @@ class Cx(LogHelper, WidgetHelper):
 
     def make_tile(self, ent):
         """make tile based on file extension"""
-        ext = os.path.splitext(ent.name)[1].lower()
-        if ext in pic.pictureExts:
-            return self.make_pic_tile(ent)
-        elif ext == ".not_found":
-            # special entry representing ID not found
-            # strip extension to recover ID from file name
-            # make file tile and set "not found" error bit
-            tile = self.make_file_tile(DirEntryFile(os.path.splitext(ent.name)[0]))
-            tile.set_error(pic.NF)
-            tile.id = tile.name
-            return tile
+        if ent.is_file():
+            ext = os.path.splitext(ent.name)[1].lower()
+            if ext in pic.pictureExts:
+                return self.make_pic_tile(ent)
+            elif ext == ".not_found":
+                # special entry representing ID not found
+                # strip extension to recover ID from file name
+                # make file tile and set "not found" error bit
+                tile = self.make_file_tile(DirEntryFile(os.path.splitext(ent.name)[0]))
+                tile.set_error(pic.NF)
+                tile.id = tile.name
+                return tile
+            else:
+                return self.make_file_tile(ent)
         else:
-            return self.make_file_tile(ent)
+            return self.make_folder_tile(ent)
 
     def make_pic_tile(self, ent):
         """make tile for a picture"""
@@ -918,6 +957,10 @@ class Cx(LogHelper, WidgetHelper):
     def make_file_tile(self, ent):
         """make tile for a file"""
         return PxTileFile(ent.name, self.env)
+
+    def make_folder_tile(self, ent):
+        """make tile for a folder"""
+        return PxTileFolder(ent.name, self.env)
 
     def add_tile(self, tile, index=-1):
         """add a tile

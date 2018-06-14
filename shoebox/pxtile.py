@@ -210,6 +210,27 @@ class PxTileContent(PxTile):
         self.h = self.h0 + bb[3] - bb[1]
         self.items = (rect, txt, line)
 
+class PxTileFolder(PxTile):
+    def __init__(self, name, env=None):
+        super().__init__(name, env)
+        self.parse_name(env)
+
+    def parse_name(self, env):
+        self.parts = pic.parse_folder(self.name, env)
+        self.id = self.parts.id if self.parts else None
+        # noncanonical means ID can't be parsed from name
+        self.noncanon = not self.id
+
+    def add_to_canvas(self, canvas, x, y, w):
+        rect = canvas.create_rectangle(x, y, x+fileBoxSz, y+fileBoxSz, fill="black")
+        # disable rect so mouse click event will occur in rect
+        line = canvas.create_rectangle(x+20, y+30, x+fileBoxSz-20, y+fileBoxSz-30, fill="wheat", state=DISABLED)
+        self.h0 = fileBoxSz
+        txt = canvas.create_text(x, y + self.h0, text=self.text, anchor=NW, width=w, fill=self.pick_text_color())
+        bb = canvas.bbox(txt)
+        self.h = self.h0 + bb[3] - bb[1]
+        self.items = (rect, txt, line)
+
 class PxTileHole(PxTile):
     def __init__(self, env=None):
         super().__init__("(hole)", env)
