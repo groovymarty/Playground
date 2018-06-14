@@ -11,7 +11,7 @@ from shoebox.cxfolder import CxFolder
 from shoebox.pxtile import PxTilePic, PxTileFile, PxTileHole, selectColors
 from shoebox.viewer import Viewer
 from shoebox.contents import Contents
-from shoebox.metadict import MetaDictLayer
+from shoebox.metadict import MetaDictLayer, get_meta_default
 from tkit.direntry import DirEntryFile, DirEntryDir
 from tkit.loghelper import LogHelper
 from tkit.widgethelper import WidgetHelper
@@ -28,6 +28,30 @@ def get_instance(instNum=None):
         return next(inst for inst in instances if inst.instNum == instNum)
     except StopIteration:
         return instances[0] if len(instances) else None
+
+class CxMetaDialog(simpledialog.Dialog):
+    def __init__(self, cx, tile):
+        self.cx = cx
+        self.tile = tile
+        simpledialog.Dialog.__init__(self, cx.top, title="Edit Metadata - {}".format(cx.myName))
+
+    def body(self, master):
+        master.columnconfigure(1, weight=1, minsize=500)
+        Label(master, text="Picture ID:").grid(row=0, sticky=W)
+        Label(master, text=self.tile.id).grid(row=0, column=1, sticky=W)
+        Label(master, text="Caption").grid(row=1, sticky=W)
+        self.caption = ttk.Entry(master)
+        self.caption.grid(row=1, column=1, sticky=(W,E))
+        self.caption.insert(0, self.cx.get_meta_value(self.tile.id, 'caption'))
+
+    def apply(self):
+        caption = self.caption.get()
+        if caption:
+            self.cx.set_meta_value(self.tile.id, 'caption', caption)
+        else:
+            self.cx.unset_meta_value(self.tile.id, 'caption')
+        self.cx.update_tile_from_meta(self.tile)
+        self.cx.write_contents()
 
 class Cx(LogHelper, WidgetHelper):
     def __init__(self):
@@ -126,6 +150,14 @@ class Cx(LogHelper, WidgetHelper):
         self.canvas.bind('<ButtonRelease>', self.on_canvas_dnd_release)
         self.canvas.bind('<Key>', self.on_canvas_key)
         dnd.add_target(self.canvas, self, self.myName)
+
+        # popup menu
+        self.popMenu = Menu(self.top, tearoff=0)
+        self.popMenu.add_command(label="Edit Metadata", command=self.do_edit_meta)
+        self.popMenu.add_command(label="Delete", command=self.do_delete)
+        self.popMenu.add_separator()
+        self.popMenu.add_command(label="[X] Close Menu", command=self.do_close_menu)
+        self.popMenuTile = None
 
         self.lastError = ""
         self.curFolder = None
@@ -618,11 +650,8 @@ class Cx(LogHelper, WidgetHelper):
                 if messagebox.askyesno("Confirm Delete", msg):
                     nDeleted = 0
                     for tile in tilesToDelete:
-                        try:
-                            self.remove_tile(tile, True)
-                            nDeleted += 1
-                        except RuntimeError as e:
-                            self.log_error(str(e))
+                        self.remove_tile(tile, True)
+                        nDeleted += 1
                     self.set_status("{:d} items deleted".format(nDeleted))
                     self.write_contents()
             else:
@@ -822,7 +851,7 @@ class Cx(LogHelper, WidgetHelper):
         try:
             nails = nailcache.get_nails(folderPath, self.nailSz, self.env)
         except FileNotFoundError:
-            self.log_error("No thumbnail file size {:d} in {}".format(self.nailSz, self.curFolder.path))
+            self.log_error("No thumbnail file size {:d} in {}".format(self.nailSz, folderPath))
         except RuntimeError as e:
             self.log_error(str(e))
         # try to get image from thumbnails
@@ -868,12 +897,8 @@ class Cx(LogHelper, WidgetHelper):
         if photo is None:
             return self.make_file_tile(ent)
         else:
-            # get metadata dictionary for the picture
-            baseMd = metacache.get_meta_dict(folderPath, self.env)
-            # contents metadata, if any, overrides values from the picture metadata
-            # so for example contents meta can specify a different caption for a picture
-            layerMd = MetaDictLayer(baseMd, self.cont.meta)
-            tile = PxTilePic(ent.name, photo, layerMd, self.env)
+            md = self.get_layered_meta_dict(folderPath)
+            tile = PxTilePic(ent.name, photo, md, self.env)
             tile.ent = ent
             return tile
 
@@ -995,7 +1020,8 @@ class Cx(LogHelper, WidgetHelper):
         # find item that was clicked
         items = self.canvas.find_withtag(CURRENT)
         if len(items) and items[0] in self.canvasItems:
-            pass
+            self.popMenuTile = self.canvasItems[items[0]]
+            self.popMenu.post(event.x_root, event.y_root)
 
     def on_canvas_doubleclick(self, event):
         """when user double clicks in canvas"""
@@ -1004,12 +1030,6 @@ class Cx(LogHelper, WidgetHelper):
         if len(items) and items[0] in self.canvasItems:
             tile = self.canvasItems[items[0]]
             if isinstance(tile, PxTilePic):
-                # double-click color is last color
-                ##################Not necessarily, depends on which pane it's going to
-                dcColor = len(selectColors)
-                # select clicked tile with that color, unselect all others
-                self.select_all(None, dcColor)
-                self.select_tile(tile, dcColor)
                 # tell viewer to display the clicked picture
                 if self.viewer is None:
                     self.viewer = Viewer(self)
@@ -1052,18 +1072,66 @@ class Cx(LogHelper, WidgetHelper):
         slider = self.canvasScroll.get()
         return top >= slider[0] and bottom <= slider[1]
 
-    def update_tile_from_meta(self, tile):
-        """update tile from metadata"""
-        if tile.id:
-            metaDict = self.get_tile_meta_dict(tile)
-            tile.set_rating(metaDict.get_rating(tile.id))
-            tile.set_caption(metaDict.get_caption(tile.id))
-            tile.redraw_text(self.canvas, self.nailSz)
-            tile.redraw_icon(self.canvas)
-
     def get_tile_path(self, tile):
         return tile.ent.path
 
     def get_tile_meta_dict(self, tile):
         folderPath = os.path.split(tile.ent.path)[0]
-        return metacache.get_meta_dict(folderPath, self.env)
+        return self.get_layered_meta_dict(folderPath)
+
+    def get_layered_meta_dict(self, folderPath):
+        """return layered metadata dictionary for specified folder
+        contents metadata, if any, overrides values from the original picture metadata
+        so for example contents meta can specify a different caption for a picture
+        """
+        md = metacache.get_meta_dict(folderPath, self.env)
+        return MetaDictLayer(md, self.cont.meta)
+
+    def update_tile_from_meta(self, tile):
+        """update tile from metadata"""
+        if tile.id:
+            md = self.get_tile_meta_dict(tile)
+            tile.set_rating(md.get_rating(tile.id))
+            tile.set_caption(md.get_caption(tile.id))
+            tile.redraw_text(self.canvas, self.nailSz)
+            tile.redraw_icon(self.canvas)
+
+    def do_delete(self):
+        """menu delete"""
+        msg = "Are you sure you want to delete {}?".format(self.popMenuTile.name)
+        if messagebox.askyesno("Confirm Delete", msg):
+            self.remove_tile(self.popMenuTile, True)
+            self.set_status("1 item deleted")
+            self.write_contents()
+
+    def do_edit_meta(self):
+        """menu edit metadata"""
+        CxMetaDialog(self, self.popMenuTile)
+
+    def do_close_menu(self):
+        """menu close"""
+        self.popMenu.unpost()
+
+    def get_meta_value(self, id, prop, default=None):
+        """get value from contents metadata"""
+        try:
+            return self.cont.meta[id][prop]
+        except KeyError:
+            if default is None:
+                return get_meta_default(prop)
+            else:
+                return default
+
+    def set_meta_value(self, id, prop, val):
+        """set value in contents metadata"""
+        if id not in self.cont.meta:
+            self.cont.meta[id] = {}
+        self.cont.meta[id][prop] = val
+
+    def unset_meta_value(self, id, prop):
+        """remove value from contents metadata"""
+        if id in self.cont.meta:
+            if prop in self.cont.meta[id]:
+                del self.cont.meta[id][prop]
+            if len(self.cont.meta[id].keys()) == 0:
+                del self.cont.meta[id]

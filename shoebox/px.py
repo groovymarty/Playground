@@ -96,15 +96,12 @@ class PxMetaDialog(simpledialog.Dialog):
     def apply(self):
         self.px.get_meta_dict()
         rating = pic.flip_rating(self.rating.current())
-        self.tile.set_rating(rating)
         self.px.metaDict.set_rating(self.tile.id, rating)
         caption = self.caption.get()
-        self.tile.set_caption(caption)
         self.px.metaDict.set_caption(self.tile.id, caption)
-        self.tile.redraw_text(self.px.canvas, self.px.nailSz)
-        self.tile.redraw_icon(self.px.canvas)
         self.px.metaDict.write(self.px.env)
         self.px.forget_meta_dict()
+        self.px.update_tile_from_meta(self.tile)
 
 class Px(LogHelper, WidgetHelper):
     def __init__(self):

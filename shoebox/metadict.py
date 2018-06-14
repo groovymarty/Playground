@@ -6,6 +6,12 @@ from shoebox import metacache
 
 metaFileName = "meta.json"
 
+def get_meta_default(prop):
+    if prop == "rating":
+        return 0
+    else:
+        return ""
+
 class MetaDict:
     def __init__(self, folderPath, env=None, okToCreate=True):
         self.folderPath = folderPath
@@ -51,18 +57,12 @@ class MetaDict:
         else:
             self.set_meta(id, meta)
 
-    def get_default(self, prop):
-        if prop == "rating":
-            return 0
-        else:
-            return ""
-
     def get_value(self, id, prop, default=None):
         try:
             return self.dict[id][prop]
         except KeyError:
             if default is None:
-                return self.get_default(prop)
+                return get_meta_default(prop)
             else:
                 return default
 
