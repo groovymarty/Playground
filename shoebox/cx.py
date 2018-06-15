@@ -154,6 +154,7 @@ class Cx(LogHelper, WidgetHelper):
         # popup menu
         self.popMenu = Menu(self.top, tearoff=0)
         self.popMenu.add_command(label="Edit Metadata", command=self.do_edit_meta)
+        self.popMenu.add_command(label="Add Source Folder", command=self.do_add_source_folder)
         self.popMenu.add_command(label="Delete", command=self.do_delete)
         self.popMenu.add_separator()
         self.popMenu.add_command(label="[X] Close Menu", command=self.do_close_menu)
@@ -1187,6 +1188,25 @@ class Cx(LogHelper, WidgetHelper):
     def do_edit_meta(self):
         """menu edit metadata"""
         CxMetaDialog(self, self.popMenuTile)
+
+    def do_add_source_folder(self):
+        """menu add source folder"""
+        self.clear_error()
+        folderId = None
+        if isinstance(self.popMenuTile, PxTilePic):
+            folderId = pic.get_folder_id(self.popMenuTile.parts)
+        elif isinstance(self.popMenuTile, PxTileFolder):
+            folderId = pic.get_parent_id(self.popMenuTile.parts)
+        if folderId:
+            folderPath = finder.find_folder(folderId)
+            if folderPath:
+                self.populate_canvas([DirEntryDir(folderPath)])
+                self.write_contents()
+            else:
+                self.log_error("Folder {} not found".format(folderId))
+        else:
+            self.log_error("No source folder for selected tile")
+        self.set_status_default_or_error()
 
     def do_close_menu(self):
         """menu close"""
