@@ -5,7 +5,7 @@ from tkinter import *
 from tkinter import ttk, messagebox, simpledialog
 from PIL import Image
 import ImageTk
-from shoebox import pic, nails, nailcache, dnd, metacache, contents, finder
+from shoebox import pic, nails, nailcache, dnd, metacache, contents, finder, px
 from shoebox.dnd import DndItemEnt, DndItemId
 from shoebox.cxfolder import CxFolder
 from shoebox.pxtile import PxTilePic, PxTileFile, PxTileFolder, PxTileHole, selectColors
@@ -171,6 +171,7 @@ class Cx(LogHelper, WidgetHelper):
         self.folders[""] = self.rootFolder
         self.populate_tree(self.rootFolder)
         self.set_status_default_or_error()
+        self.pxInstNum = None
         instances.append(self)
 
     def on_destroy(self, ev):
@@ -1078,6 +1079,24 @@ class Cx(LogHelper, WidgetHelper):
                     self.viewer = Viewer(self)
                 self.viewer.set_picture(self.tilesOrder.index(tile))
                 self.update_select_button()
+            elif isinstance(tile, PxTileFolder):
+                pxInst = self.get_px_instance()
+                if pxInst:
+                    pxInst.goto_folder(tile.id)
+
+    def get_px_instance(self):
+        pxInst = px.get_instance(self.pxInstNum)
+        if pxInst:
+            oldInstNum = self.pxInstNum
+            self.pxInstNum = pxInst.instNum
+            if pxInst.instNum != oldInstNum and oldInstNum is not None:
+                self.set_status("Can't find Px {:d}, switching to Px {:d}".format(oldInstNum, pxInst.instNum))
+            else:
+                self.set_status_default()
+        else:
+            self.set_status("No Px found, please create one")
+            self.pxInstNum = None
+        return pxInst
 
     def goto(self, folderId):
         """change to specified folder"""

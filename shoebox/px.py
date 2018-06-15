@@ -1529,18 +1529,23 @@ class Px(LogHelper, WidgetHelper):
                 self.viewer.set_picture(self.tilesOrder.index(tile))
                 self.update_select_button()
             elif isinstance(tile, PxTileContent):
-                cxInst = cx.get_instance(self.cxInstNum)
+                cxInst = self.get_cx_instance()
                 if cxInst:
-                    oldInstNum = self.cxInstNum
-                    self.cxInstNum = cxInst.instNum
-                    if cxInst.instNum != oldInstNum and oldInstNum is not None:
-                        self.set_status("Can't find Cx {:d}, switching to Cx {:d}".format(oldInstNum, cxInst.instNum))
-                    else:
-                        self.set_status_default()
                     cxInst.goto(self.curFolder.id)
-                else:
-                    self.set_status("No Cx found, please create one")
-                    self.cxInstNum = None
+
+    def get_cx_instance(self):
+        cxInst = cx.get_instance(self.cxInstNum)
+        if cxInst:
+            oldInstNum = self.cxInstNum
+            self.cxInstNum = cxInst.instNum
+            if cxInst.instNum != oldInstNum and oldInstNum is not None:
+                self.set_status("Can't find Cx {:d}, switching to Cx {:d}".format(oldInstNum, cxInst.instNum))
+            else:
+                self.set_status_default()
+        else:
+            self.set_status("No Cx found, please create one")
+            self.cxInstNum = None
+        return cxInst
 
     def do_delete(self):
         """menu delete"""
@@ -1609,6 +1614,16 @@ class Px(LogHelper, WidgetHelper):
                 self.log_error("Goto failed, folder {} not found".format(folderId))
         else:
             self.log_error("Goto failed, can't parse {}".format(id))
+
+    def goto_folder(self, folderId):
+        """change to specified folder"""
+        if folderId in self.folders:
+            folder = self.folders[folderId]
+            if (folder is not self.curFolder):
+                self.log_info("Switching folder for goto {}".format(folderId))
+                self.load_folder(folder)
+        else:
+            self.log_error("Goto failed, folder {} not found".format(folderId))
 
     def goto_index(self, index, selectColor=None):
         """select and scroll to specified tile"""
