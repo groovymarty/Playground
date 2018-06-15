@@ -339,13 +339,19 @@ class Cx(LogHelper, WidgetHelper):
         """when user clicks tree item"""
         sel = self.tree.selection()
         if sel and sel[0] in self.treeItems:
-            self.load_folder(self.treeItems[sel[0]])
+            folder = self.treeItems[sel[0]]
+            # load_folder() selects the tree item again, so this test is important to avoid an infinite loop
+            if folder != self.curFolder:
+                self.load_folder(folder)
 
     def load_folder(self, folder):
         """load specified folder"""
         self.clear_error()
         self.curFolder = folder
         self.top.title("{} - {}".format(self.myName, self.curFolder.path[2:]))
+        # make sure the folder is selected and visible in the tree view
+        self.tree.selection_set(folder.iid)
+        self.tree.see(folder.iid)
         self.clear_canvas()
         self.update_select_button()
         self.cont = Contents(self.curFolder.path, self.env)
@@ -1082,6 +1088,7 @@ class Cx(LogHelper, WidgetHelper):
                     # let's force the tile selected so UX is similar to plain double click (below)
                     self.select_tile(tile, self.curSelectColor)
                     self.update_select_button()
+                    self.update_select_status()
                     # send Px to the clicked picture
                     pxInst = self.get_px_instance()
                     if pxInst:
@@ -1092,7 +1099,6 @@ class Cx(LogHelper, WidgetHelper):
                         self.viewer = Viewer(self)
                     self.viewer.set_picture(self.tilesOrder.index(tile))
                     # viewer will select the clicked picture in left or right pane color
-                    self.update_select_button()
             elif isinstance(tile, PxTileFolder):
                 pxInst = self.get_px_instance()
                 if pxInst:
@@ -1105,8 +1111,6 @@ class Cx(LogHelper, WidgetHelper):
             self.pxInstNum = pxInst.instNum
             if pxInst.instNum != oldInstNum and oldInstNum is not None:
                 self.set_status("Can't find Px {:d}, switching to Px {:d}".format(oldInstNum, pxInst.instNum))
-            else:
-                self.set_status_default()
         else:
             self.set_status("No Px found, please create one")
             self.pxInstNum = None

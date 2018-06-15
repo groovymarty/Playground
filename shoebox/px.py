@@ -442,12 +442,18 @@ class Px(LogHelper, WidgetHelper):
         """when user clicks tree item"""
         sel = self.tree.selection()
         if sel and sel[0] in self.treeItems:
-            self.load_folder(self.treeItems[sel[0]])
+            folder = self.treeItems[sel[0]]
+            # load_folder() selects the tree item again, so this test is important to avoid an infinite loop
+            if folder != self.curFolder:
+                self.load_folder(folder)
 
     def load_folder(self, folder):
         """load specified folder"""
         self.curFolder = folder
         self.top.title("{} - {}".format(self.myName, self.curFolder.path[2:]))
+        # make sure the folder is selected and visible in the tree view
+        self.tree.selection_set(folder.iid)
+        self.tree.see(folder.iid)
         self.clear_canvas()
         self.update_select_button()
         self.populate_canvas(os.scandir(self.curFolder.path))
