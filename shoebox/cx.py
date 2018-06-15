@@ -1129,7 +1129,7 @@ class Cx(LogHelper, WidgetHelper):
             self.select_all(None, selectColor)
             self.select_tile(tile, selectColor)
             self.scroll_into_view(tile)
-            self.set_status_default()
+            self.update_select_status()
             self.update_select_button()
         except IndexError:
             self.log_error("Goto failed, index {:d} not found".format(index))
