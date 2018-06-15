@@ -1613,7 +1613,7 @@ class Px(LogHelper, WidgetHelper):
             else:
                 self.log_error("Goto failed, folder {} not found".format(folderId))
         else:
-            self.log_error("Goto failed, can't parse {}".format(id))
+            self.log_error("Goto failed, can't parse {}".format(id0))
 
     def goto_folder(self, folderId):
         """change to specified folder"""

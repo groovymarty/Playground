@@ -1074,11 +1074,25 @@ class Cx(LogHelper, WidgetHelper):
         if len(items) and items[0] in self.canvasItems:
             tile = self.canvasItems[items[0]]
             if isinstance(tile, PxTilePic):
-                # tell viewer to display the clicked picture
-                if self.viewer is None:
-                    self.viewer = Viewer(self)
-                self.viewer.set_picture(self.tilesOrder.index(tile))
-                self.update_select_button()
+                if event.state & 4: #control
+                    # double click is goofy because you also get single click event first
+                    # using control as modifier because control-click does least "damage" compared
+                    # to shift (which expands selection) and alt (which changes selection color)
+                    # the initial control-click event inverts selection, what to do about it?
+                    # let's force the tile selected so UX is similar to plain double click (below)
+                    self.select_tile(tile, self.curSelectColor)
+                    self.update_select_button()
+                    # send Px to the clicked picture
+                    pxInst = self.get_px_instance()
+                    if pxInst:
+                        pxInst.goto(tile.id)
+                else:
+                    # tell viewer to display the clicked picture
+                    if self.viewer is None:
+                        self.viewer = Viewer(self)
+                    self.viewer.set_picture(self.tilesOrder.index(tile))
+                    # viewer will select the clicked picture in left or right pane color
+                    self.update_select_button()
             elif isinstance(tile, PxTileFolder):
                 pxInst = self.get_px_instance()
                 if pxInst:
