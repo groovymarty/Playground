@@ -697,6 +697,8 @@ class Px(LogHelper, WidgetHelper):
                         newPath = self.move_file_to_cur_folder(ent.path)
                         # stash metadata in loose cache for later use
                         metacache.remove_meta_to_loose_cache(ent.path, self.env)
+                        # update path because we've moved the file
+                        metacache.change_loose_meta(ent.path, newPath)
 
                     entries.append(DirEntryFile(newPath))
                     accepted = True
@@ -741,13 +743,18 @@ class Px(LogHelper, WidgetHelper):
                     len(tilesToDelete), selectColors[self.curSelectColor])
                 if messagebox.askyesno("Confirm Delete", msg):
                     nDeleted = 0
+                    self.get_meta_dict()
                     for tile in tilesToDelete:
                         try:
+                            if tile.id:
+                                self.metaDict.remove_meta(tile.id)
                             self.delete_file_in_cur_folder(tile.name)
                             self.remove_tile(tile, True)
                             nDeleted += 1
                         except RuntimeError as e:
                             self.log_error(str(e))
+                    self.metaDict.write()
+                    self.forget_meta_dict()
                     self.set_status("{:d} items deleted".format(nDeleted))
                     self.sweep_out_of_order()
             else:
@@ -1259,6 +1266,7 @@ class Px(LogHelper, WidgetHelper):
                 # apply metadata from loose cache, if any
                 # use newName because above rename changed name in loose cache
                 self.get_meta_dict(0).restore_meta_from_loose_cache(tile.id, newName)
+                self.update_tile_from_meta(tile)
                 nChanged += 1
                 errMsgNum = num
                 num += step
@@ -1290,6 +1298,7 @@ class Px(LogHelper, WidgetHelper):
 
             if newName != tile.name:
                 try:
+                    # don't need to worry about metadata here because ID not changed
                     self.rename_file_in_cur_folder(tile.name, newName)
                     self.rename_tile(tile, newName)
                     return True
@@ -1308,11 +1317,11 @@ class Px(LogHelper, WidgetHelper):
                 if tile.id:
                     newName = "_{}".format(tile.name)
                     try:
-                        oldId = tile.id
-                        newPath = self.rename_file_in_cur_folder(tile.name, newName)
-                        self.rename_tile(tile, newName)
                         # save any metadata in loose cache for later use
-                        self.get_meta_dict(0).remove_meta(oldId, newPath)
+                        oldPath = os.path.join(self.curFolder.path, tile.name)
+                        self.get_meta_dict(0).remove_meta(tile.id, oldPath)
+                        self.rename_file_in_cur_folder(tile.name, newName)
+                        self.rename_tile(tile, newName)
                         nChanged += 1
                     except RuntimeError as e:
                         self.log_error(str(e))
@@ -1558,6 +1567,11 @@ class Px(LogHelper, WidgetHelper):
         msg = "Are you sure you want to delete {}?".format(self.popMenuTile.name)
         if messagebox.askyesno("Confirm Delete", msg):
             try:
+                if self.popMenuTile.id:
+                    self.get_meta_dict()
+                    self.metaDict.remove_meta(self.popMenuTile.id)
+                    self.metaDict.write()
+                    self.forget_meta_dict()
                 self.delete_file_in_cur_folder(self.popMenuTile.name)
                 self.remove_tile(self.popMenuTile, True)
                 self.set_status("1 item deleted")
@@ -1572,8 +1586,19 @@ class Px(LogHelper, WidgetHelper):
     def do_rename_apply(self, tile, newName):
         """when ok clicked in rename menu"""
         try:
+            self.get_meta_dict()
+            # save metadata in loose cache
+            oldPath = os.path.join(self.curFolder.path, tile.name)
+            self.metaDict.remove_meta(tile.id, oldPath)
+            # rename file and tile
             self.rename_file_in_cur_folder(tile.name, newName)
             self.rename_tile(tile, newName)
+            # restore metadata, maybe saved above or maybe it was already in loose cache
+            self.metaDict.restore_meta_from_loose_cache(tile.id, newName)
+            self.metaDict.write()
+            self.forget_meta_dict()
+            # update tile to reflect current metadata
+            self.update_tile_from_meta(tile)
             self.set_status("1 item renamed")
             self.sweep_out_of_order()
         except RuntimeError as e:
