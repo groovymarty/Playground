@@ -629,7 +629,11 @@ class Px(LogHelper, WidgetHelper):
                 if accepted:
                     for i, tile in enumerate(self.dragTiles):
                         if accepted is True or i < len(accepted) and accepted[i]:
-                            if not self.dragCopy:
+                            if self.dragCopy:
+                                # deselect after drag and drop (copy mode)
+                                self.select_tile(tile, None)
+                            else:
+                                # delete tile after drag and drop (move mode)
                                 self.nuke_nails(tile.name)
                                 self.remove_tile(tile, True)
                             nAccepted += 1
