@@ -1638,7 +1638,7 @@ class Px(LogHelper, WidgetHelper):
                     for id in ids[1:]:
                         if id in self.tiles:
                             tile = self.tiles[id]
-                            self.select_tile(tile, self.selectColor)
+                            self.select_tile(tile, selectColor)
                 else:
                     self.log_error("Goto failed, {} not found".format(id0))
             else:

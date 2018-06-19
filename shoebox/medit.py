@@ -79,6 +79,25 @@ class MetaChg:
         else:
             return False
 
+    def mark_as_is(self, env=None):
+        folderPath = finder.find_folder(pic.get_folder_id(self.parts))
+        if folderPath:
+            md = metacache.get_meta_dict(folderPath, env)
+            if md:
+                if md.get_value(self.id, self.prop) == self.val:
+                    self.applied = True
+                    self.rejected = False
+                else:
+                    self.applied = False
+                    self.rejected = True
+                return True
+            else:
+                environ.log_error(env, "Can't find meta dictionary for {}".format(self.id))
+                return False
+        else:
+            environ.log_error(env, "Can't find folder for {}".format(self.id))
+            return False
+
 class Medit(LogHelper, WidgetHelper):
     def __init__(self):
         self.env = {}
@@ -104,6 +123,8 @@ class Medit(LogHelper, WidgetHelper):
         self.rejectButton.pack(side=LEFT)
         self.undoButton = ttk.Button(self.topBar, text="Undo (U)", command=self.do_undo)
         self.undoButton.pack(side=LEFT)
+        self.markAsIsButton = ttk.Button(self.topBar, text="Mark As-Is", command=self.do_mark_as_is)
+        self.markAsIsButton.pack(side=RIGHT)
 
         # style for error messages (status bar)
         s = ttk.Style()
@@ -237,6 +258,7 @@ class Medit(LogHelper, WidgetHelper):
         self.enable_widget(self.applyButton, self.loaded and anySel)
         self.enable_widget(self.rejectButton, self.loaded and anySel)
         self.enable_widget(self.undoButton, self.loaded and anySel)
+        self.enable_widget(self.markAsIsButton, self.loaded and anySel)
 
     def do_log(self):
         """when Log button clicked"""
@@ -439,6 +461,29 @@ class Medit(LogHelper, WidgetHelper):
         self.update_buttons()
         self.update_px_from_meta(ids)
         metacache.write_all_changes(self.env)
+
+    def do_mark_as_is(self):
+        """when mark as-is clicked
+        change status to applied or rejected based on current value of item
+        """
+        ids = []
+        for mc in self.get_selected_items():
+            self.tree.selection_remove(mc.iid)
+            mc.softSelected = True
+            if mc.mark_as_is(self.env):
+                ids.append(mc.id)
+                if mc.rejected:
+                    # when item is marked as rejected, it may unshadow a prior item
+                    # repeat for that item, working backward thru shadowed items
+                    i = self.mcOrder.index(mc)
+                    while self.mcOrder[i].rejected and i > 0 and self.mcOrder[i-1].shadowed:
+                        self.mcOrder[i-1].mark_as_is(self.env)
+                        i -= 1
+        self.update_status_all()
+        self.update_tree_all()
+        self.set_status("{} items marked as-is".format(len(ids)))
+        self.update_buttons()
+        # no need to update px or write metacache because nothing really changed
 
     def update_px_from_meta(self, ids):
         """update px instance from metadata"""
