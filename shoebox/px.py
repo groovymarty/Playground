@@ -103,6 +103,40 @@ class PxMetaDialog(simpledialog.Dialog):
         self.px.forget_meta_dict()
         self.px.update_tile_from_meta(self.tile)
 
+class PxFolderDialog(simpledialog.Dialog):
+    def __init__(self, px):
+        self.px = px
+        self.isRoot = px.curFolder is None
+        simpledialog.Dialog.__init__(self, px.top, title="Folder - {}".format(px.myName))
+
+    def body(self, master):
+        master.columnconfigure(1, weight=1, minsize=500)
+        Label(master, text="Command").grid(row=0, sticky=W)
+        options = ["New Folder"]
+        if not self.isRoot:
+            options.extend(("Rename Folder", "Delete Folder", "Add Contents"))
+        self.command = ttk.Combobox(master, values=options)
+        self.command.current(0)
+        self.command.state(['readonly'])
+        self.command.grid(row=0, column=1, sticky=W)
+        Label(master, text="Current Folder:").grid(row=1, sticky=W)
+        oldName = "<Root>" if self.isRoot else self.px.curFolder.name
+        Label(master, text=oldName).grid(row=1, column=1, sticky=W)
+        Label(master, text="New Name:").grid(row=2, sticky=W)
+        self.newName = ttk.Entry(master)
+        self.newName.grid(row=2, column=1, sticky=(W,E))
+
+    def apply(self):
+        command = self.command.current()
+        if command == 0:
+            self.px.do_new_folder(self.newName.get())
+        elif command == 1:
+            self.px.do_rename_folder(self.newName.get())
+        elif command == 2:
+            self.px.do_delete_folder()
+        elif command == 3:
+            self.px.do_add_contents()
+
 class Px(LogHelper, WidgetHelper):
     def __init__(self):
         self.env = {}
@@ -138,6 +172,8 @@ class Px(LogHelper, WidgetHelper):
         self.sweeperButton.pack(side=RIGHT)
         self.nailerButton = ttk.Button(self.topBar, text="Nailer", command=self.do_nailer)
         self.nailerButton.pack(side=RIGHT)
+        self.folderButton = ttk.Button(self.topBar, text="Folder", command=self.do_folder)
+        self.folderButton.pack(side=RIGHT)
         self.enable_buttons(False)
 
         # create status bar
@@ -382,6 +418,10 @@ class Px(LogHelper, WidgetHelper):
     def do_options(self):
         """when Options button clicked"""
         PxOptionsDialog(self)
+
+    def do_folder(self):
+        """when Folder button clicked"""
+        PxFolderDialog(self)
 
     def enable_buttons(self, enable=True):
         """enable/disable buttons"""
@@ -779,7 +819,6 @@ class Px(LogHelper, WidgetHelper):
         self.nailsTried = False
         self.metaDict = None
         self.metaDictRefCnt = 0
-
 
     def populate_canvas(self, entries):
         """add specified pictures to canvas
@@ -1733,3 +1772,78 @@ class Px(LogHelper, WidgetHelper):
 
     def get_tile_path(self, tile):
         return os.path.join(self.curFolder.path, tile.name)
+
+    def do_new_folder(self, newName):
+        if newName == "":
+            messagebox.showerror("Error", "No folder name specified")
+            return
+        parent = self.curFolder
+        if parent is None:
+            parent = self.rootFolder
+        newPath = os.path.join(parent.path, newName)
+        try:
+            os.mkdir(newPath)
+        except BaseException as e:
+            self.log_error("Make directory failed for {}: {}".format(newPath, str(e)))
+            return
+        iid = self.tree.insert(parent.iid, 'end', text=newName)
+        folder = PxFolder(parent, newName, newPath, iid, env=self.env)
+        parent.add_child(folder)
+        self.treeItems[iid] = folder
+        self.add_folder(folder)
+        self.log_info("Folder created: {}".format(newName), True)
+
+    def do_rename_folder(self, newName):
+        if newName == "":
+            messagebox.showerror("Error", "No folder name specified")
+            return
+        parts = pic.parse_folder(newName, self.env)
+        id = parts.id if parts else None
+        if self.curFolder.id != id:
+            messagebox.showerror("Error", "Sorry, you cannot change the ID of a folder with rename.\n" +
+                                 "You must create a new folder and delete the old one.")
+            return
+        oldPath = self.curFolder.path
+        newPath = os.path.join(os.path.split(oldPath)[0], newName)
+        try:
+            os.rename(oldPath, newPath)
+        except BaseException as e:
+            self.log_error("Rename failed for {}: {}".format(oldPath, str(e)))
+            return
+        self.curFolder.name = newName
+        self.curFolder.path = newPath
+        self.tree.item(self.curFolder.iid, text=newName)
+        self.log_info("Folder renamed: {}".format(newName), True)
+        self.top.title("{} - {}".format(self.myName, self.curFolder.path[2:]))
+
+    def do_delete_folder(self):
+        msg = "Are you sure you want to delete '{}' and all files and subfolders it contains?".format(self.curFolder.name)
+        if messagebox.askyesno("Confirm Delete", msg):
+            try:
+                shutil.rmtree(self.curFolder.path)
+            except BaseException as e:
+                self.log_error("Remove directory failed for {}: {}".format(self.curFolder.path, str(e)))
+                return
+            self.tree.delete(self.curFolder.iid)
+            del self.treeItems[self.curFolder.iid]
+            if self.curFolder.id in self.folders:
+                del self.folders[self.curFolder.id]
+            self.clear_canvas()
+            self.canvas.configure(background=self.top.cget('background'))
+            self.loaded = False
+            self.log_info("Folder deleted: {}".format(self.curFolder.name), True)
+            self.curFolder = None
+            # repaint gray with diagonal line
+            self.canvasWidth = 1
+            self.on_canvas_resize(None)
+            self.top.title(self.myName)
+
+    def do_add_contents(self):
+        try:
+            contents.Contents(self.curFolder.path, self.env, False)
+            self.set_status("contents.json already exists")
+        except FileNotFoundError:
+            cont = contents.Contents(self.curFolder.path, self.env, True)
+            cont.write(self.env)
+            self.populate_canvas([DirEntryFile(cont.get_path())])
+            self.log_info("Created contents.json for {}".format(self.curFolder.name), True)

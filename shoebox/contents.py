@@ -8,7 +8,7 @@ contentsFileName = "contents.json"
 class Contents:
     def __init__(self, folderPath, env=None, okToCreate=True):
         self.folderPath = folderPath
-        path = os.path.join(folderPath, contentsFileName)
+        path = self.get_path()
         try:
             with open(path, mode='r', encoding='UTF-8') as f:
                 self.dict = json.load(f)
@@ -36,10 +36,12 @@ class Contents:
             self.dict['folders'] = self.folders
         if 'meta' in self.dict or len(self.meta.keys()):
             self.dict['meta'] = self.meta
-        path = os.path.join(self.folderPath, contentsFileName)
+        path = self.get_path()
         try:
             with open(path, mode='w', encoding='UTF-8') as f:
                 json.dump(self.dict, f, indent=2)
         except Exception as e:
             environ.log_error(env, "Error writing {}: {}".format(path, str(e)))
 
+    def get_path(self):
+        return os.path.join(self.folderPath, contentsFileName)
