@@ -77,31 +77,52 @@ class PxMetaDialog(simpledialog.Dialog):
     def __init__(self, px, tile):
         self.px = px
         self.tile = tile
+        self.tiles = [tile]
+        myColor = tile.selected
+        if myColor:
+            self.selectList = [t for t in self.px.tilesOrder if t.id and t.selected == myColor]
+        else:
+            self.selectList = []
         simpledialog.Dialog.__init__(self, px.top, title="Edit Metadata - {}".format(px.myName))
 
     def body(self, master):
         master.columnconfigure(1, weight=1, minsize=500)
         Label(master, text="Picture ID:").grid(row=0, sticky=W)
-        Label(master, text=self.tile.id).grid(row=0, column=1, sticky=W)
-        Label(master, text="Rating").grid(row=1, sticky=W)
+        self.ids = Label(master, text=self.tile.id)
+        self.ids.grid(row=0, column=1, sticky=W)
+        if len(self.selectList) > 1:
+            self.allVar = BooleanVar()
+            self.allVar.set(False)
+            text = "Edit all {} selected {} items".format(len(self.selectList), selectColors[self.tile.selected])
+            ttk.Checkbutton(master, text=text, command=self.toggle_all, variable=self.allVar)\
+                .grid(row=1, column=1, sticky=W)
+        Label(master, text="Rating").grid(row=2, sticky=W)
         self.rating = ttk.Combobox(master, values=list(reversed(pic.ratings)))
         self.rating.current(pic.flip_rating(self.tile.rating))
         self.rating.state(['readonly'])
-        self.rating.grid(row=1, column=1, sticky=W)
-        Label(master, text="Caption").grid(row=2, sticky=W)
+        self.rating.grid(row=2, column=1, sticky=W)
+        Label(master, text="Caption").grid(row=3, sticky=W)
         self.caption = ttk.Entry(master)
-        self.caption.grid(row=2, column=1, sticky=(W,E))
+        self.caption.grid(row=3, column=1, sticky=(W,E))
         self.caption.insert(0, self.tile.caption)
+
+    def toggle_all(self):
+        if self.allVar.get():
+            self.tiles = self.selectList
+        else:
+            self.tiles = [self.tile]
+        self.ids.configure(text=", ".join(t.id for t in self.tiles))
 
     def apply(self):
         self.px.get_meta_dict()
         rating = pic.flip_rating(self.rating.current())
-        self.px.metaDict.set_rating(self.tile.id, rating)
         caption = self.caption.get()
-        self.px.metaDict.set_caption(self.tile.id, caption)
+        for tile in self.tiles:
+            self.px.metaDict.set_rating(tile.id, rating)
+            self.px.metaDict.set_caption(tile.id, caption)
+            self.px.update_tile_from_meta(tile)
         self.px.metaDict.write(self.px.env)
         self.px.forget_meta_dict()
-        self.px.update_tile_from_meta(self.tile)
 
 class PxFolderDialog(simpledialog.Dialog):
     def __init__(self, px):
