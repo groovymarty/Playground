@@ -835,6 +835,7 @@ class Px(LogHelper, WidgetHelper):
         self.lastClickIndex = 0
         self.curSelectColor = 1
         self.nPictures = 0
+        self.numDigits = 0
         self.hTotal = tileGap / 2
         self.nails = None
         self.nailsTried = False
