@@ -128,6 +128,7 @@ class PxFolderDialog(simpledialog.Dialog):
     def __init__(self, px):
         self.px = px
         self.isRoot = px.curFolder is None
+        self.isRated = not self.isRoot and self.px.get_meta_dict(0).get_folder_rated()
         simpledialog.Dialog.__init__(self, px.top, title="Folder - {}".format(px.myName))
 
     def body(self, master):
@@ -136,6 +137,10 @@ class PxFolderDialog(simpledialog.Dialog):
         options = ["New Folder"]
         if not self.isRoot:
             options.extend(("Rename Folder", "Delete Folder", "Add Contents"))
+            if self.isRated:
+                options.append("Clear Rated")
+            else:
+                options.append("Set Rated")
         self.command = ttk.Combobox(master, values=options)
         self.command.current(0)
         self.command.state(['readonly'])
@@ -157,6 +162,8 @@ class PxFolderDialog(simpledialog.Dialog):
             self.px.do_delete_folder()
         elif command == 3:
             self.px.do_add_contents()
+        elif command == 4:
+            self.px.do_set_folder_rated(not self.isRated)
 
 class Px(LogHelper, WidgetHelper):
     def __init__(self):
@@ -1869,3 +1876,10 @@ class Px(LogHelper, WidgetHelper):
             cont.write(self.env)
             self.populate_canvas([DirEntryFile(cont.get_path())])
             self.log_info("Created contents.json for {}".format(self.curFolder.name), True)
+
+    def do_set_folder_rated(self, val):
+        self.get_meta_dict()
+        self.metaDict.set_folder_rated(val)
+        self.metaDict.write(self.env)
+        self.forget_meta_dict()
+        self.update_from_meta(self.tiles.keys())

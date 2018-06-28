@@ -7,7 +7,7 @@ from shoebox import metacache
 metaFileName = "meta.json"
 
 def get_meta_default(prop):
-    if prop == "rating":
+    if prop == 'rating':
         return 0
     else:
         return ""
@@ -61,10 +61,16 @@ class MetaDict:
         try:
             return self.dict[id][prop]
         except KeyError:
-            if default is None:
-                return get_meta_default(prop)
-            else:
+            if default is not None:
                 return default
+            else:
+                return self.get_default(prop)
+
+    def get_default(self, prop):
+        if prop == 'rating' and self.get_folder_rated():
+            return 3
+        else:
+            return get_meta_default(prop)
 
     def set_value(self, id, prop, val):
         if id not in self.dict:
@@ -83,6 +89,17 @@ class MetaDict:
 
     def set_rating(self, id, rating):
         self.set_value(id, 'rating', rating)
+
+    def get_folder_rated(self):
+        try:
+            return self.dict['_folder']['rated']
+        except KeyError:
+            return False
+
+    def set_folder_rated(self, val):
+        if '_folder' not in self.dict:
+            self.dict['_folder'] = {}
+        self.dict['_folder']['rated'] = val
 
     def touch(self, value):
         self.lastTouch = value
