@@ -33,6 +33,7 @@ class MetaDict:
     def write(self, env=None, force=False):
         if self.changed or force:
             self.changed = False
+            self.clean_meta()
             path = os.path.join(self.folderPath, metaFileName)
             try:
                 with open(path, mode='w', encoding='UTF-8') as f:
@@ -100,6 +101,7 @@ class MetaDict:
         if '_folder' not in self.dict:
             self.dict['_folder'] = {}
         self.dict['_folder']['rated'] = val
+        self.changed = True
 
     def touch(self, value):
         self.lastTouch = value
@@ -120,6 +122,18 @@ class MetaDict:
         meta = metacache.get_loose_meta(path, remove=True)
         if meta:
             self.apply_meta(id, meta)
+
+    def clean_meta(self):
+        """remove unnecessary metadata before writing to file"""
+        for id in list(self.dict.keys()):
+            meta = self.dict[id]
+            for prop in list(meta.keys()):
+                # delete empty captions
+                if prop == 'caption' and meta[prop] == "":
+                    del meta[prop]
+            # delete meta if no properties
+            if not meta:
+                del dict[id]
 
 class MetaDictLayer(MetaDict):
     """subclass of MetaDict that's a layer on top of another MetaDict
