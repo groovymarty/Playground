@@ -26,7 +26,7 @@ def make_fonts():
     ratingIcons = [
         (fontWingdings2, chr(42),  -3, "gray"),        # 0: empty box
         (fontWingdings2, chr(210),  0, "fuchsia"),     # 1: X
-        (fontSymbol,     chr(187), -4, "white"),       # 2: wavy lines
+        (fontSymbol,     chr(183),  -3, "gray"),       # 2: bullet
         (fontWingdings2, chr(80),   0, "lime"),        # 3: check
         (fontWingdings2, chr(234),  0, "deepskyblue"), # 4: star
         (fontSymbol,     chr(169), -3, "red"),         # 5: heart

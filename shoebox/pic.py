@@ -28,7 +28,7 @@ KEEPALL = 2
 ratings = [
     "0 - No Rating",
     "1 - Delete Me",
-    "2 - Poor But Keep",
+    "2 - Low Interest",
     "3 - Good",
     "4 - Better",
     "5 - Love it!"
