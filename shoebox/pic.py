@@ -5,6 +5,7 @@ from collections import namedtuple
 from tkit import environ
 
 pictureExts = [".jpg", ".jpeg", ".gif", ".png", ".tif"]
+videoExts = [".mp4", ".mov", ".avi", ".wmv", ".3gp", ".webm"]
 
 nailSizes = [128, 244]
 nailSizeNames = ["Small", "Large"]

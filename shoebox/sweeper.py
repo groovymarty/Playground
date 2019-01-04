@@ -1,6 +1,6 @@
 # shoebox.sweeper
 
-import os, io
+import os, shutil
 from tkinter import *
 from tkinter import ttk, filedialog, messagebox
 from tkit.widgetgarden import WidgetGarden
@@ -11,6 +11,10 @@ from tkit.loghelper import LogHelper
 instances = []
 nextInstNum = 1
 delayMs = 15
+#homeDir = os.path.join("\\Users", "Msaus") #mhs temp
+#videosDir = os.path.join(homeDir, "Videos") #mhs temp
+#beforeDir = os.path.join(videosDir, "Before") #mhs temp
+#afterDir = os.path.join(videosDir, "After") #mhs temp
 
 class Folder:
     def __init__(self, ent, parent):
@@ -85,6 +89,7 @@ class Sweeper(LogHelper):
         self.quit = False
         self.nFolders = 0
         self.nPictures = 0
+        self.nVideos = 0
         self.nErrors = 0
 
     def on_destroy(self, ev):
@@ -147,6 +152,7 @@ class Sweeper(LogHelper):
         self.quit = False
         self.nFolders = 0
         self.nPictures = 0
+        self.nVideos = 0
         self.nErrors = 0
         self.update_totals()
         self.top.after(self.get_delay_ms(), self.do_next)
@@ -191,19 +197,27 @@ class Sweeper(LogHelper):
                 # is a directory, remember for later if recursive
                 if self.recursive:
                    self.foldersToScan.append(Folder(ent, self.curFolder))
-            elif os.path.splitext(ent.path)[1].lower() in pic.pictureExts:
-                # is a picture
-                self.nPictures += 1
-                self.update_totals()
-                self.curEnt = ent
-                self.do_picture()
+            else:
+                ext = os.path.splitext(ent.path)[1].lower()
+                if ext in pic.pictureExts:
+                   # is a picture
+                   self.nPictures += 1
+                   self.update_totals()
+                   self.curEnt = ent
+                   self.do_picture()
+                elif ext in pic.videoExts:
+                    # is a video
+                    self.nVideos += 1
+                    self.update_totals()
+                    self.curEnt = ent
+                    self.do_video()
         # that's all for now, come back soon
         self.top.after(self.get_delay_ms(), self.do_next)
 
     def update_totals(self):
         """update totals"""
-        self.totalLabel.configure(text="{:d} folders, {:d} pictures, {:d} errors".format(
-            self.nFolders, self.nPictures, self.nErrors))
+        self.totalLabel.configure(text="{:d} folders, {:d} pictures, {:d} videos, {:d} errors".format(
+            self.nFolders, self.nPictures, self.nVideos, self.nErrors))
 
     def begin_folder(self):
         """begin processing a folder"""
@@ -246,6 +260,30 @@ class Sweeper(LogHelper):
 
             else:
                 self.log_error("Noncanonical: {}".format(self.curEnt.path))
+
+    def do_video(self):
+        """process one video"""
+        if not self.curFolder.noncanon:
+            pass
+            #parts = pic.parse_file(self.curEnt.name, self.env)
+            #if parts and (parts.parent == "D18S" or parts.parent == "D18V" or parts.parent == "D18X" or parts.parent == "D18Z"):
+            #    self.log_info("***SKIPPING*** {}".format(self.curEnt.name))
+            #else:
+            #    baseName = os.path.splitext(self.curEnt.name)[0]
+            #    afterPath = os.path.join(afterDir, "{}.mp4".format(baseName))
+            #    if not os.path.exists(afterPath):
+            #        self.log_error("Does not exist: {}".format(afterPath))
+            #    else:
+            #        self.log_info("Copying {}".format(self.curEnt.name))
+            #        try:
+            #           os.remove(self.curEnt.path)
+            #            basePath = os.path.splitext(self.curEnt.path)[0]
+            #            destPath = "{}.mp4".format(basePath)
+            #            shutil.copy(afterPath, destPath)
+            #        except BaseException as e:
+            #            raise RuntimeError("Copy failed for {}: {}".format(self.curEnt.name, str(e)))
+        else:
+            self.log_info("***NONCANON*** {}".format(self.curEnt.path))
 
     def finish_folder(self):
         """finish processing a folder"""
