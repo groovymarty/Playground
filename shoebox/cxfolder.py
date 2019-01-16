@@ -8,3 +8,6 @@ class CxFolder:
         self.name = name
         self.path = path
         self.iid = None  # set later
+
+    def add_child(self, folder):
+        self.children.append(folder)

@@ -53,6 +53,36 @@ class CxMetaDialog(simpledialog.Dialog):
         self.cx.update_tile_from_meta(self.tile)
         self.cx.write_contents()
 
+class CxFolderDialog(simpledialog.Dialog):
+    def __init__(self, cx):
+        self.cx = cx
+        simpledialog.Dialog.__init__(self, cx.top, title="Folder - {}".format(cx.myName))
+
+    def body(self, master):
+        master.columnconfigure(1, weight=1, minsize=500)
+        Label(master, text="Command").grid(row=0, sticky=W)
+        options = ["New Folder", "Rename Folder", "Delete Folder"]
+        self.command = ttk.Combobox(master, values=options)
+        self.command.current(0)
+        self.command.state(['readonly'])
+        self.command.grid(row=0, column=1, sticky=W)
+        Label(master, text="Current Folder:").grid(row=1, sticky=W)
+        oldName = self.cx.curFolder.name
+        Label(master, text=oldName).grid(row=1, column=1, sticky=W)
+        Label(master, text="New Name:").grid(row=2, sticky=W)
+        self.newName = ttk.Entry(master)
+        self.newName.grid(row=2, column=1, sticky=(W,E))
+        self.newName.insert(0, oldName)
+
+    def apply(self):
+        command = self.command.current()
+        if command == 0:
+            self.cx.do_new_folder(self.newName.get())
+        elif command == 1:
+            self.cx.do_rename_folder(self.newName.get())
+        elif command == 2:
+            self.cx.do_delete_folder()
+
 class Cx(LogHelper, WidgetHelper):
     def __init__(self):
         self.env = {}
@@ -78,6 +108,8 @@ class Cx(LogHelper, WidgetHelper):
         self.selectButton = ttk.Button(self.topBar, text="Select All", style=self.styleRoot+".Select.TButton",
                                        command=self.toggle_select_all)
         self.selectButton.pack(side=LEFT)
+        self.folderButton = ttk.Button(self.topBar, text="Folder", command=self.do_folder)
+        self.folderButton.pack(side=RIGHT)
         self.enable_buttons(False)
 
         # create status bar
@@ -300,6 +332,7 @@ class Cx(LogHelper, WidgetHelper):
         self.enable_widget(self.refreshButton, enable)
         self.enable_widget(self.sizeButton, enable)
         self.enable_widget(self.selectButton, enable)
+        self.enable_widget(self.folderButton, enable)
 
     def scan_for_contents(self, dirEnt, isRoot=False):
         """scan directory tree for contents
@@ -326,6 +359,10 @@ class Cx(LogHelper, WidgetHelper):
 
         # no contents or noncanonical, forget this one
         return None
+
+    def do_folder(self):
+        """when Folder button clicked"""
+        CxFolderDialog(self)
 
     def populate_tree(self, parent):
         """populate tree with children of specified folder"""
@@ -1233,3 +1270,74 @@ class Cx(LogHelper, WidgetHelper):
                 del self.cont.meta[id][prop]
             if len(self.cont.meta[id].keys()) == 0:
                 del self.cont.meta[id]
+
+    def do_new_folder(self, newName):
+        if newName == "":
+            messagebox.showerror("Error", "No folder name specified")
+            return
+        parts = pic.parse_folder(newName, self.env)
+        if not parts.id:
+            messagebox.showerror("Error", "Can't parse folder name: {}".format(newName))
+            return
+        parent = self.curFolder
+        newPath = os.path.join(parent.path, newName)
+        try:
+            os.mkdir(newPath)
+        except BaseException as e:
+            self.log_error("Make directory failed for {}: {}".format(newPath, str(e)))
+            return
+        cont = contents.Contents(newPath, self.env, True)
+        cont.write(self.env)
+        iid = self.tree.insert(parent.iid, 'end', text=newName)
+        folder = CxFolder([], parts.id, newName, newPath)
+        folder.parent = parent
+        folder.iid = iid
+        parent.add_child(folder)
+        self.treeItems[iid] = folder
+        self.folders[folder.id] = folder
+        self.log_info("Folder created: {}".format(newName), True)
+
+    def do_rename_folder(self, newName):
+        if newName == "":
+            messagebox.showerror("Error", "No folder name specified")
+            return
+        parts = pic.parse_folder(newName, self.env)
+        id = parts.id if parts else None
+        if self.curFolder.id != id:
+            messagebox.showerror("Error", "Sorry, you cannot change the ID of a folder with rename.\n" +
+                                 "You must create a new folder and delete the old one.")
+            return
+        oldPath = self.curFolder.path
+        newPath = os.path.join(os.path.split(oldPath)[0], newName)
+        try:
+            os.rename(oldPath, newPath)
+        except BaseException as e:
+            self.log_error("Rename failed for {}: {}".format(oldPath, str(e)))
+            return
+        self.curFolder.name = newName
+        self.curFolder.path = newPath
+        self.tree.item(self.curFolder.iid, text=newName)
+        self.log_info("Folder renamed: {}".format(newName), True)
+        self.top.title("{} - {}".format(self.myName, self.curFolder.path[2:]))
+
+    def do_delete_folder(self):
+        msg = "Are you sure you want to delete collection '{}' and all files and subfolders it contains?".format(self.curFolder.name)
+        if messagebox.askyesno("Confirm Delete", msg):
+            try:
+                shutil.rmtree(self.curFolder.path)
+            except BaseException as e:
+                self.log_error("Remove directory failed for {}: {}".format(self.curFolder.path, str(e)))
+                return
+            self.tree.delete(self.curFolder.iid)
+            del self.treeItems[self.curFolder.iid]
+            if self.curFolder.id in self.folders:
+                del self.folders[self.curFolder.id]
+            self.clear_canvas()
+            self.canvas.configure(background=self.top.cget('background'))
+            self.loaded = False
+            self.log_info("Folder deleted: {}".format(self.curFolder.name), True)
+            self.curFolder = None
+            # repaint gray with diagonal line
+            self.canvasWidth = 1
+            self.on_canvas_resize(None)
+            self.top.title(self.myName)
