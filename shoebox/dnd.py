@@ -15,9 +15,10 @@ def get_target_name(w):
 def try_drop(w, items, doCopy, event):
     if w in targets:
         target, name = targets[w]
-        # return True to accept all items
-        # return False to reject all items
-        # or return array of True/False to accept items individually
+        # return array of accept results
+        # 1 means accepted
+        # 0 means accepted by copying
+        # -1 means rejected
         # if array is shorter than items, remaining items are rejected
         return target.receive_drop(items, doCopy, event)
     else:

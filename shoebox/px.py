@@ -694,24 +694,23 @@ class Px(LogHelper, WidgetHelper):
                          for t in self.dragTiles]
                 accepted = dnd.try_drop(w, items, self.dragCopy, event)
                 nAccepted = 0
-                if accepted:
-                    for i, tile in enumerate(self.dragTiles):
-                        if accepted is True or i < len(accepted) and accepted[i]:
-                            if self.dragCopy:
-                                # deselect after drag and drop (copy mode)
-                                self.select_tile(tile, None)
-                            else:
-                                # delete tile after drag and drop (move mode)
-                                self.nuke_nails(tile.name)
-                                self.remove_tile(tile, True)
-                            nAccepted += 1
-                    self.set_status("{:d} of {:d} items accepted by {}".format(nAccepted, len(items),
-                                                                               dnd.get_target_name(w)))
-                    self.update_select_button()
-                    if nAccepted and not self.dragCopy:
-                        self.sweep_out_of_order()
-                else:
-                    self.set_status("No items accepted")
+                nDeleted = 0
+                for i, tile in enumerate(self.dragTiles):
+                    if i < len(accepted) and accepted[i] >= 0:
+                        nAccepted += 1
+                        if accepted[i] == 0:
+                            # deselect after drag and drop (copy mode)
+                            self.select_tile(tile, None)
+                        else:
+                            # delete tile after drag and drop (move mode)
+                            self.nuke_nails(tile.name)
+                            self.remove_tile(tile, True)
+                            nDeleted += 1
+                self.set_status("{:d} of {:d} items accepted by {}".format(nAccepted, len(items),
+                                                                           dnd.get_target_name(w)))
+                self.update_select_button()
+                if nDeleted:
+                    self.sweep_out_of_order()
             else:
                 # dnd within same window
                 targ = self.get_target_tile(event)
@@ -753,27 +752,28 @@ class Px(LogHelper, WidgetHelper):
         self.canvas.configure(cursor="")
 
     def receive_drop(self, items, doCopy, event):
-        """called by dnd, return true if drop accepted (or array of true/false)"""
+        """called by dnd, return array of 1 if accepted, 0 if accepted by copy, -1 if rejected """
         if not self.curFolder:
-            return False
+            return []
         entries = []
         result = []
         for item in items:
-            accepted = False
+            accepted = -1
             if isinstance(item, DndItemEnt):
                 ent = item.thing
                 try:
                     if doCopy:
                         newPath = self.copy_file_to_cur_folder(ent.path)
+                        accepted = 0
                     else:
                         newPath = self.move_file_to_cur_folder(ent.path)
                         # stash metadata in loose cache for later use
                         metacache.remove_meta_to_loose_cache(ent.path, self.env)
                         # update path because we've moved the file
                         metacache.change_loose_meta(ent.path, newPath)
+                        accepted = 1
 
                     entries.append(DirEntryFile(newPath))
-                    accepted = True
                 except RuntimeError as e:
                     self.log_error(str(e))
             result.append(accepted)

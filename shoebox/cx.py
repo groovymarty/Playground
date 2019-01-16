@@ -560,18 +560,15 @@ class Cx(LogHelper, WidgetHelper):
                 items = [DndItemId(t.id) for t in self.dragTiles if t.id]
                 accepted = dnd.try_drop(w, items, self.dragCopy, event)
                 nAccepted = 0
-                if accepted:
-                    for i, tile in enumerate(self.dragTiles):
-                        if accepted is True or i < len(accepted) and accepted[i]:
-                            if not self.dragCopy:
-                                self.remove_tile(tile, True)
-                            nAccepted += 1
-                    self.set_status("{:d} of {:d} items accepted by {}".format(nAccepted, len(items),
-                                                                               dnd.get_target_name(w)))
-                    self.update_select_button()
-                    self.write_contents()
-                else:
-                    self.set_status("No items accepted")
+                for i, tile in enumerate(self.dragTiles):
+                    if i < len(accepted) and accepted[i] >= 0:
+                        nAccepted += 1
+                        if accepted[i] > 0:
+                            self.remove_tile(tile, True)
+                self.set_status("{:d} of {:d} items accepted by {}".format(nAccepted, len(items),
+                                                                           dnd.get_target_name(w)))
+                self.update_select_button()
+                self.write_contents()
             else:
                 # dnd within same window
                 targ = self.get_target_tile(event)
@@ -610,22 +607,23 @@ class Cx(LogHelper, WidgetHelper):
         self.canvas.configure(cursor="")
 
     def receive_drop(self, items, doCopy, event):
-        """called by dnd, return true if drop accepted (or array of true/false)"""
+        """called by dnd, return array of 1 if accepted, 0 if accepted by copy, -1 if rejected """
         if not self.curFolder:
-            return False
+            return []
         entries = []
         result = []
         for item in items:
-            accepted = False
-            if isinstance(item, DndItemEnt) and doCopy:
+            accepted = -1
+            if isinstance(item, DndItemEnt):
                 ent = item.thing
                 if self.is_valid_ext(ent):
                     entries.append(ent)
-                    accepted = True
+                    # always accept by copying
+                    accepted = 0
             elif isinstance(item, DndItemId):
                 # accept all IDs even if not found
                 id = item.thing
-                accepted = True
+                accepted = 0 if doCopy else 1
                 filePath = finder.find_file(id)
                 if filePath:
                     entries.append(DirEntryFile(filePath))
@@ -1179,7 +1177,7 @@ class Cx(LogHelper, WidgetHelper):
 
     def do_delete(self):
         """menu delete"""
-        msg = "Are you sure you want to delete {}?".format(self.popMenuTile.name)
+        msg = "Are you sure you want to delete {} from the collection?".format(self.popMenuTile.name)
         if messagebox.askyesno("Confirm Delete", msg):
             self.remove_tile(self.popMenuTile, True)
             self.set_status("1 item deleted")
