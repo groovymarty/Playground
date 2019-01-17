@@ -61,7 +61,7 @@ class CxFolderDialog(simpledialog.Dialog):
     def body(self, master):
         master.columnconfigure(1, weight=1, minsize=500)
         Label(master, text="Command").grid(row=0, sticky=W)
-        options = ["New Folder", "Rename Folder", "Delete Folder"]
+        options = ["Rename Folder", "New Folder", "Delete Folder"]
         self.command = ttk.Combobox(master, values=options)
         self.command.current(0)
         self.command.state(['readonly'])
@@ -77,9 +77,9 @@ class CxFolderDialog(simpledialog.Dialog):
     def apply(self):
         command = self.command.current()
         if command == 0:
-            self.cx.do_new_folder(self.newName.get())
-        elif command == 1:
             self.cx.do_rename_folder(self.newName.get())
+        elif command == 1:
+            self.cx.do_new_folder(self.newName.get())
         elif command == 2:
             self.cx.do_delete_folder()
 
