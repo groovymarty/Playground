@@ -7,7 +7,7 @@ from tkinter import filedialog, messagebox
 picturesDir="C:\\Users\\Msaus\\Pictures"
 root = Tk()
 
-compileDir = filedialog.askdirectory(title="Select directory to compile", initialdir=os.path.join(picturesDir, "C01 Slide Shows"))
+compileDir = filedialog.askdirectory(title="Select directory to compile", initialdir=os.path.join(picturesDir, "C99 Categories\\C99+014 Kermit & Ruth"))
 if not compileDir:
     sys.exit(0)
 
@@ -30,7 +30,7 @@ nDeleted = 0
 for item in os.listdir(compileDir):
     name, ext = os.path.splitext(item)
     ext = ext.lower()
-    if ext == ".jpg" or ext == ".jpeg":
+    if ext == ".jpg" or ext == ".jpeg" or ext == ".lnk":
         if name not in contents['pictures']:
             contents['pictures'].append(name)
             nAdded += 1
