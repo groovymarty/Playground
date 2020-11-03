@@ -53,7 +53,8 @@ def copyfile(srcpath, targpath, why):
 
 def targisnewer(srcpath, targpath):
     logit("Skipping "+os.path.basename(srcpath)+" because target file is newer")
-    newer.append(targpath)
+    newer.append('cp -p "c:' + srcpath + '" "c:' + targpath + '"')
+    #newer.append(targpath)
     #shutil.copystat(srcpath, targpath)
 
 # usually we skip files and dirs only on the source side (local disk, not dropbox)
@@ -67,7 +68,7 @@ def skipdir(folder, dname, isSrc=True):
     if folder.endswith("Documents"):
         if dname == "My Music" or dname == "My Pictures" or dname == "My Videos":
             return isSrc
-    if dname == ".git" or dname == "__pycache__" or dname == "node_modules" or dname == "cache":
+    if dname == ".git" or dname == "__pycache__" or dname == "node_modules" or dname == "cache" or dname == "hq":
         return isSrc
     return False
 

@@ -49,6 +49,11 @@ def scan_dir(dir):
                     targetFound[i] = True
                     matches.append((i, path))
 
+def delete_found():
+    for i, matchPath in matches:
+        print("deleting", targetFiles[i])
+        os.remove(targetFiles[i])
+
 scan_dir(searchDir)
 matches.sort()
 print(len(matches), "matches found")
@@ -58,11 +63,13 @@ if matches:
     root.title("Results")
     root.geometry("750x500")
     root.grid_columnconfigure(0, weight=1)
-    root.grid_rowconfigure(0, weight=1)
+    root.grid_rowconfigure(1, weight=1)
+    delFoundBtn = Button(root, text="Delete Found", command=delete_found)
+    delFoundBtn.grid(row=0, column=0, sticky=(N,W))
     text = Text(root)
-    text.grid(row=0, column=0, sticky=(N,S,W,E))
+    text.grid(row=1, column=0, sticky=(N,S,W,E))
     sb = Scrollbar(root, orient=VERTICAL, command=text.yview)
-    sb.grid(row=0, column=1, sticky=(N,S))
+    sb.grid(row=1, column=1, sticky=(N,S))
     text['yscrollcommand'] = sb.set
 
     text.insert(END, "Found:\n")
