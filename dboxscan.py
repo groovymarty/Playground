@@ -66,6 +66,7 @@ def skipdir(folder, dname, isSrc=True):
     if folder.endswith("SlideShows"):
         return isSrc
     if folder.endswith("Documents"):
+        # not sure we need this...
         if dname == "My Music" or dname == "My Pictures" or dname == "My Videos":
             return isSrc
     if dname == ".git" or dname == "__pycache__" or dname == "node_modules" or dname == "cache" or dname == "_hq":
@@ -119,7 +120,7 @@ def extradir(targpath):
         delcmds.append('rm -rf "c:'+targpath+'"')
     numdirrem += 1
 
-def scandir(srcdir, targdir):
+def scandir(srcdir, targdir, exclude=[]):
     global totsize, sizelimited, pendlog
     dirs_scanned[targdir] = True
     scanning = "Scanning "+srcdir
@@ -136,7 +137,7 @@ def scandir(srcdir, targdir):
         targpath = os.path.join(targdir, item)
         if os.path.isdir(srcpath):
             #print(srcpath+" is dir")
-            if skipdir(srcdir, item) or targpath in dirs_scanned:
+            if item in exclude or skipdir(srcdir, item) or targpath in dirs_scanned:
                 continue
             if not os.path.exists(targpath):
                 makedir(targpath)
