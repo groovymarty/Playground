@@ -11,7 +11,7 @@ scanone("Documents", os.path.join("Jill", "Documents"))
 scanone("Desktop", os.path.join("Jill", "Desktop"))
 basedir = "\\Jill"
 scanone("Life", "Life")
-scanone("Scatacook Shores HOA", "Scatacook Shores HOA")
+#scanone("Scatacook Shores HOA", "Scatacook Shores HOA")
 scanone("Teaching", "Teaching")
 
 dboxscan.finish()
