@@ -12,7 +12,7 @@ from everybody.personlist_and_detail import PersonListAndDetail
 
 debugMode = False
 
-baseDir = os.path.join(os.path.expanduser("~"), "Documents", "Everybody")
+baseDir = "."
 
 with BasicLogger(baseDir, "Everybody.log", echoStdout=debugMode) as logger:
     logger.log_info("Everybody: starting")
