@@ -1,6 +1,6 @@
 import dboxscan, os
 
-basedir = os.path.join("D:\\Users","Jill")
+basedir = os.path.join("D:\\Users","jills")
 dboxdir = os.path.join(basedir,"DropBox")
 
 def scanone(srctail, targtail, exclude=[]):
