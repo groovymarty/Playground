@@ -52,6 +52,7 @@ updateBtns = []
 statuses = []
 moveBtns = []
 deleteBtns = []
+replaceBtns = []
 
 def doView(i):
     item = list[i]
@@ -86,12 +87,13 @@ def doUpdate(i):
         sz = round(os.path.getsize(path)/1024)
         statuses[i].config(text="{}K".format(sz))
 
-def clearRow(i):
-    labels[i].config(text="")
+def clearRow(i, what):
+    labels[i].config(text="** "+what+" **")
 
+# move video to _hq folder
 def doMove(i):
     item = list[i]
-    if item:
+    if item and not item.startswith("*"):
         itempath = os.path.join(originalsDir, item)
         dirPath = getDirPath(i)
         if dirPath:
@@ -99,22 +101,41 @@ def doMove(i):
             if not os.path.exists(hqPath):
                 os.mkdir(hqPath)
             str = entries[i].get()
+            # use name from std video file with -hq inserted
             name, ext = os.path.splitext(str)
-            newname = name + "_hq" + ext
+            # keep extension from hq video file
+            dummy, itemext = os.path.splitext(item)
+            newname = name + "-hq" + itemext
             destpath = os.path.join(hqPath, newname)
             print("moving {0} to {1}".format(itempath, destpath))
             os.rename(itempath, destpath)
-            clearRow(i)
+            clearRow(i, "moved")
 
+# move video to Deleted folder
 def doDelete(i):
     item = list[i]
-    if item:
+    if item and not item.startswith("*"):
         itempath = os.path.join(originalsDir, item)
         destpath = os.path.join(deletedDir, item)
         print("moving {0} to {1}".format(itempath, destpath))
         os.rename(itempath, destpath)
-        clearRow(i)
-    
+        clearRow(i, "deleted")
+
+# replace existing std video file
+def doReplace(i):
+    item = list[i]
+    if item and not item.startswith("*"):
+        itempath = os.path.join(originalsDir, item)
+        dirPath = getDirPath(i)
+        if dirPath:
+            str = entries[i].get()
+            destpath = os.path.join(dirPath, str)
+            print("removing {0}".format(destpath))
+            os.remove(destpath)
+            print("moving {0} to {1}".format(itempath, destpath))
+            os.rename(itempath, destpath)
+            clearRow(i, "replaced")
+
 for i, item in enumerate(list):
     label = ttk.Label(sframe, text=item)
     label.grid(row=i, column=0)
@@ -141,6 +162,9 @@ for i, item in enumerate(list):
     deleteBtn = ttk.Button(sframe, text="Delete", command=lambda i=i: doDelete(i))
     deleteBtn.grid(row=i, column=7)
     deleteBtns.append(deleteBtn)
+    replaceBtn = ttk.Button(sframe, text="Replace", command=lambda i=i: doReplace(i))
+    replaceBtn.grid(row=i, column=8)
+    replaceBtns.append(replaceBtn)
     
 
 frame.pack(fill="both", expand=True)
