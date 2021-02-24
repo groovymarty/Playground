@@ -1,4 +1,33 @@
-# find_files_by_content
+# vid_roundup
+
+# This is a one-time use program which I wrote to help me deal with a folder
+# of original video files.  My practice for a long time was to run video files
+# through Handbrake to make them smaller and always mp4, then copy to their
+# place in the Pictures folder structure.  This also resulted in their
+# being saved to Dropbox.
+
+# I saved the original video files in a folder called Originals, but
+# they were never backed up or put anywhere.  Then I added support for
+# "high quality" videos to the gvypics system.  The videos in the regular
+# folders are "standard quality" (compressed for web).  An optional _hq
+# folder can contain a "high quality" alternative file for each video.
+# The hq videos are not saved in Dropbox, but they are copied to the
+# Digital Ocean space (as are the regular video files).
+
+# Now I can do something with those original video files.
+# This program lists all the files in the Originals folder and gives options
+# for processing each one:
+
+# Move - Most of the original files are "straight from the camera" videos,
+# much larger than the compressed files.  These are moved to the _hq folder.
+
+# Delete - Some of the original files are very small videos saved from
+# a text message.  These are deleted.
+
+# Replace - In some cases the original videos were reasonably sized
+# mp4 files.  I should not have run these through Handbrake, so the
+# Replace button puts the original file in the picture folder.  There
+# is no hq file in this case.
 
 from os.path import dirname
 import sys, os, shutil, subprocess
