@@ -37,7 +37,7 @@ logit("DboxScan on " + time.strftime("%c"))
 def makedir(targpath):
     global mkdirs
     logit("Creating directory "+os.path.basename(targpath))
-    #addcmds.append('mkdir -p "c:'+targpath+'"')
+    #addcmds.append('mkdir -p "'+targpath+'"')
     os.makedirs(targpath)
     mkdirs += 1
     
@@ -48,12 +48,12 @@ def copyfile(srcpath, targpath, why):
         shutil.copyfile(srcpath, targpath)
         shutil.copystat(srcpath, targpath)
     else:
-        addcmds.append('cp -p "c:'+srcpath+'" "c:'+targpath+'"')
+        addcmds.append('cp -p "'+srcpath+'" "'+targpath+'"')
     numcopied += 1
 
 def targisnewer(srcpath, targpath):
     logit("Skipping "+os.path.basename(srcpath)+" because target file is newer")
-    newer.append('cp -p "c:' + srcpath + '" "c:' + targpath + '"')
+    newer.append('cp -p "' + srcpath + '" "' + targpath + '"')
     #newer.append(targpath)
     #shutil.copystat(srcpath, targpath)
 
@@ -108,7 +108,7 @@ def extrafile(targpath):
     if doDels:
         movetowaste(targpath)
     else:
-        delcmds.append('rm "c:'+targpath+'"')
+        delcmds.append('rm "'+targpath+'"')
     numfilerem += 1
 
 def extradir(targpath):
@@ -117,7 +117,7 @@ def extradir(targpath):
     if doDels:
         movetowaste(targpath)
     else:
-        delcmds.append('rm -rf "c:'+targpath+'"')
+        delcmds.append('rm -rf "'+targpath+'"')
     numdirrem += 1
 
 def scandir(srcdir, targdir, exclude=[]):
@@ -188,7 +188,7 @@ def finish():
     logit("{} bytes copied".format(totsize))
     logit("{} files removed".format(numfilerem))
     logit("{} directories removed".format(numdirrem))
-    logit("{} newer files skipped (see newer.txt)".format(len(newer)))
+    logit("{} newer files skipped (see newer.sh)".format(len(newer)))
             
     with open(os.path.join(myBaseDir, "addcmds.sh"), mode="w", encoding="utf-8") as f:
         for command in addcmds:
@@ -198,7 +198,7 @@ def finish():
         for command in delcmds:
             print(command, file=f)
             
-    with open(os.path.join(myBaseDir, "newer.txt"), mode="w", encoding="utf-8") as f:
+    with open(os.path.join(myBaseDir, "newer.sh"), mode="w", encoding="utf-8") as f:
         for fname in newer:
             print(fname, file=f)
 
