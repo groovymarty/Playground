@@ -62,16 +62,6 @@ root = Tk()
 frame = scrollableframe.ScrollableFrame(root)
 sframe = frame.scrollable_frame
 
-#frame.grid_columnconfigure(0, weight=1)
-#frame.grid_rowconfigure(0, weight=1)
-#delBtn = Button(root, text="Delete Found", command=do_delete)
-#delBtn.grid(row=0, column=0, sticky=(N,W))
-#text = Text(root)
-#text.grid(row=1, column=0, sticky=(N,S,W,E))
-#sb = Scrollbar(root, orient=VERTICAL, command=root.yview)
-#sb.grid(row=0, column=1, sticky=(N,S))
-#root['yscrollcommand'] = sb.set
-
 list = os.listdir(originalsDir)
 
 labels = []
@@ -83,6 +73,18 @@ moveBtns = []
 deleteBtns = []
 replaceBtns = []
 
+def findById(str):
+    parts = pic.parse_file(str)
+    if parts and parts.id:
+        dir = parts.parent + parts.child
+        dirPath = dirMap[dir]
+        if dirPath:
+            for item in os.listdir(dirPath):
+                itemParts = pic.parse_file(item)
+                if itemParts and itemParts.id == parts.id:
+                    return item
+    return ""
+
 def doView(i):
     item = list[i]
     itempath = os.path.join(originalsDir, item)
@@ -90,7 +92,7 @@ def doView(i):
 
 def getDirPath(i):
     str = entries[i].get()
-    parts = parts = pic.parse_file(str)
+    parts = pic.parse_file(str)
     if not parts or not parts.id:
         statuses[i].config(text="parse failed")
         return None
@@ -109,6 +111,12 @@ def getDirPath(i):
                 return dirPath
 
 def doUpdate(i):
+    str = entries[i].get()
+    if not str:
+        str = findById(list[i])
+        if str:
+            print("found {0}".format(str))
+            entries[i].insert(0, str)
     dirPath = getDirPath(i)
     if dirPath:
         str = entries[i].get()
@@ -133,9 +141,16 @@ def doMove(i):
             # use name from std video file with -hq inserted
             name, ext = os.path.splitext(str)
             # keep extension from hq video file
+            # but change mov to mp4
             dummy, itemext = os.path.splitext(item)
+            if itemext.lower().endswith("mov"):
+                print("changing extention to .mp4, was {0}".format(itemext))
+                itemext = ".mp4"
             newname = name + "-hq" + itemext
             destpath = os.path.join(hqPath, newname)
+            if os.path.exists(destpath):
+                print("deleting existing file {0}".format(destpath))
+                os.remove(destpath)
             print("moving {0} to {1}".format(itempath, destpath))
             os.rename(itempath, destpath)
             clearRow(i, "moved")
