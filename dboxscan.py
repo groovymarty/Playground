@@ -78,7 +78,7 @@ def skipfile(folder, fname, isSrc=True):
         return isSrc
     if "SlideShows" in folder:
         ext = os.path.splitext(fname)[1]
-        if ext == ".pxc" or ext == ".mov" or ext.startswith(".b"):
+        if ext == ".pxc" or ext == ".mov" or ext == ".avi" or ext.startswith(".b"):
             return isSrc
     if folder.endswith("Pictures"):
         if fname.endswith(".php"):
