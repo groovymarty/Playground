@@ -15,7 +15,7 @@ dirs_scanned = {}
 doAdds = True
 doDels = True
 
-myBaseDir = "C:\\DboxScan"
+myBaseDir = "D:\\DboxScan"
 wastebase = os.path.join(myBaseDir, "Deleted-Files")
 logPath = os.path.join(myBaseDir, "dboxscan.log")
 
@@ -87,6 +87,8 @@ def skipfile(folder, fname, isSrc=True):
 
 def movetowaste(targpath):
     (targdir, targname) = os.path.split(targpath)
+    if re.match(r"[A-Za-z]:", targdir):
+        targdir = targdir[2:]
     while targdir.startswith(os.sep):
         targdir = targdir[1:]
     wastepath = os.path.join(wastebase, targdir)
