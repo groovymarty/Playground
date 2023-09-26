@@ -51,7 +51,7 @@ def do_fix(export_arg):
             if clip_in.startswith("https://photos.google.com/share/"):
                 message = "Clipboard URL already fixed"
             else:
-                mr = re.match(r'https://photos.google.com/u/1/share/([A-Za-z0-9_-]+/photo/[A-Za-z0-9_-]+\?key=[A-Za-z0-9_-]+)', clip_in)
+                mr = re.match(r'https://photos.google.com/u/\d+/share/([A-Za-z0-9_-]+/photo/[A-Za-z0-9_-]+\?key=[A-Za-z0-9_-]+)', clip_in)
                 if mr and export_arg == "":
                     clip_out = "https://photos.google.com/share/" + mr.group(1)
     if clip_out:
