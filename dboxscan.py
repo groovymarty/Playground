@@ -7,6 +7,7 @@ numdirrem = 0
 addcmds = []
 delcmds = []
 newer = []
+newer_life = []
 totsize = 0
 sizelimit = 1000000000
 sizelimited = False
@@ -52,10 +53,18 @@ def copyfile(srcpath, targpath, why):
     numcopied += 1
 
 def targisnewer(srcpath, targpath):
-    logit("Skipping "+os.path.basename(srcpath)+" because target file is newer")
-    newer.append('cp -p "' + srcpath + '" "' + targpath + '"')
-    #newer.append(targpath)
-    #shutil.copystat(srcpath, targpath)
+    if os.path.join([Documents, Life]) in srcpath:
+        logit("Duplicating "+os.path.basename(srcpath)+" because target file is newer")
+        base, ext = os.path.splitext(srcpath)
+        srcpath = base + "-dropbox" + ext
+        shutil.copyfile(targpath, srcpath)
+        shutil.copystat(targpath, srcpath)
+        newer_life.append(srcpath)
+    else:
+        logit("Skipping "+os.path.basename(srcpath)+" because target file is newer")
+        newer.append('cp -p "' + srcpath + '" "' + targpath + '"')
+        #newer.append(targpath)
+        #shutil.copystat(srcpath, targpath)
 
 # usually we skip files and dirs only on the source side (local disk, not dropbox)
 # this way they'll be cleaned up (not skipped) if they show up on dropbox
@@ -191,6 +200,8 @@ def finish():
     logit("{} files removed".format(numfilerem))
     logit("{} directories removed".format(numdirrem))
     logit("{} newer files skipped (see newer.sh)".format(len(newer)))
+    for path in newer_life:
+        logit("*** Dropbox file is newer, please check: {}".format(path))
             
     with open(os.path.join(myBaseDir, "addcmds.sh"), mode="w", encoding="utf-8") as f:
         for command in addcmds:
