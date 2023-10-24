@@ -53,7 +53,7 @@ def copyfile(srcpath, targpath, why):
     numcopied += 1
 
 def targisnewer(srcpath, targpath):
-    if os.path.join([Documents, Life]) in srcpath:
+    if os.path.join("Documents", "Life") in srcpath:
         logit("Duplicating "+os.path.basename(srcpath)+" because target file is newer")
         base, ext = os.path.splitext(srcpath)
         srcpath = base + "-dropbox" + ext
