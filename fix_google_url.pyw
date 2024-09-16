@@ -27,6 +27,18 @@ clip_out_lab.pack(side=TOP, expand=True, ipady=10)
 # Change to:
 # https://photos.google.com/share/AF1QipO15a-JTXURdX2RmbWfz5JhOkMwcgrVB0d_pONYyDPKxZXwZbNYg_lMTzmDpafa1w/photo/AF1QipND79vwqKWgh7BrdW2HU2JLgbZLjkr9UTFD15nw?key=elFDckZLZkpFQU45NTlRWm5YMERSQ3E3blAtZHdB
 
+# KS iTunes Example:
+# "D:\Users\msaus\Music\iTunes\iTunes Media\Music\The Kent Singers\Handel_ Messiah (Kent Singers 2022)\1-01 Mendelssohn_ He Watching Over I.m4a"
+
+# Change to:
+# "https://kentsingers.com/audio/Handel_ Messiah (Kent Singers 2022)/1-01 Mendelssohn_ He Watching Over I.m4a"
+
+# KS Pictures Example:
+# "D:\Users\msaus\Pictures\KS Kent Singers\KS+01 Artwork & Graphics\KS+01-0130-rose-in-winter-AQ-original.jpg"
+
+# Change to:
+# "https://kentsingers.com/pictures/KS+01-0130-rose-in-winter-AQ-original.jpg"
+
 def do_fix(export_arg):
     try:
         clip_in = root.clipboard_get()
@@ -54,6 +66,14 @@ def do_fix(export_arg):
                 mr = re.match(r'https://photos.google.com/u/\d+/share/([A-Za-z0-9_-]+/photo/[A-Za-z0-9_-]+\?key=[A-Za-z0-9_-]+)', clip_in)
                 if mr and export_arg == "":
                     clip_out = "https://photos.google.com/share/" + mr.group(1)
+                else:
+                    mr = re.match(r'.*\\Music\\iTunes\\iTunes Media\\Music\\The Kent Singers\\(.*)?"', clip_in)
+                    if mr and export_arg == "":
+                        clip_out = "https://kentsingers.com/audio/" + mr.group(1).replace('\\', '/').replace('#', '')
+                    else:
+                        mr = re.match(r'.*\\Pictures\\.*\\([ A-Za-z0-9_,.+-]+)?"', clip_in)
+                        if mr and export_arg == "":
+                            clip_out = "https://kentsingers.com/pictures/" + mr.group(1).replace('+', '%2b')
     if clip_out:
         clip_out_lab.config(text=clip_out, background="lime")
         root.clipboard_clear()
@@ -75,6 +95,16 @@ cxButton.pack(side=LEFT, fill=X, expand=True, ipady=10)
 def fix_photo():
     do_fix("")
 cxButton = ttk.Button(root, text="Google Photo", command=fix_photo)
+cxButton.pack(side=LEFT, fill=X, expand=True, ipady=10)
+
+def fix_KS_iTunes():
+    do_fix("")
+cxButton = ttk.Button(root, text="KS iTunes", command=fix_KS_iTunes)
+cxButton.pack(side=LEFT, fill=X, expand=True, ipady=10)
+
+def fix_KS_picture():
+    do_fix("")
+cxButton = ttk.Button(root, text="KS Picture", command=fix_KS_picture)
 cxButton.pack(side=LEFT, fill=X, expand=True, ipady=10)
 
 def on_exit():
