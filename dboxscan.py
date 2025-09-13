@@ -80,12 +80,14 @@ def skipdir(folder, dname, isSrc=True):
             return isSrc
     if dname == ".git" or dname == "__pycache__" or dname == "node_modules" or dname == "cache" or dname == "_hq":
         return isSrc
+    if "Photopia Slide Shows" in folder and dname == "Data":
+        return isSrc
     return False
 
 def skipfile(folder, fname, isSrc=True):
     if fname == "desktop.ini" or fname == "Thumbs.db":
         return isSrc
-    if "SlideShows" in folder:
+    if "SlideShows" in folder or "Slide Shows" in folder:
         ext = os.path.splitext(fname)[1]
         if ext == ".pxc" or ext == ".mov" or ext == ".avi" or ext == ".mp4" or ext == ".iso" or ext.startswith(".b"):
             return isSrc
