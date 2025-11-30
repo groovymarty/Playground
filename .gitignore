@@ -70,3 +70,6 @@ target/
 
 # JetBrains
 .idea/workspace.xml
+
+# Virtual environment
+.venv
