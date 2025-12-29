@@ -30,7 +30,7 @@ nDeleted = 0
 for item in os.listdir(compileDir):
     name, ext = os.path.splitext(item)
     ext = ext.lower()
-    if ext == ".jpg" or ext == ".jpeg" or ext == ".lnk":
+    if ext == ".jpg" or ext == ".jpeg" or ext == ".lnk" or ext == ".png":
         if name not in contents['pictures']:
             contents['pictures'].append(name)
             nAdded += 1
