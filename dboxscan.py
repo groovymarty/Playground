@@ -87,7 +87,7 @@ def skipdir(folder, dname, isSrc=True):
 def skipfile(folder, fname, isSrc=True):
     if fname == "desktop.ini" or fname == "Thumbs.db":
         return isSrc
-    if "SlideShows" in folder or "Slide Shows" in folder:
+    if "SlideShows" in folder or "Photopia" in folder:
         ext = os.path.splitext(fname)[1]
         if ext == ".pxc" or ext == ".mov" or ext == ".avi" or ext == ".mp4" or ext == ".iso" or ext.startswith(".b"):
             return isSrc
