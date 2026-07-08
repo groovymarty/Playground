@@ -95,6 +95,7 @@ def print_report(cd_root: Path, db_path: Path, show_match_path: bool = False):
     matched_files = 0
     missing_files = 0
     error_files = 0
+    not_found_files = []
 
     for file_path in scan_files(cd_root):
         try:
@@ -134,6 +135,7 @@ def print_report(cd_root: Path, db_path: Path, show_match_path: bool = False):
             else:
                 missing_files += 1
                 notation = "**NOT FOUND**"
+                not_found_files.append(file_path)
 
             print(f"    {filename}    {notation}")
 
@@ -152,6 +154,9 @@ def print_report(cd_root: Path, db_path: Path, show_match_path: bool = False):
     print(f"Not found:           {missing_files}")
     print(f"Errors:              {error_files}")
 
+    with open(db_path.parent / "not_found_files.txt", mode="w", encoding="utf-8") as f:
+        for fname in not_found_files:
+            print(fname, file=f)
 
 def main():
     parser = argparse.ArgumentParser(

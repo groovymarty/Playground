@@ -76,3 +76,7 @@ target/
 
 # Databases
 *.sqlite
+
+# Generated report output files
+photo_consolidation_report.txt
+not_found_files.txt
