@@ -46,36 +46,38 @@ def trim_transparent_to_size(input_file, output_file, target_w, target_h):
     while bottom - top > target_h and row_is_fully_transparent(bottom - 1):
         bottom -= 1
 
-    # If still slightly too large, trim the least-black / most-transparent edge.
-    # If equal score, alternate sides
-    last_edge_trimmed = ""
-    if right - left <= target_w + MAX_EXTRA_PIXELS:
-        while right - left > target_w:
-            left_score = col_score(left)
-            right_score = col_score(right - 1)
+    # If target size is zero then only trim fully transparent edges, else keep going
+    if target_w > 0 and target_h > 0:
+        # If still slightly too large, trim the least-black / most-transparent edge.
+        # If equal score, alternate sides
+        last_edge_trimmed = ""
+        if right - left <= target_w + MAX_EXTRA_PIXELS:
+            while right - left > target_w:
+                left_score = col_score(left)
+                right_score = col_score(right - 1)
 
-            if left_score < right_score or (left_score == right_score and last_edge_trimmed == "right"):
-                left += 1
-                last_edge_trimmed = "left"
-            else:
-                right -= 1
-                last_edge_trimmed = "right"
+                if left_score < right_score or (left_score == right_score and last_edge_trimmed == "right"):
+                    left += 1
+                    last_edge_trimmed = "left"
+                else:
+                    right -= 1
+                    last_edge_trimmed = "right"
 
-    if bottom - top <= target_h + MAX_EXTRA_PIXELS:
-        while bottom - top > target_h:
-            top_score = row_score(top)
-            bottom_score = row_score(bottom - 1)
+        if bottom - top <= target_h + MAX_EXTRA_PIXELS:
+            while bottom - top > target_h:
+                top_score = row_score(top)
+                bottom_score = row_score(bottom - 1)
 
-            if top_score < bottom_score or (top_score == bottom_score and last_edge_trimmed == "bottom"):
-                top += 1
-                last_edge_trimmed = "top"
-            else:
-                bottom -= 1
-                last_edge_trimmed = "bottom"
+                if top_score < bottom_score or (top_score == bottom_score and last_edge_trimmed == "bottom"):
+                    top += 1
+                    last_edge_trimmed = "top"
+                else:
+                    bottom -= 1
+                    last_edge_trimmed = "bottom"
 
     cropped = img.crop((left, top, right, bottom))
 
-    if cropped.size != (target_w, target_h):
+    if target_w > 0 and target_h > 0 and cropped.size != (target_w, target_h):
         raise ValueError(f"Could not reach exact target size. Got {cropped.size}, target {(target_w, target_h)}")
 
     # retain same DPI as original, default to 300
