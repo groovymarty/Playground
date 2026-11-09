@@ -5,7 +5,7 @@ import tkinter
 from tkinter import filedialog, messagebox
 from trim_to_size import trim_transparent_to_size
 
-docs_dir ="C:\\Users\\Msaus\\Documents"
+docs_dir ="D:\\Users\\Msaus\\Documents"
 
 root = tkinter.Tk()
 root.withdraw()
