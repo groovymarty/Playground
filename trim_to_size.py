@@ -2,6 +2,19 @@ from PIL import Image
 import sys
 
 MAX_EXTRA_PIXELS = 6
+SUPPORTED_AD_SIZES = ((1125, 1000), (1125, 600), (600, 1125))
+
+
+def detect_target_size(width, height):
+    """Choose the supported ad size closest to the input pixel dimensions.
+
+    Orientation matters: width and height are compared separately. The
+    trimming function still validates that the chosen size can be reached.
+    """
+    return min(
+        SUPPORTED_AD_SIZES,
+        key=lambda size: (width - size[0]) ** 2 + (height - size[1]) ** 2,
+    )
 
 def edge_score_rgba(pixel):
     r, g, b, a = pixel
@@ -14,9 +27,15 @@ def edge_score_rgba(pixel):
     # Higher score = less desirable to trim.
     return a + r + g + b
 
-def trim_transparent_to_size(input_file, output_file, target_w, target_h):
-    img = Image.open(input_file).convert("RGBA")
+def trim_transparent_to_size(input_file, output_file, target_w=None, target_h=None):
+    with Image.open(input_file) as source:
+        img = source.convert("RGBA")
     w, h = img.size
+
+    if target_w is None and target_h is None:
+        target_w, target_h = detect_target_size(w, h)
+    elif target_w is None or target_h is None:
+        raise ValueError("Provide both target width and height, or neither for automatic detection")
 
     if w < target_w or h < target_h:
         raise ValueError(f"Image is smaller than target: {w}x{h}, target {target_w}x{target_h}")
@@ -84,6 +103,7 @@ def trim_transparent_to_size(input_file, output_file, target_w, target_h):
     dpi = img.info.get("dpi", (300, 300))
     cropped.save(output_file, dpi=dpi)
     print(f"Saved {output_file}: {cropped.size[0]}x{cropped.size[1]}")
+    return cropped.size
 
 if __name__ == "__main__":
     if len(sys.argv) != 5:
