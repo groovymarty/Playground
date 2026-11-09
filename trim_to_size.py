@@ -3,16 +3,29 @@ import sys
 
 MAX_EXTRA_PIXELS = 6
 SUPPORTED_AD_SIZES = ((1125, 1000), (1125, 600), (600, 1125))
+TARGET_SIZE_TOLERANCE = 0.10
 
 
 def detect_target_size(width, height):
-    """Choose the supported ad size closest to the input pixel dimensions.
+    """Choose the closest supported size within 10% on both dimensions.
 
     Orientation matters: width and height are compared separately. The
     trimming function still validates that the chosen size can be reached.
     """
+    candidates = [
+        size for size in SUPPORTED_AD_SIZES
+        if abs(width - size[0]) <= size[0] * TARGET_SIZE_TOLERANCE
+        and abs(height - size[1]) <= size[1] * TARGET_SIZE_TOLERANCE
+    ]
+    if not candidates:
+        supported = ", ".join(f"{w}x{h}" for w, h in SUPPORTED_AD_SIZES)
+        raise ValueError(
+            f"Image size {width}x{height} is not within "
+            f"{TARGET_SIZE_TOLERANCE:.0%} of any supported size: {supported}. "
+            "Both width and height must be within tolerance. No changes were saved."
+        )
     return min(
-        SUPPORTED_AD_SIZES,
+        candidates,
         key=lambda size: (width - size[0]) ** 2 + (height - size[1]) ** 2,
     )
 
