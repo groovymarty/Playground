@@ -2,8 +2,8 @@ from PIL import Image
 import sys
 
 MAX_EXTRA_PIXELS = 6
-SUPPORTED_AD_SIZES = ((1125, 1000), (1125, 600), (600, 1125))
-TARGET_SIZE_TOLERANCE = 0.10
+SUPPORTED_AD_SIZES = ((1125, 600), (650, 975), (1125, 1000), (2100, 2100))
+TARGET_SIZE_TOLERANCE = 0.20
 
 
 def detect_target_size(width, height):
